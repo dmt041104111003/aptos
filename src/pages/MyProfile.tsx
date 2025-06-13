@@ -85,6 +85,7 @@ export default function MyProfile() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1); // Thêm state cho trang hiện tại
   const itemsPerPage = 3; // Số mục mỗi trang
+  const [ipfsError, setIpfsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -130,29 +131,47 @@ export default function MyProfile() {
         const cccdData = profileDataFromChain.cccd;
         const didData = profileDataFromChain.did;
 
-        if (!profileCID) {
-          console.log("MyProfile: Profile CID is empty.");
-          throw new Error("Profile not registered: CID is empty.");
-        }
-
-        console.log("MyProfile: Fetching profile data from IPFS using CID:", profileCID);
-        const url = convertIPFSURL(profileCID);
-        const response = await fetch(url);
-        const text = await response.text();
-        if (!response.ok || text.startsWith("<!DOCTYPE")) {
-          console.error(`MyProfile: IPFS fetch failed: ${response.status} - ${text.slice(0, 50)}...`);
-          throw new Error(`IPFS fetch failed: ${text.slice(0, 50)}...`);
-        }
-        const profileData = JSON.parse(text);
-        console.log("MyProfile: Profile data from IPFS:", profileData);
-        setProfile({
-          ...profileData,
+        // Populate basic profile data from chain first
+        setProfile(prev => ({
+          ...prev,
           cccd: cccdData,
           did: didData,
-        });
-        console.log("MyProfile: Profile set successfully.");
+          wallet: account, // Ensure wallet is set
+        }));
+
+        if (!profileCID) {
+          console.log("MyProfile: Profile CID is empty. Cannot fetch from IPFS.");
+          setIpfsError("Không có CID. Dữ liệu chi tiết hồ sơ không khả dụng từ IPFS."); // Set a specific IPFS error
+        } else {
+          try {
+            console.log("MyProfile: Fetching profile data from IPFS using CID:", profileCID);
+            const url = convertIPFSURL(profileCID);
+            const response = await fetch(url);
+            const text = await response.text();
+            if (!response.ok || text.startsWith("<!DOCTYPE")) {
+              console.error(`MyProfile: IPFS fetch failed: ${response.status} - ${text.slice(0, 50)}...`);
+              throw new Error(`IPFS fetch failed: ${response.status} - ${text.slice(0, 50)}...`);
+            }
+            const profileData = JSON.parse(text);
+            console.log("MyProfile: Profile data from IPFS:", profileData);
+            setProfile(prev => ({
+              ...prev,
+              ...profileData, // Merge with existing blockchain data
+              // Ensure these are from chain, not overwritten by IPFS data if IPFS is outdated
+              cccd: cccdData,
+              did: didData,
+              wallet: account,
+            }));
+            setIpfsError(null); // Clear any previous IPFS errors
+            console.log("MyProfile: Profile set successfully (with IPFS data).");
+          } catch (ipfsErr: any) {
+            console.error("MyProfile: Lỗi khi tải dữ liệu từ IPFS:", ipfsErr);
+            setIpfsError(`Đã xảy ra lỗi khi tải dữ liệu chi tiết hồ sơ từ IPFS: ${ipfsErr.message || String(ipfsErr)}. Có thể do lỗi mạng hoặc dữ liệu không còn khả dụng.`);
+            console.log("MyProfile: Continuing with blockchain-only profile data due to IPFS error.");
+          }
+        }
       } catch (err: any) {
-        console.error("MyProfile: Lỗi khi tải hồ sơ tổng thể:", err);
+        console.error("MyProfile: Lỗi khi tải hồ sơ tổng thể từ blockchain (Resource/TableItem not found):", err);
         if (
           err.toString().includes("Profile not registered") ||
           err.toString().includes("TableItemNotFound") ||
@@ -161,7 +180,7 @@ export default function MyProfile() {
           err.message.includes("CID is empty") // Thêm lỗi CID rỗng
         ) {
           setError("PROFILE_NOT_FOUND");
-          console.log("MyProfile: Setting error to PROFILE_NOT_FOUND.");
+          console.log("MyProfile: Setting error to PROFILE_NOT_FOUND (blockchain level).");
           return;
         }
         setError("Đã xảy ra lỗi khi tải hồ sơ. Vui lòng thử lại.");
@@ -346,6 +365,12 @@ export default function MyProfile() {
                     <span className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
                       Ví: {profile.wallet.slice(0, 6)}...{profile.wallet.slice(-4)}
                     </span>
+                    {ipfsError && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-red-500/20 text-red-400 rounded-lg text-xs w-full justify-center font-primary break-words break-all">
+                        <AlertCircle size={16} />
+                        <span>{ipfsError}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-3 mt-4 justify-center">
                     {profile.social.github && (
