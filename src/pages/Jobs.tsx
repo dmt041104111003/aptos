@@ -360,7 +360,7 @@ const Jobs = () => {
       });
 
       toast.success('Đơn ứng tuyển của bạn đã được gửi thành công!');
-      setApplyDialogOpen(false);
+    setApplyDialogOpen(false);
       loadJobs(); // Re-load jobs to reflect changes
 
       // No navigation needed as per new requirements, just update state/UI
@@ -528,7 +528,7 @@ const Jobs = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
-
+      
       <section ref={heroRef} className="relative py-20 bg-gradient-to-br from-blue-900/20 via-violet-900/30 to-black">
         <div className="absolute inset-0 bg-[url('/img/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">

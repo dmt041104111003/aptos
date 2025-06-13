@@ -62,35 +62,37 @@ const Dashboard = () => {
 
     setLoading(true);
     setError(null);
+    console.log("Dashboard: Loading user jobs...");
     try {
       const fetchedInProgressJobs: JobPost[] = [];
       const fetchedCompletedJobs: JobPost[] = [];
 
+      console.log("Dashboard: Fetching Events resource...");
       const eventsResource = await aptos.getAccountResource({
         accountAddress: CONTRACT_ADDRESS,
         resourceType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Events`,
       });
 
       if (!eventsResource || !(eventsResource as any).post_event?.guid?.id) {
-        console.warn("JobPostedEvent handle not found or marketplace not initialized.");
+        console.warn("Dashboard: JobPostedEvent handle not found or marketplace not initialized.");
         setLoading(false);
         return;
       }
+      console.log("Dashboard: Events resource found.", eventsResource);
 
-      // Lấy tất cả JobPostedEvent
+      console.log("Dashboard: Fetching all JobPostedEvent...");
       const rawPostedEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
         options: {
-          limit: 100, // Fetch a reasonable number of recent events
+          limit: 100,
         }
       });
+      console.log("Dashboard: Fetched raw JobPostedEvents:", rawPostedEvents);
 
       const allJobIds = new Set(rawPostedEvents.map((e: any) => e.data.job_id.toString()));
-      const jobDetailsMap = new Map<string, JobPost>();
-      const uniqueAddresses = new Set<string>();
+      const jobDetailsMap = new Map<string, any>();
 
       for (const event of rawPostedEvents) {
-        uniqueAddresses.add(event.data.poster);
         const jobCid = event.data.cid;
         if (jobCid) {
           try {
@@ -101,79 +103,80 @@ const Dashboard = () => {
             
             if (!response.ok) {
               const errorText = await response.text();
-              console.error(`IPFS fetch failed for CID ${jobCid}. Status: ${response.status}. Response text: ${errorText.slice(0, 500)}`);
+              console.error(`Dashboard: IPFS fetch failed for CID ${jobCid}. Status: ${response.status}. Response text: ${errorText.slice(0, 500)}`);
               continue; // Skip this job if HTTP response is not OK
             }
 
             if (!contentType || !contentType.includes('application/json')) {
               const errorText = await response.text();
-              console.warn(`IPFS response for CID ${jobCid} is not JSON. Content-Type: ${contentType}. Response text: ${errorText.slice(0, 500)}`);
+              console.warn(`Dashboard: IPFS response for CID ${jobCid} is not JSON. Content-Type: ${contentType}. Response text: ${errorText.slice(0, 500)}`);
               continue; // Skip if content type is not JSON
             }
 
             let jobDataFromIPFS: any;
             try {
-              jobDataFromIPFS = await response.json(); // Attempt to parse JSON
+              jobDataFromIPFS = await response.json();
             } catch (jsonError) {
               const errorText = await response.text();
-              console.error(`Failed to parse JSON for CID ${jobCid}. Error: ${jsonError}. Raw response: ${errorText.slice(0, 500)}`);
+              console.error(`Dashboard: Failed to parse JSON for CID ${jobCid}. Error: ${jsonError}. Raw response: ${errorText.slice(0, 500)}`);
               continue; // Skip if JSON parsing fails
             }
-            // Temporarily store IPFS data with job_id
             jobDetailsMap.set(event.data.job_id.toString(), jobDataFromIPFS);
           } catch (ipfsError) {
-            console.error(`Error fetching IPFS data for job ${event.data.job_id}:`, ipfsError);
+            console.error(`Dashboard: Error fetching IPFS data for job ${event.data.job_id}:`, ipfsError);
           }
         }
       }
-      
-      // Batch fetch profile details for all posters and workers
-      const profileDetailsCache = new Map<string, { name: string; avatar: string }>();
-      await Promise.all(Array.from(uniqueAddresses).map(async (address) => {
-        const profile = await fetchProfileDetails(address);
-        profileDetailsCache.set(address, profile);
-      }));
 
-      // Fetch on-chain Job resources
+      console.log("Dashboard: Fetching on-chain Jobs resource...");
       const jobsResource = await aptos.getAccountResource({
         accountAddress: MODULE_ADDRESS,
         resourceType: `${MODULE_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Jobs`,
       });
 
       if (!jobsResource || !(jobsResource as any).jobs?.handle) {
-        console.warn("Jobs resource not found or marketplace not initialized.");
+        console.warn("Dashboard: Jobs resource not found or marketplace not initialized.");
         setLoading(false);
         return;
       }
       const jobsTableHandle = (jobsResource as any).jobs.handle;
+      console.log("Dashboard: Jobs resource found. Table handle:", jobsTableHandle);
 
       for (const jobId of Array.from(allJobIds)) {
         try {
+          console.log(`Dashboard: Fetching on-chain data for job ID: ${jobId}`);
           let jobOnChain: any = null;
-          if (jobsResource && (jobsResource as any).jobs?.handle) {
-            try {
-              jobOnChain = await aptos.getTableItem<any>({
-                handle: (jobsResource as any).jobs.handle,
-                data: {
-                  key_type: "u64",
-                  value_type: `${MODULE_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Job`,
-                  key: jobId,
-                },
-              });
-            } catch (tableError) {
-              console.warn(`Job ${jobId} not found in Jobs table, may be completed or cancelled:`, tableError);
-              continue; // Skip if job is not found in the active table
-            }
+          try {
+            jobOnChain = await aptos.getTableItem<any>({
+              handle: jobsTableHandle,
+              data: {
+                key_type: "u64",
+                value_type: `${MODULE_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Job`,
+                key: jobId,
+              },
+            });
+            console.log(`Dashboard: On-chain job data for ${jobId}:`, jobOnChain);
+          } catch (tableError) {
+            console.warn(`Dashboard: Job ${jobId} not found in Jobs table, may be completed or cancelled:`, tableError);
+            continue; // Skip if job is not found in the active table
           }
 
-          if (!jobOnChain) continue; // Skip if job resource is not found
+          if (!jobOnChain) {
+            console.warn(`Dashboard: No on-chain data found for job ${jobId}.`);
+            continue; // Skip if job resource is not found
+          }
         
           const jobDataFromIPFS: Record<string, any> = jobDetailsMap.get(jobId) || {};
-          const posterProfile = profileDetailsCache.get(jobOnChain.poster) || { name: "Người dùng ẩn danh", avatar: "" };
+          console.log(`Dashboard: IPFS data for job ${jobId}:`, jobDataFromIPFS);
 
-          // Populate applications with profile data
+          // Fetch poster profile details using aptosUtils.ts (which has caching)
+          const posterProfile = await fetchProfileDetails(jobOnChain.poster);
+          console.log(`Dashboard: Poster profile for ${jobOnChain.poster}:`, posterProfile);
+
+          // Populate applications with profile data using aptosUtils.ts (which has caching)
           const applicationsWithProfiles = await Promise.all(jobOnChain.applications.map(async (app: any) => {
-            const workerProfile = profileDetailsCache.get(app.worker) || await fetchProfileDetails(app.worker); // Fetch if not already cached
+            const workerProfile = await fetchProfileDetails(app.worker);
+            console.log(`Dashboard: Worker profile for application ${app.worker}:`, workerProfile);
             return {
               ...app,
               workerProfileName: workerProfile.name,
@@ -200,7 +203,7 @@ const Dashboard = () => {
             poster: jobOnChain.poster,
             posterProfile: jobDataFromIPFS.posterProfile || "",
             postedAt: new Date(Number(jobOnChain.start_time) * 1000).toISOString(),
-            initialFundAmount: Number(jobOnChain.escrowed_amount || 0), // Initial fund is the escrowed amount upon posting
+            initialFundAmount: Number(jobOnChain.escrowed_amount || 0),
             client: {
               id: jobOnChain.poster,
               name: posterProfile.name,
@@ -208,8 +211,8 @@ const Dashboard = () => {
             },
             start_time: Number(jobOnChain.start_time),
             end_time: Number(jobOnChain.end_time || 0),
-            milestones: jobOnChain.milestones.map(Number),
-            duration_per_milestone: jobOnChain.duration_per_milestone.map(Number),
+            milestones: jobOnChain.milestones ? jobOnChain.milestones.map(Number) : [],
+            duration_per_milestone: jobOnChain.duration_per_milestone ? jobOnChain.duration_per_milestone.map(Number) : [],
             worker: jobOnChain.worker,
             approved: jobOnChain.approved,
             active: jobOnChain.active,
@@ -234,8 +237,8 @@ const Dashboard = () => {
             completed: jobOnChain.completed,
             rejected_count: Number(jobOnChain.rejected_count),
             job_expired: jobOnChain.job_expired,
-            auto_confirmed: jobOnChain.auto_confirmed,
-            milestone_deadlines: jobOnChain.milestone_deadlines.map(Number),
+            auto_confirmed: jobOnChain.auto_confirmed ? jobOnChain.auto_confirmed : [],
+            milestone_deadlines: jobOnChain.milestone_deadlines ? jobOnChain.milestone_deadlines.map(Number) : [],
             application_deadline: Number(jobOnChain.application_deadline),
             selected_application_index: jobOnChain.selected_application_index ? Number(jobOnChain.selected_application_index) : null,
             last_reject_time: jobOnChain.last_reject_time ? Number(jobOnChain.last_reject_time) : null,
@@ -243,28 +246,33 @@ const Dashboard = () => {
 
           const userAddress = account.toLowerCase();
           const isPoster = jobPost.poster.toLowerCase() === userAddress;
-          const isWorker = jobPost.worker?.toLowerCase() === userAddress;
-          const isApplicant = jobPost.applications.some(app => app.worker.toLowerCase() === userAddress);
+          const isWorker = jobPost.worker && jobPost.worker.toLowerCase() === userAddress;
+          const isApplicant = jobPost.applications.some(app => app.worker && app.worker.toLowerCase() === userAddress);
+          console.log(`Dashboard: Job ${jobId} - isPoster: ${isPoster}, isWorker: ${isWorker}, isApplicant: ${isApplicant}`);
 
           if (isPoster || isWorker || isApplicant) {
             if (jobPost.completed || jobPost.job_expired || !jobPost.active) {
               fetchedCompletedJobs.push(jobPost);
+              console.log(`Dashboard: Job ${jobId} pushed to completed jobs.`);
             } else {
               fetchedInProgressJobs.push(jobPost);
+              console.log(`Dashboard: Job ${jobId} pushed to in-progress jobs.`);
             }
           }
 
         } catch (jobFetchError) {
-          console.error(`Error fetching on-chain data for job ${jobId}:`, jobFetchError);
+          console.error(`Dashboard: Error fetching on-chain data for job ${jobId}:`, jobFetchError);
         }
       }
 
+      console.log("Dashboard: Final inProgressJobs:", fetchedInProgressJobs);
+      console.log("Dashboard: Final completedJobs:", fetchedCompletedJobs);
       setInProgressJobs(fetchedInProgressJobs);
       setCompletedJobs(fetchedCompletedJobs);
       setLoading(false);
 
     } catch (error: any) {
-      console.error("Failed to load user jobs:", error);
+      console.error("Dashboard: Failed to load user jobs:", error);
       setError(`Failed to load jobs: ${error.message || "Unknown error"}`);
       setLoading(false);
     }
@@ -492,15 +500,15 @@ const Dashboard = () => {
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-400">{inProgressJobs.length}</div>
               <div className="text-gray-400">Dự án đang tiến hành</div>
-            </div>
+              </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-violet-400">{completedJobs.length}</div>
               <div className="text-gray-400">Dự án đã hoàn thành</div>
-            </div>
+              </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-purple-400">24/7</div>
               <div className="text-gray-400">Hỗ trợ</div>
-            </div>
+              </div>
           </motion.div>
 
           <div className="flex border-b border-white/10 mb-8">
@@ -525,7 +533,7 @@ const Dashboard = () => {
               Đã hoàn thành
             </button>
           </div>
-
+          
           {loading && (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
@@ -551,10 +559,10 @@ const Dashboard = () => {
                   ) : (
                     <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
                       Bạn chưa có dự án nào đang tiến hành.
-                    </div>
+                  </div>
                   )}
-                </div>
-              )}
+            </div>
+          )}
 
               {activeTab === 'completed' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -565,7 +573,7 @@ const Dashboard = () => {
                       Bạn chưa có dự án nào đã hoàn thành.
                     </div>
                   )}
-                </div>
+                        </div>
               )}
             </motion.div>
           )}
