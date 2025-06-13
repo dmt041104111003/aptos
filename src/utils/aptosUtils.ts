@@ -15,9 +15,19 @@ export interface ProfileDataFromChain {
   created_at: number;
 }
 
-export const fetchProfileDetails = async (address: string): Promise<{ name: string; avatar: string }> => {
-  let name = "Người dùng ẩn danh";
+// Cache for profile details
+const profileCache = new Map<string, { name: string; avatar: string; did: string; profile_cid: string }>();
+
+export const fetchProfileDetails = async (address: string): Promise<{ name: string; avatar: string; did: string; profile_cid: string }> => {
+  if (profileCache.has(address)) {
+    return profileCache.get(address)!;
+  }
+
+  let name = "Ẩn danh";
   let avatar = "";
+  let did = "";
+  let profile_cid = "";
+
   try {
     const profileRegistryResource = await aptos.getAccountResource({
       accountAddress: MODULE_ADDRESS,
@@ -27,27 +37,54 @@ export const fetchProfileDetails = async (address: string): Promise<{ name: stri
     if (profileRegistryResource && (profileRegistryResource as any).profiles?.handle) {
       const profileTableHandle = (profileRegistryResource as any).profiles.handle;
 
-      const profileDataFromChain = await aptos.getTableItem({
+      const profileDataFromChain = await aptos.getTableItem<ProfileDataFromChain>({
         handle: profileTableHandle,
         data: {
           key_type: "address",
           value_type: `${MODULE_ADDRESS}::${PROFILE_MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`,
           key: address,
         },
-      }) as ProfileDataFromChain;
+      });
 
-      if (profileDataFromChain.cid) {
-        const profileJsonUrl = convertIPFSURL(profileDataFromChain.cid);
+      profile_cid = profileDataFromChain.cid;
+      did = profileDataFromChain.did;
+
+      if (profile_cid) {
+        const profileJsonUrl = convertIPFSURL(profile_cid);
         const response = await fetch(profileJsonUrl);
-        if (response.ok) {
-          const profileJson = await response.json();
-          name = profileJson.name || "Người dùng ẩn danh";
-          avatar = profileJson.profilePic || "";
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`IPFS fetch failed for CID ${profile_cid}. Status: ${response.status}. Response text: ${errorText.slice(0, 500)}`);
+          // If IPFS fetch fails, still use blockchain DID if available
+          const cachedResult: { name: string; avatar: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, avatar: "", did, profile_cid };
+          profileCache.set(address, cachedResult);
+          return cachedResult;
         }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const errorText = await response.text();
+          console.warn(`IPFS response for CID ${profile_cid} is not JSON. Content-Type: ${contentType}. Response text: ${errorText.slice(0, 500)}`);
+          const cachedResult: { name: string; avatar: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, avatar: "", did, profile_cid };
+          profileCache.set(address, cachedResult);
+          return cachedResult;
+        }
+
+        const profileJson = await response.json();
+        name = profileJson.name || `Người dùng ${address.slice(0, 6)}...`;
+        avatar = profileJson.profilePic || "";
       }
     }
-  } catch (profileError) {
+  } catch (profileError: any) {
     console.warn(`Could not fetch profile for ${address}:`, profileError);
+    // If fetching from chain fails, return a default anonymous profile
+    const cachedResult: { name: string; avatar: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, avatar: "", did: "", profile_cid: "" };
+    profileCache.set(address, cachedResult);
+    return cachedResult;
   }
-  return { name, avatar };
+
+  const result = { name, avatar, did, profile_cid };
+  profileCache.set(address, result);
+  return result;
 }; 
