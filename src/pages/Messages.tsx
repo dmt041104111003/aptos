@@ -30,77 +30,93 @@ const Messages = () => {
   const [conversations, setConversations] = useState<Conversation[]>([
     {
       id: '1',
-      participantId: '1',
-      lastMessagePreview: 'Hi there! I saw your profile and would like to discuss the NFT marketplace project.',
+      participantId: 'client1',
+      lastMessagePreview: 'Công ty chúng tôi đang tìm kiếm nhà phát triển hợp đồng thông minh.',
       unread: 2,
-      lastMessageTime: '2h ago',
+      lastMessageTime: '2 giờ trước',
     },
     {
       id: '2',
-      participantId: '2',
-      lastMessagePreview: 'Thanks for accepting! When can we schedule a call to discuss the details?',
+      participantId: 'client2',
+      lastMessagePreview: 'Cảm ơn đã chấp nhận đề xuất! Khi nào chúng ta có thể gọi điện?',
       unread: 0,
-      lastMessageTime: '1d ago',
+      lastMessageTime: '1 ngày trước',
     },
     {
       id: '3',
-      participantId: '3',
-      lastMessagePreview: 'Contract proposal received. Would you be open to negotiating the timeline?',
+      participantId: 'client3',
+      lastMessagePreview: 'Đã nhận đề xuất. Chúng ta có thể thương lượng thêm về thời gian không?',
       unread: 1,
-      lastMessageTime: '3d ago',
+      lastMessageTime: '3 ngày trước',
     }
   ]);
 
-  const [messages, setMessages] = useState<{ [key: string]: Message[] }>({
-    '1': [
-      {
-        id: '1-1',
-        senderId: '1',
-        receiverId: 'me',
-        content: 'Hi there! I saw your profile and would like to discuss the NFT marketplace project.',
-        timestamp: '2023-04-24T10:30:00Z',
-      },
-      {
-        id: '1-2',
-        senderId: '1',
-        receiverId: 'me',
-        content: 'Do you have experience with ERC-721 and ERC-1155 standards?',
-        timestamp: '2023-04-24T10:32:00Z',
-      }
-    ],
-    '2': [
-      {
-        id: '2-1',
-        senderId: '2',
-        receiverId: 'me',
-        content: 'Hello! Thanks for accepting my job proposal.',
-        timestamp: '2023-04-23T09:15:00Z',
-      },
-      {
-        id: '2-2',
-        senderId: 'me',
-        receiverId: '2',
-        content: "No problem! I'm excited to work on this project.",
-        timestamp: '2023-04-23T09:20:00Z',
-      },
-      {
-        id: '2-3',
-        senderId: '2',
-        receiverId: 'me',
-        content: 'Thanks for accepting! When can we schedule a call to discuss the details?',
-        timestamp: '2023-04-23T09:25:00Z',
-      }
-    ],
-    '3': [
-      {
-        id: '3-1',
-        senderId: '3',
-        receiverId: 'me',
-        content: 'Contract proposal received. Would you be open to negotiating the timeline?',
-        timestamp: '2023-04-21T14:10:00Z',
-      }
-    ]
-  });
+  const [messages, setMessages] = useState<{ [key: string]: Message[] }>(
+    {
+      '1': [
+        {
+          id: '1-1',
+          senderId: 'client1',
+          receiverId: 'me',
+          content: 'Chào bạn! Công ty chúng tôi đang tìm kiếm một nhà phát triển hợp đồng thông minh cho dự án DeFi mới. Hồ sơ của bạn trông rất ấn tượng.',
+          timestamp: '2023-05-24T10:30:00Z',
+        },
+        {
+          id: '1-2',
+          senderId: 'me',
+          receiverId: 'client1',
+          content: 'Cảm ơn! Tôi rất quan tâm đến các dự án DeFi. Yêu cầu cụ thể của dự án là gì?',
+          timestamp: '2023-05-24T10:32:00Z',
+        },
+        {
+          id: '1-3',
+          senderId: 'client1',
+          receiverId: 'me',
+          content: 'Chúng tôi cần xây dựng một giao thức cho vay phi tập trung trên Aptos. Bạn có kinh nghiệm với các tiêu chuẩn Move và các giao thức như Lending/Borrowing không?',
+          timestamp: '2023-05-24T10:35:00Z',
+        }
+      ],
+      '2': [
+        {
+          id: '2-1',
+          senderId: 'client2',
+          receiverId: 'me',
+          content: 'Chào bạn, chúng tôi đã xem xét ứng tuyển của bạn cho vị trí phát triển frontend.',
+          timestamp: '2023-05-23T09:15:00Z',
+        },
+        {
+          id: '2-2',
+          senderId: 'me',
+          receiverId: 'client2',
+          content: "Chào bạn! Tôi có 3 năm kinh nghiệm với React và đã làm việc với Aptos SDK trong nhiều dự án. Tôi có thể chia sẻ các demo nếu cần.",
+          timestamp: '2023-05-23T09:20:00Z',
+        },
+        {
+          id: '2-3',
+          senderId: 'client2',
+          receiverId: 'me',
+          content: 'Tuyệt vời! Chúng ta có thể sắp xếp một cuộc gọi trong tuần này để thảo luận sâu hơn không?',
+          timestamp: '2023-05-23T09:25:00Z',
+        }
+      ],
+      '3': [
+        {
+          id: '3-1',
+          senderId: 'me',
+          receiverId: 'client3',
+          content: 'Tôi đã gửi đề xuất dự án cho vị trí quản lý cộng đồng. Bạn có thể xem xét và cho tôi phản hồi không?',
+          timestamp: '2023-05-21T14:10:00Z',
+        },
+        {
+          id: '3-2',
+          senderId: 'client3',
+          receiverId: 'me',
+          content: 'Đã nhận được đề xuất của bạn. Về ngân sách, chúng tôi có thể thảo luận thêm không?',
+          timestamp: '2023-05-21T14:15:00Z',
+        }
+      ]
+    }
+  );
 
   useEffect(() => {
     if (conversations.length > 0 && !activeConversation) {
@@ -127,7 +143,7 @@ const Messages = () => {
     setConversations(prev => 
       prev.map(conv => 
         conv.id === activeConversation 
-          ? { ...conv, lastMessagePreview: messageInput, lastMessageTime: 'Just now', unread: 0 } 
+          ? { ...conv, lastMessagePreview: messageInput, lastMessageTime: 'Vừa xong', unread: 0 } 
           : conv
       )
     );
@@ -137,11 +153,23 @@ const Messages = () => {
 
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Custom format to show just time if today, otherwise date
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString('vi-VN'); // Vietnamese date format
+    }
   };
 
   const getParticipant = (participantId: string) => {
-    return mockClients.find(client => client.id === participantId) || null;
+    // Assuming mockClients needs to be updated to match client1, client2, client3
+    const updatedMockClients = [
+        { id: 'client1', name: 'Công ty A', avatar: '/img/client-a.png', lensHandle: '@congtyA' },
+        { id: 'client2', name: 'Dự án Blockchain XYZ', avatar: '/img/client-b.png', lensHandle: '@duanXYZ' },
+        { id: 'client3', name: 'Tổ chức Web3 Talent', avatar: '/img/client-c.png', lensHandle: '@web3talent' },
+    ];
+    return updatedMockClients.find(client => client.id === participantId) || null;
   };
 
   const handleConversationSelect = (conversationId: string) => {
@@ -252,37 +280,31 @@ const Messages = () => {
                       ))}
                     </div>
                     {/* Message Input */}
-                    <div className="p-4 border-t border-white/10 bg-black/40">
-                      <div className="flex space-x-3">
-                        <Input
-                          placeholder="Nhập tin nhắn..."
-                          value={messageInput}
-                          onChange={(e) => setMessageInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSendMessage();
-                            }
-                          }}
-                          className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-gray-400 h-12 rounded-xl focus:border-blue-500/50 focus:ring-blue-500/20 font-primary"
-                        />
-                        <Button 
-                          onClick={handleSendMessage}
-                          className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white font-semibold px-6 rounded-xl transition-all duration-300 font-primary"
-                        >
-                          Gửi
-                        </Button>
-                      </div>
+                    <div className="p-4 border-t border-white/10 bg-gray-900/50 flex items-center gap-3">
+                      <Input
+                        type="text"
+                        placeholder="Nhập tin nhắn..." 
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSendMessage();
+                          }
+                        }}
+                        className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-blue-500/20"
+                      />
+                      <Button
+                        onClick={handleSendMessage}
+                        className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white"
+                      >
+                        Gửi
+                      </Button>
                     </div>
                   </>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-br from-gray-900/30 to-black/10">
-                    <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mb-6 shadow-xl animate-pulse-glow">
-                      <MessageCircle className="h-10 w-10 text-white" />
-                    </div>
-                    <h3 className="text-xl font-heading font-bold mb-3 text-blue-400">Tin nhắn của bạn</h3>
-                    <p className="text-gray-400 leading-relaxed max-w-xs font-primary">
-                      Chọn một cuộc trò chuyện để bắt đầu nhắn tin với khách hàng và đối tác
-                    </p>
+                  <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                    <MessageCircle size={64} className="mb-4" />
+                    <p className="text-lg font-medium">Chọn một cuộc trò chuyện để bắt đầu.</p>
                   </div>
                 )}
               </div>

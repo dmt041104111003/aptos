@@ -19,7 +19,6 @@ import { useWallet } from '../context/WalletContext';
 import { useProfile } from '../contexts/ProfileContext';
 import { uploadJSONToIPFS } from '@/utils/pinata';
 import { uploadFileToIPFS } from '@/utils/pinata';
-import Groq from "groq-sdk";
 import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 
 import { motion } from 'framer-motion';
@@ -40,19 +39,20 @@ import {
   Rocket,
   Users,
   Shield,
-  Star
+  Star,
+  FileText,
+  Tag,
+  Calendar
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 
-const JOBS_MODULE_ADDRESS = import.meta.env.VITE_JOBS_CONTRACT_ADDRESS; // Assuming this will be your Aptos Jobs Module Address
-const JOBS_MODULE_NAME = "jobs_contract"; // Replace with your actual Aptos Jobs Module Name
+const JOBS_MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
+const JOBS_MODULE_NAME = "job_marketplace_v5";
 
-const config = new AptosConfig({ network: Network.DEVNET });
+const config = new AptosConfig({ network: Network.TESTNET });
 const aptos = new Aptos(config);
 
 interface FormState {
-  companyName: string;
-  website: string;
   title: string;
   description: string;
   category: string;
@@ -62,23 +62,21 @@ interface FormState {
   duration: string;
   location: 'remote' | 'onsite' | 'hybrid';
   immediate: boolean;
+  experience: string;
+  attachments: File[];
+  applicationDeadlineDays: number;
+  initialFundAmount: number;
 }
 
 const PostJob = () => {
-  const [aiMarkdown, setAiMarkdown] = useState<string>("");
-
   const navigate = useNavigate();
   const { account, accountType } = useWallet();
   const { profile } = useProfile();
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isAIAssisted, setIsAIAssisted] = useState(true);
   const [skill, setSkill] = useState<string>('');
-  const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string>('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [form, setForm] = useState<FormState>({
-    companyName: '',
-    website: '',
     title: '',
     description: '',
     category: '',
@@ -88,22 +86,20 @@ const PostJob = () => {
     duration: '',
     location: 'remote',
     immediate: false,
+    experience: '',
+    attachments: [],
+    applicationDeadlineDays: 7, // Default to 7 days
+    initialFundAmount: 1000000, // Default to 1 APT (1_000_000 micro-APT)
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setCompanyLogoFile(file);
-      const reader = new FileReader();
-      reader.onload = () => setLogoPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm(prev => ({
+      ...prev,
+      [name]: name === 'budgetMin' || name === 'budgetMax' || name === 'applicationDeadlineDays' || name === 'initialFundAmount'
+        ? Number(value) : value
+    }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -124,16 +120,17 @@ const PostJob = () => {
     }));
   };
 
-  const groq = new Groq({
-    apiKey: import.meta.env.VITE_GROQ_API_KEY,
-    dangerouslyAllowBrowser: true
-  });
-  const [prompt, setPrompt] = useState("");
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments(prev => [...prev, ...files]);
+  };
+
+  const handleFileRemove = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!form.companyName.trim()) newErrors.companyName = 'Vui lòng nhập tên công ty';
-    if (!form.website.trim()) newErrors.website = 'Vui lòng nhập website công ty';
     if (!form.title.trim()) newErrors.title = 'Vui lòng nhập tiêu đề dự án';
     if (!form.description.trim()) newErrors.description = 'Vui lòng nhập mô tả công việc';
     if (!form.category.trim()) newErrors.category = 'Vui lòng chọn danh mục';
@@ -141,6 +138,9 @@ const PostJob = () => {
     if (!form.budgetMin || !form.budgetMax) newErrors.budget = 'Vui lòng nhập ngân sách';
     if (!form.duration.trim()) newErrors.duration = 'Vui lòng chọn thời gian thực hiện';
     if (!form.location.trim()) newErrors.location = 'Vui lòng chọn hình thức làm việc';
+    if (!form.experience.trim()) newErrors.experience = 'Vui lòng chọn kinh nghiệm yêu cầu';
+    if (!form.applicationDeadlineDays || form.applicationDeadlineDays <= 0) newErrors.applicationDeadlineDays = 'Vui lòng nhập thời hạn nộp đơn hợp lệ';
+    if (!form.initialFundAmount || form.initialFundAmount <= 0) newErrors.initialFundAmount = 'Vui lòng nhập số tiền quỹ ban đầu hợp lệ';
     return newErrors;
   };
 
@@ -153,76 +153,79 @@ const PostJob = () => {
     e.preventDefault();
     const newErrors = validateForm();
     setErrors(newErrors);
+    
     if (Object.keys(newErrors).length > 0) {
       toast.error('Vui lòng điền đầy đủ thông tin bắt buộc!');
       return;
     }
+
+    if (!account || accountType !== 'aptos' || !window.aptos) {
+      toast.error('Vui lòng kết nối ví Aptos để đăng dự án.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      let companyLogoCID = profile.profilePic;
-    
-      if (companyLogoFile) {
-        const cid = await uploadFileToIPFS(companyLogoFile);
-        const gateway = `https://${import.meta.env.VITE_PINATA_GATEWAY}/ipfs/${cid}`;
-        
-        const img = new Image();
-        img.src = gateway;
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = () => reject(new Error('Company logo not found on IPFS'));
-        });
-        
-        companyLogoCID = gateway;
-      }
+      // First, transfer the initial fund amount to the contract address
+      const transferPayload = {
+        type: "entry_function_payload",
+        function: "0x1::coin::transfer",
+        type_arguments: ["0x1::aptos_coin::AptosCoin"],
+        arguments: [
+          JOBS_MODULE_ADDRESS,
+          form.initialFundAmount * 1_000_000 // Amount in micro-APT
+        ]
+      };
+
+      console.log("Transfer Payload:", transferPayload);
+      const transferTxnHash = await window.aptos.signAndSubmitTransaction(transferPayload);
+      await aptos.waitForTransaction({ transactionHash: transferTxnHash.hash });
+      toast.success(`Chuyển ${form.initialFundAmount} APT thành công. Đang đăng dự án...`);
+
+      // Upload attachments to IPFS
+      const attachmentCIDs = await Promise.all(
+        attachments.map(file => uploadFileToIPFS(file))
+      );
 
       const jobData = {
         ...form,
         poster: account,
         posterProfile: profile.lastCID,
         postedAt: new Date().toISOString(),
-        client: {
-          id: profile.lastCID,
-          name: form.companyName,
-          avatar: companyLogoCID
-        },
-        budget: {
-          min: form.budgetMin,
-          max: form.budgetMax,
-          currency: "USDC"
-        }
+        attachments: attachmentCIDs,
+        status: 'open'
       };
       
       const cid = await uploadJSONToIPFS(jobData);
       
-      if (!account || accountType !== 'aptos' || !window.aptos) {
-        toast.error('Vui lòng kết nối ví Aptos để đăng dự án.');
-        return;
-      }
-
       const txnPayload = {
         type: "entry_function_payload",
         function: `${JOBS_MODULE_ADDRESS}::${JOBS_MODULE_NAME}::post_job`,
         type_arguments: [],
-        arguments: [cid]
+        arguments: [
+          cid, // job_details_cid
+          Math.floor(Date.now() / 1000) + form.applicationDeadlineDays * 24 * 60 * 60, // application_deadline (seconds from now)
+          form.initialFundAmount * 1_000_000, // initial_fund_amount (convert APT to micro-APT)
+          profile.did || "", // poster_did (from user profile)
+          profile.lastCID || "" // poster_profile_cid (from user profile)
+        ]
       };
+
+      console.log("Transaction Payload Arguments:", txnPayload.arguments);
   
       const txnHash = await window.aptos.signAndSubmitTransaction(txnPayload);
-
       await aptos.waitForTransaction({ transactionHash: txnHash.hash });
   
       toast.success('Đăng dự án thành công!');
       navigate('/jobs');
     } catch (error) {
       console.error('Job post failed:', error);
-      toast.error('Failed to post job');
+      toast.error('Đăng dự án thất bại. Vui lòng thử lại!');
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  const stripMarkdown = (text: string) =>
-    text
-      .replace(/\*\*/g, "")
-      .replace(/^- /gm, "")
-      .replace(/[`*_#]/g, "")
-      .trim();
 
   const categories = [
     { value: 'Smart Contract Development', label: 'Phát triển Smart Contract' },
@@ -244,6 +247,12 @@ const PostJob = () => {
     { value: 'Ongoing', label: 'Dài hạn' },
   ];
 
+  const experiences = [
+    { value: 'entry', label: 'Mới bắt đầu' },
+    { value: 'intermediate', label: 'Trung cấp' },
+    { value: 'expert', label: 'Chuyên gia' },
+  ];
+
   const locations = [
     { value: 'remote', label: 'Làm việc từ xa', icon: Globe },
     { value: 'onsite', label: 'Tại văn phòng', icon: Building2 },
@@ -253,418 +262,313 @@ const PostJob = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
-      
-      {/* Hero Section */}
-      <section className="relative py-20 bg-gradient-to-br from-blue-900/20 via-violet-900/30 to-black">
-        <div className="absolute inset-0 bg-[url('/img/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
-        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">
-              Đăng <span className="text-white">Dự án</span>
-            </h1>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Tìm kiếm tài năng Web3 toàn cầu. Đăng dự án của bạn và kết nối với những chuyên gia hàng đầu.
-            </p>
-          </motion.div>
-        </div>
-      </section>
+      <div className="container mx-auto px-4 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card className="max-w-4xl mx-auto bg-gradient-to-br from-gray-900/50 to-gray-800/50 border border-white/10 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold flex items-center gap-2 text-white">
+                <Briefcase className="w-6 h-6 text-blue-400" />
+                Đăng Dự Án Mới
+              </CardTitle>
+              <CardDescription className="text-gray-400">
+                Điền thông tin chi tiết về dự án của bạn để tìm kiếm freelancer phù hợp
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Title */}
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="text-white">Tiêu đề dự án</Label>
+                  <Input
+                    id="title"
+                    name="title"
+                    value={form.title}
+                    onChange={handleInputChange}
+                    placeholder="Ví dụ: Cần phát triển smart contract cho marketplace"
+                    className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.title ? 'border-red-500/50' : ''}`}
+                  />
+                  {errors.title && <p className="text-red-400 text-sm">{errors.title}</p>}
+                </div>
 
-      {/* Main Content */}
-      <section className="py-16 bg-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            
-            {/* Benefits Card */}
-            <motion.div 
-              className="lg:col-span-1"
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7, delay: 0.2 }}
-            >
-              <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border border-white/10 backdrop-blur-sm h-full">
-                <CardHeader className="text-center pb-6">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-                    <Rocket className="w-8 h-8 text-white" />
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-white">Mô tả chi tiết</Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    value={form.description}
+                    onChange={handleInputChange}
+                    placeholder="Mô tả chi tiết về dự án, yêu cầu và mục tiêu..."
+                    className={`min-h-[200px] bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.description ? 'border-red-500/50' : ''}`}
+                  />
+                  {errors.description && <p className="text-red-400 text-sm">{errors.description}</p>}
+                </div>
+
+                {/* Category & Experience */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category" className="text-white">Danh mục</Label>
+                    <Select
+                      value={form.category}
+                      onValueChange={(value) => handleSelectChange('category', value)}
+                    >
+                      <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.category ? 'border-red-500/50' : ''}`}>
+                        <SelectValue placeholder="Chọn danh mục" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-900 border-gray-700">
+                        {categories.map((category) => (
+                          <SelectItem key={category.value} value={category.value} className="text-white hover:bg-gray-800">
+                            {category.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.category && <p className="text-red-400 text-sm">{errors.category}</p>}
                   </div>
-                  <CardTitle className="text-2xl font-bold text-white mb-2">
-                    Đăng dự án trên Web3Work
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Tiếp cận hơn 12,000 chuyên gia Web3 toàn cầu
-                  </CardDescription>
-                </CardHeader>
-                
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Users className="w-4 h-4 text-blue-400" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-white">12,000+ Chuyên gia</div>
-                        <div className="text-sm text-gray-400">Tài năng Web3 toàn cầu</div>
-                      </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="experience" className="text-white">Kinh nghiệm yêu cầu</Label>
+                    <Select
+                      value={form.experience}
+                      onValueChange={(value) => handleSelectChange('experience', value)}
+                    >
+                      <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.experience ? 'border-red-500/50' : ''}`}>
+                        <SelectValue placeholder="Chọn kinh nghiệm" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-900 border-gray-700">
+                        {experiences.map((exp) => (
+                          <SelectItem key={exp.value} value={exp.value} className="text-white hover:bg-gray-800">
+                            {exp.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.experience && <p className="text-red-400 text-sm">{errors.experience}</p>}
+                  </div>
+                </div>
+
+                {/* Skills */}
+                <div className="space-y-2">
+                  <Label className="text-white">Kỹ năng yêu cầu</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={skill}
+                      onChange={(e) => setSkill(e.target.value)}
+                      placeholder="Thêm kỹ năng..."
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleSkillAdd())}
+                      className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.skills ? 'border-red-500/50' : ''}`}
+                    />
+                    <Button type="button" onClick={handleSkillAdd} variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                      <Plus className="w-4 h-4 text-blue-400" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {form.skills.map((skill) => (
+                      <Badge key={skill} variant="secondary" className="flex items-center gap-1 bg-blue-500/20 text-blue-300 border-blue-500/30">
+                        {skill}
+                        <button
+                          type="button"
+                          onClick={() => handleSkillRemove(skill)}
+                          className="text-blue-300 hover:text-red-400"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  {errors.skills && <p className="text-red-400 text-sm">{errors.skills}</p>}
+                </div>
+
+                {/* Budget */}
+                <div className="space-y-2">
+                  <Label className="text-white">Ngân sách (USDC)</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Input
+                        type="number"
+                        name="budgetMin"
+                        value={form.budgetMin}
+                        onChange={handleInputChange}
+                        placeholder="Tối thiểu"
+                        className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.budget ? 'border-red-500/50' : ''}`}
+                      />
                     </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Shield className="w-4 h-4 text-violet-400" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-white">Bảo mật ISO 27001</div>
-                        <div className="text-sm text-gray-400">Thanh toán minh bạch, an toàn</div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <Star className="w-4 h-4 text-purple-400" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-white">Hỗ trợ 24/7</div>
-                        <div className="text-sm text-gray-400">Đội ngũ hỗ trợ Việt Nam</div>
-                      </div>
+                    <div>
+                      <Input
+                        type="number"
+                        name="budgetMax"
+                        value={form.budgetMax}
+                        onChange={handleInputChange}
+                        placeholder="Tối đa"
+                        className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.budget ? 'border-red-500/50' : ''}`}
+                      />
                     </div>
                   </div>
-                  
-                  <div className="pt-6 border-t border-white/10">
-                    <div className="text-center">
-                      <div className="text-sm text-gray-400 mb-2">Đăng dự án miễn phí</div>
-                      <div className="text-xs text-gray-500">Chỉ trả phí khi dự án hoàn thành thành công!</div>
-                    </div>
+                  {errors.budget && <p className="text-red-400 text-sm">{errors.budget}</p>}
+                </div>
+
+                {/* Application Deadline */}
+                <div className="space-y-2">
+                  <Label htmlFor="applicationDeadlineDays" className="text-white">Thời hạn nộp đơn (ngày)</Label>
+                  <Input
+                    id="applicationDeadlineDays"
+                    name="applicationDeadlineDays"
+                    type="number"
+                    value={form.applicationDeadlineDays}
+                    onChange={handleInputChange}
+                    placeholder="Ví dụ: 7 (trong 7 ngày)"
+                    className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.applicationDeadlineDays ? 'border-red-500/50' : ''}`}
+                  />
+                  {errors.applicationDeadlineDays && <p className="text-red-400 text-sm">{errors.applicationDeadlineDays}</p>}
+                </div>
+
+                {/* Initial Fund Amount */}
+                <div className="space-y-2">
+                  <Label htmlFor="initialFundAmount" className="text-white">Số tiền quỹ ban đầu (APT)</Label>
+                  <Input
+                    id="initialFundAmount"
+                    name="initialFundAmount"
+                    type="number"
+                    value={form.initialFundAmount}
+                    onChange={handleInputChange}
+                    placeholder="Ví dụ: 1 (để escrow 1 APT)"
+                    className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.initialFundAmount ? 'border-red-500/50' : ''}`}
+                  />
+                  {errors.initialFundAmount && <p className="text-red-400 text-sm">{errors.initialFundAmount}</p>}
+                </div>
+
+                {/* Duration & Location */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="duration" className="text-white">Thời gian thực hiện</Label>
+                    <Select
+                      value={form.duration}
+                      onValueChange={(value) => handleSelectChange('duration', value)}
+                    >
+                      <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.duration ? 'border-red-500/50' : ''}`}>
+                        <SelectValue placeholder="Chọn thời gian" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-900 border-gray-700">
+                        {durations.map((duration) => (
+                          <SelectItem key={duration.value} value={duration.value} className="text-white hover:bg-gray-800">
+                            {duration.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.duration && <p className="text-red-400 text-sm">{errors.duration}</p>}
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
 
-            {/* Form */}
-            <motion.div 
-              className="lg:col-span-2"
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7, delay: 0.4 }}
-            >
-              <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border border-white/10 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-2xl font-bold text-white flex items-center gap-3">
-                    <Briefcase className="w-6 h-6 text-blue-400" />
-                    Thông tin dự án
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Điền đầy đủ thông tin để tìm kiếm tài năng phù hợp
-                  </CardDescription>
-                </CardHeader>
-                
-                <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-8">
-                    {/* Company Information */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="companyName" className="text-sm font-semibold text-white mb-2 block">
-                            Tên công ty
-                          </Label>
-                          <Input
-                            id="companyName"
-                            name="companyName"
-                            value={form.companyName}
-                            onChange={handleInputChange}
-                            placeholder="VD: Decentral Labs"
-                            className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.companyName ? 'border-red-500/50' : ''}`}
-                          />
-                          {errors.companyName && (
-                            <div className="text-red-400 text-xs mt-1">{errors.companyName}</div>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="website" className="text-sm font-semibold text-white mb-2 block">
-                            Website công ty
-                          </Label>
-                          <Input
-                            id="website"
-                            name="website"
-                            value={form.website}
-                            onChange={handleInputChange}
-                            placeholder="https://tencongty.vn"
-                            className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.website ? 'border-red-500/50' : ''}`}
-                          />
-                          {errors.website && (
-                            <div className="text-red-400 text-xs mt-1">{errors.website}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Logo Upload */}
-                      <div className="space-y-4">
-                        <Label className="text-sm font-semibold text-white mb-2 block">
-                          Logo công ty
-                        </Label>
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
-                          <div className="w-20 h-20 mx-auto mb-4 rounded-full overflow-hidden border-2 border-blue-500/30">
-                            <img 
-                              src={logoPreview || (profile.profilePic || '/default-company.png')}
-                              alt="Company Logo" 
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <label className="group relative z-10 cursor-pointer overflow-hidden rounded-full  font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10">
-                            <span className="relative inline-flex overflow-hidden font-primary text-base">
-                              <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
-                                Tải lên logo
-                              </div>
-                              <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
-                                Tải lên logo
-                              </div>
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleLogoChange}
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Project Information */}
-                    <div className="space-y-6">
-                      <div>
-                        <Label htmlFor="title" className="text-sm font-semibold text-white mb-2 block">
-                          Tiêu đề dự án
-                        </Label>
-                        <Input
-                          id="title"
-                          name="title"
-                          value={form.title}
-                          onChange={handleInputChange}
-                          placeholder="VD: Lập trình viên Smart Contract"
-                          className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.title ? 'border-red-500/50' : ''}`}
-                        />
-                        {errors.title && (
-                          <div className="text-red-400 text-xs mt-1">{errors.title}</div>
-                        )}
-                      </div>
-
-                      <div>
-                        <Label htmlFor="description" className="text-sm font-semibold text-white mb-2 block">
-                          Mô tả công việc
-                        </Label>
-                        <Textarea
-                          id="description"
-                          name="description"
-                          value={form.description}
-                          onChange={handleInputChange}
-                          placeholder="Mô tả chi tiết yêu cầu, đầu việc, thời gian..."
-                          className={`h-32 resize-none bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.description ? 'border-red-500/50' : ''}`}
-                        />
-                        {errors.description && (
-                          <div className="text-red-400 text-xs mt-1">{errors.description}</div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <Label htmlFor="category" className="text-sm font-semibold text-white mb-2 block">
-                            Danh mục
-                          </Label>
-                          <Select 
-                            value={form.category}
-                            onValueChange={(value) => handleSelectChange('category', value)}
+                  <div className="space-y-2">
+                    <Label className="text-white">Hình thức làm việc</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {locations.map((loc) => {
+                        const Icon = loc.icon;
+                        return (
+                          <Button
+                            key={loc.value}
+                            type="button"
+                            variant={form.location === loc.value ? 'default' : 'outline'}
+                            className={`flex flex-col items-center gap-1 h-auto py-2 ${form.location === loc.value ? 'bg-blue-600 text-white' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+                            onClick={() => handleSelectChange('location', loc.value)}
                           >
-                            <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.category ? 'border-red-500/50' : ''}`}>
-                              <SelectValue placeholder="Chọn danh mục" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-gray-900 border-gray-700">
-                              {categories.map((category) => (
-                                <SelectItem key={category.value} value={category.value} className="text-white hover:bg-gray-800">
-                                  {category.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {errors.category && (
-                            <div className="text-red-400 text-xs mt-1">{errors.category}</div>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label htmlFor="duration" className="text-sm font-semibold text-white mb-2 block">
-                            Thời gian thực hiện
-                          </Label>
-                          <Select 
-                            value={form.duration} 
-                            onValueChange={(value) => handleSelectChange('duration', value)}
-                          >
-                            <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.duration ? 'border-red-500/50' : ''}`}>
-                              <SelectValue placeholder="Chọn thời gian" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-gray-900 border-gray-700">
-                              {durations.map((duration) => (
-                                <SelectItem key={duration.value} value={duration.value} className="text-white hover:bg-gray-800">
-                                  {duration.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {errors.duration && (
-                            <div className="text-red-400 text-xs mt-1">{errors.duration}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label className="text-sm font-semibold text-white mb-2 block">
-                          Kỹ năng yêu cầu
-                        </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={skill}
-                            onChange={(e) => setSkill(e.target.value)}
-                            placeholder="VD: Solidity"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSkillAdd();
-                              }
-                            }}
-                            className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.skills ? 'border-red-500/50' : ''}`}
-                          />
-                          <Button 
-                            type="button" 
-                            onClick={handleSkillAdd}
-                            className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white"
-                          >
-                            <Plus className="w-4 h-4" />
+                            <Icon className="w-4 h-4" />
+                            <span className="text-xs">{loc.label}</span>
                           </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {form.skills.map((skill) => (
-                            <Badge 
-                              key={skill} 
-                              variant="secondary" 
-                              className="bg-blue-500/20 text-blue-300 border-blue-500/30 cursor-pointer hover:bg-blue-500/30 transition-colors"
-                              onClick={() => handleSkillRemove(skill)}
-                            >
-                              {skill}
-                              <X className="w-3 h-3 ml-1" />
-                            </Badge>
-                          ))}
-                        </div>
-                        {errors.skills && (
-                          <div className="text-red-400 text-xs mt-1">{errors.skills}</div>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <Label className="text-sm font-semibold text-white mb-2 block">
-                            Ngân sách (USDC)
-                          </Label>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Input
-                                type="number"
-                                value={form.budgetMin}
-                                onChange={(e) => setForm(prev => ({ ...prev, budgetMin: Number(e.target.value) }))}
-                                min={0}
-                                placeholder="Min"
-                                className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.budget ? 'border-red-500/50' : ''}`}
-                              />
-                              <div className="text-xs text-gray-400 mt-1">Tối thiểu</div>
-                            </div>
-                            <div>
-                              <Input
-                                type="number"
-                                value={form.budgetMax}
-                                onChange={(e) => setForm(prev => ({ ...prev, budgetMax: Number(e.target.value) }))}
-                                min={form.budgetMin}
-                                placeholder="Max"
-                                className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.budget ? 'border-red-500/50' : ''}`}
-                              />
-                              <div className="text-xs text-gray-400 mt-1">Tối đa</div>
-                            </div>
-                          </div>
-                          {errors.budget && (
-                            <div className="text-red-400 text-xs mt-1">{errors.budget}</div>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="text-sm font-semibold text-white mb-2 block">
-                            Hình thức làm việc
-                          </Label>
-                          <Select 
-                            value={form.location} 
-                            onValueChange={(value: 'remote' | 'onsite' | 'hybrid') => handleSelectChange('location', value)}
-                          >
-                            <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.location ? 'border-red-500/50' : ''}`}>
-                              <SelectValue placeholder="Chọn hình thức" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-gray-900 border-gray-700">
-                              {locations.map((location) => (
-                                <SelectItem key={location.value} value={location.value} className="text-white hover:bg-gray-800">
-                                  <div className="flex items-center gap-2">
-                                    <location.icon className="w-4 h-4" />
-                                    {location.label}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {errors.location && (
-                            <div className="text-red-400 text-xs mt-1">{errors.location}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-3 p-4 bg-white/5 rounded-lg border border-white/10">
-                        <Switch
-                          id="immediate"
-                          checked={form.immediate}
-                          onCheckedChange={(checked) => setForm(prev => ({ ...prev, immediate: checked }))}
-                          className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-yellow-500 data-[state=checked]:to-orange-500"
-                        />
-                        <Label htmlFor="immediate" className="text-white cursor-pointer font-medium">
-                          <div className="flex items-center gap-2">
-                            <Zap className={`w-4 h-4 ${form.immediate ? 'text-yellow-400' : 'text-gray-400'}`} />
-                            Cần bắt đầu ngay
-                          </div>
-                        </Label>
-                      </div>
+                        );
+                      })}
                     </div>
+                    {errors.location && <p className="text-red-400 text-sm">{errors.location}</p>}
+                  </div>
+                </div>
 
-                    {/* Submit Button */}
-                    <div >
-                      <Button 
-                        type="submit" 
-                        size="lg"
-                        disabled={Object.keys(errors).length > 0}
-                        className="group bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white relative z-10 w-full cursor-pointer overflow-hidden rounded-full  font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10"                      >
-                     
-                        <span className="relative inline-flex overflow-hidden font-primary text-base">
-                          <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
-                            Đăng dự án
-                          </div>
-                          <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
-                            Đăng dự án
-                          </div>
-                        </span>
+                {/* Attachments */}
+                <div className="space-y-2">
+                  <Label className="text-white">Tài liệu đính kèm</Label>
+                  <div className="border-2 border-dashed border-white/20 rounded-lg p-4">
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <div className="text-sm text-gray-400">
+                        Kéo thả file hoặc click để chọn
+                      </div>
+                      <Input
+                        type="file"
+                        multiple
+                        onChange={handleFileChange}
+                        className="hidden"
+                        id="file-upload"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('file-upload')?.click()}
+                        className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      >
+                        Chọn file
                       </Button>
                     </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-        </div>
-      </section>
+                  </div>
+                  {attachments.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {attachments.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between bg-white/10 p-2 rounded">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm text-white">{file.name}</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleFileRemove(index)}
+                            className="text-gray-400 hover:text-red-400"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Immediate Start */}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="immediate"
+                    checked={form.immediate}
+                    onCheckedChange={(checked) => setForm(prev => ({ ...prev, immediate: checked }))}
+                    className="data-[state=checked]:bg-blue-600"
+                  />
+                  <Label htmlFor="immediate" className="text-white">Cần bắt đầu ngay</Label>
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Đang xử lý...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Rocket className="w-4 h-4" />
+                      Đăng dự án
+                    </div>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
     </div>
   );
 };
