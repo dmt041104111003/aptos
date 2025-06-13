@@ -16,6 +16,8 @@ import { toast } from '@/components/ui/sonner';
 import { useNavigate } from 'react-router-dom';
 import { ethers } from 'ethers';
 import { convertIPFSURL } from '@/utils/ipfs';
+import { useWallet } from '../context/WalletContext';
+import { useProfile } from '../contexts/ProfileContext';
 import { 
   Search, 
   Filter, 
@@ -46,6 +48,7 @@ const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v5";
 const PROFILE_MODULE_NAME = "web3_profiles_v7";
 const PROFILE_RESOURCE_NAME = "ProfileRegistryV7";
+const APPLY_FEE = 1000000; // 0.01 APT in micro-APT
 
 export interface JobPost {
   id: string;
@@ -80,7 +83,7 @@ export interface JobPost {
   milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } }; // table<u64, MilestoneData>
   submit_time: number | null; // Option<u64>
   escrowed_amount: number; // u64
-  applications: { worker: string; apply_time: number; did: string; profile_cid: string }[]; // vector<Application>
+  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfileAvatar: string }[]; // vector<Application>
   approve_time: number | null; // Option<u64>
   poster_did: string; // DID of the job poster
   poster_profile_cid: string; // CID of the job poster's profile (from contract)
@@ -121,6 +124,9 @@ const Jobs = () => {
 
   const [historyResult, setHistoryResult] = useState<any[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const { account, accountType } = useWallet();
+  const { profile } = useProfile();
 
   useEffect(() => {
     let filtered = jobs;
@@ -279,6 +285,8 @@ const Jobs = () => {
                 apply_time: Number(app.apply_time),
                 did: app.did,
                 profile_cid: app.profile_cid,
+                workerProfileName: app.workerProfileName || "",
+                workerProfileAvatar: app.workerProfileAvatar || "",
               })) : [],
               approve_time: eventData.approve_time ? Number(eventData.approve_time) : null,
               poster_profile_cid: eventData.poster_profile_cid || "",
@@ -319,12 +327,47 @@ const Jobs = () => {
     setApplyDialogOpen(true);
   };
   
-  const handleSendApplication = () => {
-    setApplyDialogOpen(false);
-    toast.success('Đơn ứng tuyển đã được gửi! Chuyển hướng đến tin nhắn...');
-    setTimeout(() => {
-      navigate('/messages');
-    }, 1500);
+  const handleSendApplication = async () => {
+    if (!selectedJob) {
+      toast.error('Không tìm thấy thông tin dự án.');
+      return;
+    }
+
+    if (!account || accountType !== 'aptos' || !window.aptos) {
+      toast.error('Vui lòng kết nối ví Aptos để ứng tuyển.');
+      return;
+    }
+
+    if (!profile || !profile.did || !profile.lastCID) {
+      toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi ứng tuyển.');
+      return;
+    }
+
+    try {
+      const transaction = await window.aptos.signAndSubmitTransaction({
+        type: "entry_function_payload",
+        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::apply_for_job`,
+        type_arguments: [],
+        arguments: [
+          selectedJob.id, // job_id: u64
+          profile.did, // worker_did: String
+          profile.lastCID // worker_profile_cid: String
+        ]
+      });
+
+      await aptos.waitForTransaction({
+        transactionHash: transaction.hash,
+      });
+
+      toast.success('Đơn ứng tuyển của bạn đã được gửi thành công!');
+      setApplyDialogOpen(false);
+      loadJobs(); // Re-load jobs to reflect changes
+
+      // No navigation needed as per new requirements, just update state/UI
+    } catch (error: any) {
+      console.error('Ứng tuyển thất bại:', error);
+      toast.error(`Ứng tuyển thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+    }
   };
   
   const getLocationIcon = (location: string) => {
