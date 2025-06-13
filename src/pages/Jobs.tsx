@@ -37,7 +37,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
-import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
+import { aptos, aptosConfig, fetchProfileDetails, ProfileDataFromChain } from '@/utils/aptosUtils';
 
 declare global { interface Window { ethereum?: any } }
 
@@ -46,14 +46,6 @@ const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v5";
 const PROFILE_MODULE_NAME = "web3_profiles_v7";
 const PROFILE_RESOURCE_NAME = "ProfileRegistryV7";
-const aptosConfig = new AptosConfig({ network: Network.TESTNET });
-const aptos = new Aptos(aptosConfig);
-
-interface ProfileDataFromChain {
-  cid: string;
-  cccd: number;
-  did: string;
-}
 
 export interface JobPost {
   id: string;

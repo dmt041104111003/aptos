@@ -11,7 +11,7 @@ Tính năng chính
 - Xây dựng và cập nhật hồ sơ cá nhân, lưu trữ trên IPFS.
 - Lịch sử cập nhật hồ sơ (on-chain event history).
 - Chuyển quyền sở hữu hồ sơ sang ví khác.
-- AI hỗ trợ tìm kiếm, gợi ý công việc phù hợp.
+- AI ngăn đăng job ảo.
 - Đánh giá, điểm uy tín, xác thực kỹ năng on-chain.
 - Đăng dự án, tìm kiếm freelancer, xác thực hồ sơ trực tiếp từ blockchain.
 - Thanh toán minh bạch, bảo mật qua smart contract Move.
@@ -19,13 +19,12 @@ Tính năng chính
 
 Công nghệ sử dụng
 -----------------
-- Frontend: React.js, Tailwind CSS, Context API
-- Wallet/Auth: Aptos Wallet Adapter (Pontem, Petra, Martian, ...)
+- Frontend: Nextjs, Tailwind CSS, Context API
+- Wallet/Auth: Aptos Wallet Adapter (Petra)
 - State Management: React Context, Custom Hooks
 - Blockchain: Aptos Move, Aptos SDK, Aptos REST API
 - Lưu trữ: IPFS (Pinata)
-- AI Matching: Groq API, OpenAI API (tùy chọn)
-- Triển khai: Vercel, Netlify
+- Triển khai: Vercel
 
 Hướng dẫn cài đặt và chạy local
 -------------------------------
@@ -37,7 +36,7 @@ Hướng dẫn cài đặt và chạy local
    ```bash
    npm run dev
    ```
-3. (Tùy chọn) Phát triển smart contract Move:
+3. Phát triển smart contract Move:
    ```bash
    aptos move compile
    aptos move test
