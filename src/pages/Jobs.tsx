@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Dialog,
@@ -69,16 +68,38 @@ export interface JobPost {
   experience: string;
   attachments: string[];
   poster: string;
-  posterProfile: string;
-  postedAt: string;
-  applicationDeadline: string;
-  initialFundAmount: number;
-  posterDid: string;
+  posterProfile: string; // CID of poster's profile on IPFS
+  postedAt: string; // ISO string of when the job was posted (from event.start_time)
+  initialFundAmount: number; // Funds escrowed for the job
   client: {
     id: string;
     name: string;
     avatar: string;
   };
+  // Fields directly from the Move contract's Job struct
+  start_time: number; // u64
+  end_time: number; // u64
+  milestones: number[]; // vector<u64> - amounts for each milestone
+  duration_per_milestone: number[]; // vector<u64> - duration in seconds for each milestone
+  worker: string | null; // Option<address>
+  approved: boolean;
+  active: boolean;
+  current_milestone: number; // u64
+  milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } }; // table<u64, MilestoneData>
+  submit_time: number | null; // Option<u64>
+  escrowed_amount: number; // u64
+  applications: { worker: string; apply_time: number; did: string; profile_cid: string }[]; // vector<Application>
+  approve_time: number | null; // Option<u64>
+  poster_did: string; // DID of the job poster
+  poster_profile_cid: string; // CID of the job poster's profile (from contract)
+  completed: boolean;
+  rejected_count: number; // u8
+  job_expired: boolean;
+  auto_confirmed: boolean[]; // vector<bool>
+  milestone_deadlines: number[]; // vector<u64>
+  application_deadline: number; // u64
+  selected_application_index: number | null; // Option<u64>
+  last_reject_time: number | null; // Option<u64>
 }
 
 const Jobs = () => {
@@ -157,13 +178,26 @@ const Jobs = () => {
         eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
         options: {
           limit: 50, // Fetch a reasonable number of recent events
-          orderBy: { transaction_version: "desc" } // Fetch newest events first
+          orderBy: [{ transaction_version: "desc" }] // Fetch newest events first
         }
       });
 
-      console.log("Fetched raw JobPostedEvents:", rawEvents);
+      console.log("Fetched raw JobPostedEvents", rawEvents);
 
       const fetchedJobs: JobPost[] = [];
+      const uniquePosterAddresses = new Set<string>();
+
+      for (const event of rawEvents) {
+        uniquePosterAddresses.add(event.data.poster);
+      }
+
+      const profileDetailsMap = new Map<string, { name: string; avatar: string }>();
+      const fetchProfilePromises = Array.from(uniquePosterAddresses).map(async (address) => {
+        const profile = await fetchProfileDetails(address);
+        profileDetailsMap.set(address, profile);
+      });
+      await Promise.all(fetchProfilePromises);
+
       for (const event of rawEvents) {
         const eventData = event.data as any; // JobPostedEvent data from blockchain
         const jobCid = eventData.cid; // CID pointing to job details on IPFS
@@ -172,46 +206,32 @@ const Jobs = () => {
           try {
             const jobDetailsUrl = convertIPFSURL(jobCid);
             const response = await fetch(jobDetailsUrl);
+            
+            const contentType = response.headers.get('content-type');
+            
             if (!response.ok) {
-              console.error(`Failed to fetch job details from IPFS for CID ${jobCid}: ${response.statusText}`);
-              continue;
+              const errorText = await response.text();
+              console.error(`IPFS fetch failed for CID ${jobCid}. Status: ${response.status}. Response text: ${errorText.slice(0, 500)}`);
+              continue; // Skip this job if HTTP response is not OK
             }
-            const jobDataFromIPFS = await response.json(); // Job details JSON from IPFS
 
-            // Fetch poster profile data for client name/avatar
-            let posterName = "Client";
-            let posterAvatar = "";
+            if (!contentType || !contentType.includes('application/json')) {
+              const errorText = await response.text();
+              console.warn(`IPFS response for CID ${jobCid} is not JSON. Content-Type: ${contentType}. Response text: ${errorText.slice(0, 500)}`);
+              continue; // Skip if content type is not JSON
+            }
+
+            let jobDataFromIPFS: any;
             try {
-              const profileRegistryResource = await aptos.getAccountResource({
-                accountAddress: MODULE_ADDRESS,
-                resourceType: `${MODULE_ADDRESS}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}`,
-              });
-
-              if (profileRegistryResource && (profileRegistryResource as any).profiles?.handle) {
-                const profileTableHandle = (profileRegistryResource as any).profiles.handle;
-
-                const profileDataFromChain = await aptos.getTableItem({
-                  handle: profileTableHandle,
-                  data: {
-                    key_type: "address",
-                    value_type: `${MODULE_ADDRESS}::${PROFILE_MODULE_NAME}::ProfileData`,
-                    key: eventData.poster, // Poster address from the job event
-                  },
-                }) as ProfileDataFromChain;
-
-                if (profileDataFromChain.cid) {
-                  const profileJsonUrl = convertIPFSURL(profileDataFromChain.cid);
-                  const profileResponse = await fetch(profileJsonUrl);
-                  if (profileResponse.ok) {
-                    const profileJson = await profileResponse.json();
-                    posterName = profileJson.name || "Client";
-                    posterAvatar = profileJson.profilePic || "";
-                  }
-                }
-              }
-            } catch (profileError) {
-              console.warn(`Could not fetch profile for ${eventData.poster}:`, profileError);
+              jobDataFromIPFS = await response.json(); // Attempt to parse JSON
+            } catch (jsonError) {
+              const errorText = await response.text();
+              console.error(`Failed to parse JSON for CID ${jobCid}. Error: ${jsonError}. Raw response: ${errorText.slice(0, 500)}`);
+              continue; // Skip if JSON parsing fails
             }
+
+            // Use pre-fetched poster profile data
+            const posterProfile = profileDetailsMap.get(eventData.poster) || { name: "Client", avatar: "" };
 
             // Construct jobPost object, ensuring all fields from JobPost interface are populated
             const jobPost: JobPost = {
@@ -231,16 +251,53 @@ const Jobs = () => {
               experience: jobDataFromIPFS.experience || "Any",
               attachments: jobDataFromIPFS.attachments || [],
               poster: eventData.poster,
-              posterProfile: jobDataFromIPFS.posterProfile || "", // This should be a CID
+              posterProfile: jobDataFromIPFS.posterProfile || "",
               postedAt: new Date(Number(eventData.start_time) * 1000).toISOString(),
-              applicationDeadline: new Date(Number(eventData.start_time) * 1000 + Number(jobDataFromIPFS.applicationDeadlineDays) * 24 * 60 * 60 * 1000).toISOString(),
               initialFundAmount: jobDataFromIPFS.initialFundAmount || 0,
-              posterDid: jobDataFromIPFS.posterDid || "",
+              poster_did: jobDataFromIPFS.posterDid || "", // Corrected from posterDid
               client: {
                 id: eventData.poster,
-                name: posterName,
-                avatar: posterAvatar
-              }
+                name: posterProfile.name,
+                avatar: posterProfile.avatar
+              },
+              start_time: Number(eventData.start_time),
+              end_time: Number(eventData.end_time || 0),
+              milestones: eventData.milestones ? eventData.milestones.map(Number) : [],
+              duration_per_milestone: eventData.duration_per_milestone ? eventData.duration_per_milestone.map(Number) : [],
+              worker: eventData.worker || null,
+              approved: eventData.approved || false,
+              active: eventData.active || false,
+              current_milestone: Number(eventData.current_milestone || 0),
+              milestone_states: eventData.milestone_states?.data ? 
+                Object.fromEntries(
+                  Object.entries(eventData.milestone_states.data).map(([key, value]: [string, any]) => [
+                    Number(key),
+                    {
+                      submitted: value.submitted || false,
+                      accepted: value.accepted || false,
+                      submit_time: Number(value.submit_time || 0),
+                      reject_count: Number(value.reject_count || 0),
+                    },
+                  ])
+                ) : {},
+              submit_time: eventData.submit_time ? Number(eventData.submit_time) : null,
+              escrowed_amount: Number(eventData.escrowed_amount || 0),
+              applications: eventData.applications ? eventData.applications.map((app: any) => ({
+                worker: app.worker,
+                apply_time: Number(app.apply_time),
+                did: app.did,
+                profile_cid: app.profile_cid,
+              })) : [],
+              approve_time: eventData.approve_time ? Number(eventData.approve_time) : null,
+              poster_profile_cid: eventData.poster_profile_cid || "",
+              completed: eventData.completed || false,
+              rejected_count: Number(eventData.rejected_count || 0),
+              job_expired: eventData.job_expired || false,
+              auto_confirmed: eventData.auto_confirmed || [],
+              milestone_deadlines: eventData.milestone_deadlines ? eventData.milestone_deadlines.map(Number) : [],
+              application_deadline: Number(eventData.application_deadline || 0),
+              selected_application_index: eventData.selected_application_index ? Number(eventData.selected_application_index) : null,
+              last_reject_time: eventData.last_reject_time ? Number(eventData.last_reject_time) : null,
             };
             fetchedJobs.push(jobPost);
 

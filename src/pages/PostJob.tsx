@@ -263,70 +263,70 @@ const PostJob = () => {
     <div className="min-h-screen bg-black text-white">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <motion.div
+          <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+            animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
           <Card className="max-w-4xl mx-auto bg-gradient-to-br from-gray-900/50 to-gray-800/50 border border-white/10 backdrop-blur-sm">
-            <CardHeader>
+                <CardHeader>
               <CardTitle className="text-2xl font-bold flex items-center gap-2 text-white">
-                <Briefcase className="w-6 h-6 text-blue-400" />
+                    <Briefcase className="w-6 h-6 text-blue-400" />
                 Đăng Dự Án Mới
-              </CardTitle>
-              <CardDescription className="text-gray-400">
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
                 Điền thông tin chi tiết về dự án của bạn để tìm kiếm freelancer phù hợp
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Title */}
                 <div className="space-y-2">
                   <Label htmlFor="title" className="text-white">Tiêu đề dự án</Label>
-                  <Input
-                    id="title"
-                    name="title"
-                    value={form.title}
-                    onChange={handleInputChange}
+                        <Input
+                          id="title"
+                          name="title"
+                          value={form.title}
+                          onChange={handleInputChange}
                     placeholder="Ví dụ: Cần phát triển smart contract cho marketplace"
-                    className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.title ? 'border-red-500/50' : ''}`}
-                  />
+                          className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.title ? 'border-red-500/50' : ''}`}
+                        />
                   {errors.title && <p className="text-red-400 text-sm">{errors.title}</p>}
-                </div>
+                      </div>
 
                 {/* Description */}
                 <div className="space-y-2">
                   <Label htmlFor="description" className="text-white">Mô tả chi tiết</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={form.description}
-                    onChange={handleInputChange}
+                        <Textarea
+                          id="description"
+                          name="description"
+                          value={form.description}
+                          onChange={handleInputChange}
                     placeholder="Mô tả chi tiết về dự án, yêu cầu và mục tiêu..."
                     className={`min-h-[200px] bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.description ? 'border-red-500/50' : ''}`}
-                  />
+                        />
                   {errors.description && <p className="text-red-400 text-sm">{errors.description}</p>}
-                </div>
+                      </div>
 
                 {/* Category & Experience */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="category" className="text-white">Danh mục</Label>
-                    <Select
-                      value={form.category}
-                      onValueChange={(value) => handleSelectChange('category', value)}
-                    >
-                      <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.category ? 'border-red-500/50' : ''}`}>
-                        <SelectValue placeholder="Chọn danh mục" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-900 border-gray-700">
-                        {categories.map((category) => (
-                          <SelectItem key={category.value} value={category.value} className="text-white hover:bg-gray-800">
-                            {category.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          <Select 
+                            value={form.category}
+                            onValueChange={(value) => handleSelectChange('category', value)}
+                          >
+                            <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.category ? 'border-red-500/50' : ''}`}>
+                              <SelectValue placeholder="Chọn danh mục" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-900 border-gray-700">
+                              {categories.map((category) => (
+                                <SelectItem key={category.value} value={category.value} className="text-white hover:bg-gray-800">
+                                  {category.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                     {errors.category && <p className="text-red-400 text-sm">{errors.category}</p>}
                   </div>
 
@@ -381,7 +381,7 @@ const PostJob = () => {
                     ))}
                   </div>
                   {errors.skills && <p className="text-red-400 text-sm">{errors.skills}</p>}
-                </div>
+                        </div>
 
                 {/* Budget */}
                 <div className="space-y-2">
@@ -397,7 +397,7 @@ const PostJob = () => {
                         className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.budget ? 'border-red-500/50' : ''}`}
                       />
                     </div>
-                    <div>
+                        <div>
                       <Input
                         type="number"
                         name="budgetMax"
@@ -445,23 +445,23 @@ const PostJob = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="duration" className="text-white">Thời gian thực hiện</Label>
-                    <Select
-                      value={form.duration}
-                      onValueChange={(value) => handleSelectChange('duration', value)}
-                    >
-                      <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.duration ? 'border-red-500/50' : ''}`}>
-                        <SelectValue placeholder="Chọn thời gian" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-900 border-gray-700">
-                        {durations.map((duration) => (
-                          <SelectItem key={duration.value} value={duration.value} className="text-white hover:bg-gray-800">
-                            {duration.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          <Select 
+                            value={form.duration} 
+                            onValueChange={(value) => handleSelectChange('duration', value)}
+                          >
+                            <SelectTrigger className={`bg-white/10 border-white/20 text-white ${errors.duration ? 'border-red-500/50' : ''}`}>
+                              <SelectValue placeholder="Chọn thời gian" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-900 border-gray-700">
+                              {durations.map((duration) => (
+                                <SelectItem key={duration.value} value={duration.value} className="text-white hover:bg-gray-800">
+                                  {duration.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                     {errors.duration && <p className="text-red-400 text-sm">{errors.duration}</p>}
-                  </div>
+                      </div>
 
                   <div className="space-y-2">
                     <Label className="text-white">Hình thức làm việc</Label>
@@ -469,9 +469,9 @@ const PostJob = () => {
                       {locations.map((loc) => {
                         const Icon = loc.icon;
                         return (
-                          <Button
+                          <Button 
                             key={loc.value}
-                            type="button"
+                            type="button" 
                             variant={form.location === loc.value ? 'default' : 'outline'}
                             className={`flex flex-col items-center gap-1 h-auto py-2 ${form.location === loc.value ? 'bg-blue-600 text-white' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
                             onClick={() => handleSelectChange('location', loc.value)}
@@ -483,8 +483,8 @@ const PostJob = () => {
                       })}
                     </div>
                     {errors.location && <p className="text-red-400 text-sm">{errors.location}</p>}
-                  </div>
-                </div>
+                        </div>
+                        </div>
 
                 {/* Attachments */}
                 <div className="space-y-2">
@@ -495,7 +495,7 @@ const PostJob = () => {
                       <div className="text-sm text-gray-400">
                         Kéo thả file hoặc click để chọn
                       </div>
-                      <Input
+                              <Input
                         type="file"
                         multiple
                         onChange={handleFileChange}
@@ -510,8 +510,8 @@ const PostJob = () => {
                       >
                         Chọn file
                       </Button>
-                    </div>
-                  </div>
+                            </div>
+                            </div>
                   {attachments.length > 0 && (
                     <div className="mt-4 space-y-2">
                       {attachments.map((file, index) => (
@@ -533,22 +533,22 @@ const PostJob = () => {
                       ))}
                     </div>
                   )}
-                </div>
+                      </div>
 
                 {/* Immediate Start */}
                 <div className="flex items-center space-x-2">
-                  <Switch
-                    id="immediate"
-                    checked={form.immediate}
-                    onCheckedChange={(checked) => setForm(prev => ({ ...prev, immediate: checked }))}
+                        <Switch
+                          id="immediate"
+                          checked={form.immediate}
+                          onCheckedChange={(checked) => setForm(prev => ({ ...prev, immediate: checked }))}
                     className="data-[state=checked]:bg-blue-600"
                   />
                   <Label htmlFor="immediate" className="text-white">Cần bắt đầu ngay</Label>
-                </div>
+                    </div>
 
-                {/* Submit Button */}
-                <Button
-                  type="submit"
+                    {/* Submit Button */}
+                      <Button 
+                        type="submit" 
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   disabled={isSubmitting}
                 >
@@ -556,19 +556,19 @@ const PostJob = () => {
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Đang xử lý...
-                    </div>
+                          </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <Rocket className="w-4 h-4" />
-                      Đăng dự án
+                            Đăng dự án
                     </div>
                   )}
                 </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
     </div>
   );
 };
