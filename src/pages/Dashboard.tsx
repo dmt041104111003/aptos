@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -13,18 +13,305 @@ import {
   CheckCircle,
   Sparkles,
   Award,
-  Shield
+  Shield,
+  Briefcase
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
+import { useWallet } from '../context/WalletContext';
+import { convertIPFSURL } from '@/utils/ipfs';
+import { JobPost } from '../pages/Jobs'; // Import JobPost interface
+
+const CONTRACT_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
+const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242"; // Same as contract address for now
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v5";
+const PROFILE_MODULE_NAME = "web3_profiles_v7";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV7";
+
+const aptosConfig = new AptosConfig({ network: Network.TESTNET });
+const aptos = new Aptos(aptosConfig);
+
+interface ProfileDataFromChain {
+  cid: string;
+  cccd: number;
+  did: string;
+  created_at: number;
+}
 
 const Dashboard = () => {
+  const { account, accountType } = useWallet();
   const [activeTab, setActiveTab] = useState<string>('in-progress');
+  const [inProgressJobs, setInProgressJobs] = useState<JobPost[]>([]);
+  const [completedJobs, setCompletedJobs] = useState<JobPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Animation refs
   const heroRef = useRef(null);
   const statsRef = useRef(null);
   const heroInView = useInView(heroRef, { once: true });
   const statsInView = useInView(statsRef, { once: true });
+
+  const fetchProfileDetails = async (address: string): Promise<{ name: string; avatar: string }> => {
+    let name = "Người dùng ẩn danh";
+    let avatar = "";
+    try {
+      const profileRegistryResource = await aptos.getAccountResource({
+        accountAddress: MODULE_ADDRESS,
+        resourceType: `${MODULE_ADDRESS}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}`,
+      });
+
+      if (profileRegistryResource && (profileRegistryResource as any).profiles?.handle) {
+        const profileTableHandle = (profileRegistryResource as any).profiles.handle;
+
+        const profileDataFromChain = await aptos.getTableItem({
+          handle: profileTableHandle,
+          data: {
+            key_type: "address",
+            value_type: `${MODULE_ADDRESS}::${PROFILE_MODULE_NAME}::ProfileData`,
+            key: address,
+          },
+        }) as ProfileDataFromChain;
+
+        if (profileDataFromChain.cid) {
+          const profileJsonUrl = convertIPFSURL(profileDataFromChain.cid);
+          const response = await fetch(profileJsonUrl);
+          if (response.ok) {
+            const profileJson = await response.json();
+            name = profileJson.name || "Người dùng ẩn danh";
+            avatar = profileJson.profilePic || "";
+          }
+        }
+      }
+    } catch (profileError) {
+      console.warn(`Could not fetch profile for ${address}:`, profileError);
+    }
+    return { name, avatar };
+  };
+
+  const loadUserJobs = async () => {
+    if (!account || accountType !== 'aptos') {
+      setLoading(false);
+      setError("Vui lòng kết nối ví Aptos để xem công việc của bạn.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const fetchedInProgressJobs: JobPost[] = [];
+      const fetchedCompletedJobs: JobPost[] = [];
+
+      // Lấy các JobPostedEvent
+      const rawPostedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+        options: {
+          limit: 100, // Fetch a reasonable number of recent events
+        }
+      });
+
+      // Lấy các WorkerAppliedEvent để biết người dùng có apply hay không
+      const rawAppliedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerAppliedEvent`,
+        options: {
+          limit: 100, // Fetch a reasonable number of recent events
+        }
+      });
+
+      // Lấy các WorkerApprovedEvent để biết người dùng có được chọn làm worker không
+      const rawApprovedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
+        options: {
+          limit: 100, // Fetch a reasonable number of recent events
+        }
+      });
+
+      const userAppliedJobIds = new Set(rawAppliedEvents
+        .filter((event: any) => event.data.worker.toLowerCase() === account.toLowerCase())
+        .map((event: any) => event.data.job_id.toString()));
+      
+      const userApprovedJobIds = new Set(rawApprovedEvents
+        .filter((event: any) => event.data.worker.toLowerCase() === account.toLowerCase())
+        .map((event: any) => event.data.job_id.toString()));
+
+      for (const event of rawPostedEvents) {
+        const eventData = event.data as any; // JobPostedEvent data from blockchain
+        const jobCid = eventData.cid; // CID pointing to job details on IPFS
+
+        if (jobCid) {
+          try {
+            const jobDetailsUrl = convertIPFSURL(jobCid);
+            const response = await fetch(jobDetailsUrl);
+            if (!response.ok) {
+              console.error(`Failed to fetch job details from IPFS for CID ${jobCid}: ${response.statusText}`);
+              continue;
+            }
+            const jobDataFromIPFS = await response.json(); // Job details JSON from IPFS
+
+            // Lấy trạng thái của công việc từ smart contract (cần đọc resource Job)
+            const jobResource = await aptos.getAccountResource({
+              accountAddress: MODULE_ADDRESS,
+              resourceType: `${MODULE_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Jobs`,
+            });
+
+            let jobOnChain: any = null;
+            if (jobResource && (jobResource as any).jobs?.handle) {
+              try {
+                jobOnChain = await aptos.getTableItem({
+                  handle: (jobResource as any).jobs.handle,
+                  data: {
+                    key_type: "u64",
+                    value_type: `${MODULE_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Job`,
+                    key: eventData.job_id,
+                  },
+                });
+              } catch (tableError) {
+                console.warn(`Job ${eventData.job_id} not found in Jobs table, may be completed or cancelled:`, tableError);
+                continue; // Skip if job is not found in the active table
+              }
+            }
+
+            if (!jobOnChain) continue; // Skip if job resource is not found
+
+            // Fetch poster profile details
+            const posterProfile = await fetchProfileDetails(eventData.poster);
+
+            // Check if current user is poster or worker or applicant
+            const isPoster = eventData.poster.toLowerCase() === account.toLowerCase();
+            const isWorker = jobOnChain.worker?.toLowerCase() === account.toLowerCase();
+            const isApplicant = userAppliedJobIds.has(eventData.job_id.toString());
+            const isApprovedWorker = userApprovedJobIds.has(eventData.job_id.toString());
+
+            // Only show jobs relevant to the current user (as poster, worker, or applicant)
+            if (!isPoster && !isWorker && !isApplicant && !isApprovedWorker) {
+              continue;
+            }
+
+            const jobPost: JobPost = {
+              id: eventData.job_id.toString(),
+              title: jobDataFromIPFS.title || "Untitled Job",
+              description: jobDataFromIPFS.description || "No description provided.",
+              category: jobDataFromIPFS.category || "Uncategorized",
+              skills: jobDataFromIPFS.skills || [],
+              budget: { // Ensure budget is correctly parsed
+                min: jobDataFromIPFS.budgetMin || 0,
+                max: jobDataFromIPFS.budgetMax || 0,
+                currency: jobDataFromIPFS.budgetCurrency || "USDC" // Assuming USDC
+              },
+              duration: jobDataFromIPFS.duration || "Flexible",
+              location: jobDataFromIPFS.location || "remote",
+              immediate: jobDataFromIPFS.immediate || false,
+              experience: jobDataFromIPFS.experience || "Any",
+              attachments: jobDataFromIPFS.attachments || [],
+              poster: eventData.poster,
+              posterProfile: jobDataFromIPFS.posterProfile || "",
+              postedAt: new Date(Number(eventData.start_time) * 1000).toISOString(),
+              applicationDeadline: new Date(Number(jobDataFromIPFS.applicationDeadlineDays) * 24 * 60 * 60 * 1000 + Number(eventData.start_time) * 1000).toISOString(),
+              initialFundAmount: jobDataFromIPFS.initialFundAmount || 0,
+              posterDid: jobDataFromIPFS.posterDid || "",
+              client: {
+                id: eventData.poster,
+                name: posterProfile.name,
+                avatar: posterProfile.avatar,
+              },
+              // Add fields from jobOnChain to display status
+              start_time: Number(jobOnChain.start_time),
+              end_time: Number(jobOnChain.end_time),
+              milestones: jobOnChain.milestones.map(Number),
+              duration_per_milestone: jobOnChain.duration_per_milestone.map(Number),
+              worker: jobOnChain.worker,
+              approved: jobOnChain.approved,
+              active: jobOnChain.active,
+              current_milestone: Number(jobOnChain.current_milestone),
+              milestone_states: Object.fromEntries(
+                Object.entries(jobOnChain.milestone_states.data).map(([key, value]: [string, any]) => [
+                  Number(key),
+                  {
+                    submitted: value.submitted,
+                    accepted: value.accepted,
+                    submit_time: Number(value.submit_time),
+                    reject_count: Number(value.reject_count),
+                  },
+                ])
+              ),
+              submit_time: jobOnChain.submit_time ? Number(jobOnChain.submit_time) : null,
+              escrowed_amount: Number(jobOnChain.escrowed_amount),
+              applications: jobOnChain.applications.map((app: any) => ({
+                worker: app.worker,
+                apply_time: Number(app.apply_time),
+                did: app.did,
+                profile_cid: app.profile_cid,
+              })),
+              approve_time: jobOnChain.approve_time ? Number(jobOnChain.approve_time) : null,
+              poster_profile_cid: jobOnChain.poster_profile_cid,
+              completed: jobOnChain.completed,
+              rejected_count: Number(jobOnChain.rejected_count),
+              job_expired: jobOnChain.job_expired,
+              auto_confirmed: jobOnChain.auto_confirmed,
+              milestone_deadlines: jobOnChain.milestone_deadlines.map(Number),
+              selected_application_index: jobOnChain.selected_application_index ? Number(jobOnChain.selected_application_index) : null,
+              last_reject_time: jobOnChain.last_reject_time ? Number(jobOnChain.last_reject_time) : null,
+            };
+
+            if (jobOnChain.completed) {
+              fetchedCompletedJobs.push(jobPost);
+            } else {
+              fetchedInProgressJobs.push(jobPost);
+            }
+
+          } catch (ipfsError) {
+            console.error(`Error processing job from IPFS CID ${jobCid}:`, ipfsError);
+          }
+        }
+      }
+
+      setInProgressJobs(fetchedInProgressJobs);
+      setCompletedJobs(fetchedCompletedJobs);
+
+    } catch (err: any) {
+      console.error("Failed to load user jobs:", err);
+      setError(`Không thể tải công việc của bạn: ${err.message || String(err)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUserJobs();
+  }, [account, accountType]);
+
+  const formatPostedTime = (timestamp: string) => {
+    const now = new Date();
+    const posted = new Date(timestamp);
+    const diffHours = Math.floor((now.getTime() - posted.getTime()) / (1000 * 60 * 60));
+
+    if (diffHours < 1) return 'Vừa đăng';
+    if (diffHours < 24) return `${diffHours} giờ trước`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} ngày trước`;
+  };
+
+  const getMilestoneStatus = (job: JobPost, index: number) => {
+    if (!job.milestone_states) return "Chưa rõ";
+    const milestoneData = (job.milestone_states as any).data.find((m: any) => m.key === index);
+    if (milestoneData?.value.accepted) {
+      return "Hoàn thành";
+    } else if (milestoneData?.value.submitted) {
+      return "Đã nộp";
+    } else {
+      return "Chưa bắt đầu";
+    }
+  };
+
+  const getMilestoneBadgeVariant = (job: JobPost, index: number) => {
+    const status = getMilestoneStatus(job, index);
+    switch (status) {
+      case "Hoàn thành": return "bg-green-500/20 text-green-300 border-green-500/30";
+      case "Đã nộp": return "bg-blue-500/20 text-blue-300 border-blue-500/30";
+      case "Chưa bắt đầu": return "bg-gray-700 text-gray-300 border-gray-500";
+      default: return "";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -132,48 +419,64 @@ const Dashboard = () => {
           {activeTab === 'in-progress' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Dự án đang thực hiện</h2>
-                <Badge className="border-blue-700 text-blue-700 bg-white font-semibold">{mockJobs.slice(0, 3).length} dự án</Badge>
+                <h2 className="text-2xl font-bold text-white">Dự án đang thực hiện</h2>
+                <Badge className="border-blue-700 text-blue-700 bg-white font-semibold">{inProgressJobs.length} dự án</Badge>
               </div>
               
-              {mockJobs.slice(0, 3).map((job, index) => (
+              {loading ? (
+                <div className="flex justify-center items-center py-20">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
+                  <span className="ml-4 text-blue-400">Đang tải công việc...</span>
+                </div>
+              ) : error ? (
+                <div className="text-red-400 text-center py-20">
+                  <Briefcase className="w-16 h-16 mx-auto mb-4" />
+                  <p className="text-xl font-semibold mb-2">Lỗi tải công việc</p>
+                  <p>{error}</p>
+                </div>
+              ) : inProgressJobs.length === 0 ? (
+                <div className="text-gray-400 text-center py-20">
+                  <Briefcase className="w-16 h-16 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Không có dự án đang thực hiện nào.</h3>
+                  <p>Bạn chưa bắt đầu hoặc được chấp thuận cho bất kỳ dự án nào.</p>
+                </div>
+              ) : (
                 <motion.div
-                  key={job.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
                 >
                   <Card className="bg-gradient-to-br from-gray-900/70 to-gray-800/70 border border-white/10 shadow-xl rounded-2xl hover:border-blue-500/30 transition-all duration-300">
                     <CardHeader>
                       <div className="flex flex-wrap justify-between items-start gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 font-semibold">{job.category}</Badge>
+                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 font-semibold">{inProgressJobs[0].category}</Badge>
                             <span className="text-sm text-blue-400 flex items-center gap-1 font-semibold">
                               <Clock className="w-4 h-4" />
                               Đang thực hiện
                             </span>
                           </div>
-                          <CardTitle className="text-xl text-white font-bold">{job.title}</CardTitle>
+                          <CardTitle className="text-xl text-white font-bold">{inProgressJobs[0].title}</CardTitle>
                           <CardDescription className="mt-2 flex items-center gap-4 text-gray-300 font-semibold">
                             <span className="flex items-center gap-1">
                               <DollarSign className="w-4 h-4" />
-                              {job.budget.min}-{job.budget.max} {job.budget.currency}
+                              ${inProgressJobs[0].budget.min.toLocaleString()}-{inProgressJobs[0].budget.max.toLocaleString()} {inProgressJobs[0].budget.currency}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-4 h-4" />
-                              {job.duration}
+                              {inProgressJobs[0].duration}
                             </span>
                           </CardDescription>
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="text-right">
-                            <div className="text-sm font-semibold text-blue-200">{job.client.name}</div>
+                            <div className="text-sm font-semibold text-blue-200">{inProgressJobs[0].client.name}</div>
                             <div className="text-xs text-gray-400">Khách hàng</div>
                           </div>
                           <Avatar className="h-12 w-12 border-2 border-blue-500/30">
-                            <AvatarImage src={job.client.avatar} />
-                            <AvatarFallback className="bg-gray-100 text-blue-700">{job.client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                            <AvatarImage src={inProgressJobs[0].client.avatar} />
+                            <AvatarFallback className="bg-gray-100 text-blue-700">{inProgressJobs[0].client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                           </Avatar>
                         </div>
                       </div>
@@ -183,56 +486,190 @@ const Dashboard = () => {
                       <div className="mb-6">
                         <div className="flex justify-between items-center mb-3">
                           <span className="text-sm font-semibold text-blue-200">Tiến độ dự án</span>
-                          <span className="text-sm font-bold text-blue-400">65%</span>
+                          <span className="text-sm font-bold text-blue-400">
+                            {inProgressJobs.length > 0 ? 
+                              `${Math.floor((inProgressJobs[0].current_milestone / inProgressJobs[0].milestones.length) * 100)}%` : '0%'
+                            }
+                          </span>
                         </div>
                         <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: '65%' }} />
+                          <div 
+                            className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                            style={{ width: inProgressJobs.length > 0 ? `${(inProgressJobs[0].current_milestone / inProgressJobs[0].milestones.length) * 100}%` : '0%' }}
+                          />
                         </div>
                       </div>
                       
                       <div className="space-y-3">
                         <h4 className="text-sm font-semibold text-blue-200 mb-3">Các mốc quan trọng</h4>
                         <div className="space-y-2">
-                          <div className="flex items-center gap-3 group">
-                            <CheckCircle className="w-5 h-5 text-green-400" />
-                            <span className="text-sm font-semibold text-green-200 group-hover:text-blue-400 transition-colors duration-200 cursor-pointer">Milestone 1: Hoàn thành</span>
-                            <Badge className="bg-green-500/20 text-green-300 border-green-500/30 ml-auto font-semibold">Xong</Badge>
-                          </div>
-                          <div className="flex items-center gap-3 group">
-                            <div className="w-5 h-5 rounded-full border-2 border-blue-400 bg-blue-900 flex items-center justify-center">
-                              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                          {inProgressJobs.map((job, index) => (
+                            <div key={job.id} className="flex items-center gap-3 group">
+                              {getMilestoneStatus(job, index) === "Hoàn thành" ? (
+                                <CheckCircle className="w-5 h-5 text-green-400" />
+                              ) : getMilestoneStatus(job, index) === "Đã nộp" ? (
+                                <div className="w-5 h-5 rounded-full border-2 border-blue-400 bg-blue-900 flex items-center justify-center">
+                                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                                </div>
+                              ) : (
+                                <div className="w-5 h-5 rounded-full border-2 border-gray-500" />
+                              )}
+                              <span className="text-sm font-semibold text-white group-hover:text-blue-400 transition-colors duration-200 cursor-pointer">
+                                Milestone {index + 1}: {getMilestoneStatus(job, index)}
+                              </span>
+                              <Badge className={`${getMilestoneBadgeVariant(job, index)} ml-auto font-semibold`}>
+                                {getMilestoneStatus(job, index)}
+                              </Badge>
                             </div>
-                            <span className="text-sm font-semibold text-blue-200 group-hover:text-blue-400 transition-colors duration-200 cursor-pointer">Milestone 2: Đang thực hiện</span>
-                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 ml-auto font-semibold">Đang làm</Badge>
-                          </div>
-                          <div className="flex items-center gap-3 group">
-                            <div className="w-5 h-5 rounded-full border-2 border-gray-500" />
-                            <span className="text-sm text-gray-400 font-semibold group-hover:text-blue-400 transition-colors duration-200 cursor-pointer">Milestone 3: Chưa bắt đầu</span>
-                            <Badge className="bg-gray-700 text-gray-300 border-gray-500 ml-auto font-semibold">Chờ</Badge>
-                          </div>
+                          ))}
                         </div>
                       </div>
                       
                       <div className="mt-6 pt-4 border-t border-white/10">
                         <div className="flex justify-between items-center">
-                          <Button className="group relative z-10 cursor-pointer overflow-hidden rounded-full  font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10">
-                            <span className="relative inline-flex overflow-hidden font-primary text-base">
-                              <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
-                                Xem chi tiết
-                              </div>
-                              <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
-                                Xem chi tiết
-                              </div>
+                          {/* Render buttons based on user role and job status */}
+                          {inProgressJobs[0].poster.toLowerCase() === account?.toLowerCase() && !inProgressJobs[0].completed && inProgressJobs[0].worker?.toLowerCase() === account?.toLowerCase() && (
+                            <> {/* Only if a worker is approved */}
+                              <Button className="group relative z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10">
+                                <span className="relative inline-flex overflow-hidden font-primary text-base">
+                                  <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">Duyệt/Từ chối</div>
+                                  <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">Duyệt/Từ chối</div>
+                                </span>
+                              </Button>
+                              <Button className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white group relative z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow">
+                                <span className="relative inline-flex overflow-hidden font-primary text-base">
+                                  <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">Hủy công việc</div>
+                                  <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">Hủy công việc</div>
+                                </span>
+                              </Button>
+                            </>
+                          )}
+                          {inProgressJobs[0].worker?.toLowerCase() === account?.toLowerCase() && !inProgressJobs[0].completed && inProgressJobs[0].approved && (
+                            <Button className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white group relative z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow">
+                              <span className="relative inline-flex overflow-hidden font-primary text-base">
+                                <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">Nộp Milestone</div>
+                                <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">Nộp Milestone</div>
+                              </span>
+                            </Button>
+                          )}
+                          {!inProgressJobs[0].poster.toLowerCase() === account?.toLowerCase() && !inProgressJobs[0].worker?.toLowerCase() === account?.toLowerCase() && inProgressJobs[0].applications.some(app => app.worker.toLowerCase() === account?.toLowerCase()) && !inProgressJobs[0].approved && (
+                            <Button className="group relative z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10" disabled>
+                              <span className="relative inline-flex overflow-hidden font-primary text-base">
+                                <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">Đã ứng tuyển</div>
+                                <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">Đã ứng tuyển</div>
+                              </span>
+                            </Button>
+                          )}
+                          {!inProgressJobs[0].poster.toLowerCase() === account?.toLowerCase() && !inProgressJobs[0].worker?.toLowerCase() === account?.toLowerCase() && (
+                             <Button className="group relative z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10">
+                                <span className="relative inline-flex overflow-hidden font-primary text-base">
+                                  <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">Xem chi tiết</div>
+                                  <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">Xem chi tiết</div>
+                                </span>
+                              </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </div>
+          )}
+          {activeTab === 'completed' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Dự án đã hoàn thành</h2>
+                <Badge className="border-blue-700 text-blue-700 bg-white font-semibold">{completedJobs.length} dự án</Badge>
+              </div>
+
+              {loading ? (
+                <div className="flex justify-center items-center py-20">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
+                  <span className="ml-4 text-blue-400">Đang tải công việc...</span>
+                </div>
+              ) : error ? (
+                <div className="text-red-400 text-center py-20">
+                  <Briefcase className="w-16 h-16 mx-auto mb-4" />
+                  <p className="text-xl font-semibold mb-2">Lỗi tải công việc</p>
+                  <p>{error}</p>
+                </div>
+              ) : completedJobs.length === 0 ? (
+                <div className="text-gray-400 text-center py-20">
+                  <Briefcase className="w-16 h-16 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Không có dự án đã hoàn thành nào.</h3>
+                  <p>Bạn chưa hoàn thành bất kỳ dự án nào.</p>
+                </div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                >
+                  <Card className="bg-gradient-to-br from-gray-900/70 to-gray-800/70 border border-white/10 shadow-xl rounded-2xl hover:border-blue-500/30 transition-all duration-300">
+                    <CardHeader>
+                      <div className="flex flex-wrap justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 font-semibold">{completedJobs[0].category}</Badge>
+                            <span className="text-sm text-blue-400 flex items-center gap-1 font-semibold">
+                              <CheckCircle className="w-4 h-4" />
+                              Đã hoàn thành
                             </span>
-                          </Button>
-                          <Button className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white group relative z-10 cursor-pointer overflow-hidden rounded-full  font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10">
+                          </div>
+                          <CardTitle className="text-xl text-white font-bold">{completedJobs[0].title}</CardTitle>
+                          <CardDescription className="mt-2 flex items-center gap-4 text-gray-300 font-semibold">
+                            <span className="flex items-center gap-1">
+                              <DollarSign className="w-4 h-4" />
+                              ${completedJobs[0].budget.min.toLocaleString()}-{completedJobs[0].budget.max.toLocaleString()} {completedJobs[0].budget.currency}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {completedJobs[0].duration}
+                            </span>
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-blue-200">{completedJobs[0].client.name}</div>
+                            <div className="text-xs text-gray-400">Khách hàng</div>
+                          </div>
+                          <Avatar className="h-12 w-12 border-2 border-blue-500/30">
+                            <AvatarImage src={completedJobs[0].client.avatar} />
+                            <AvatarFallback className="bg-gray-100 text-blue-700">{completedJobs[0].client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent>
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-semibold text-blue-200 mb-3">Các mốc quan trọng</h4>
+                        <div className="space-y-2">
+                          {completedJobs.map((job, index) => (
+                            <div key={job.id} className="flex items-center gap-3 group">
+                              {getMilestoneStatus(job, index) === "Hoàn thành" ? (
+                                <CheckCircle className="w-5 h-5 text-green-400" />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full border-2 border-gray-500" />
+                              )}
+                              <span className="text-sm font-semibold text-white group-hover:text-blue-400 transition-colors duration-200 cursor-pointer">
+                                Milestone {index + 1}: {getMilestoneStatus(job, index)}
+                              </span>
+                              <Badge className={`${getMilestoneBadgeVariant(job, index)} ml-auto font-semibold`}>
+                                {getMilestoneStatus(job, index)}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-6 pt-4 border-t border-white/10">
+                        <div className="flex justify-between items-center">
+                          <Button className="group relative z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10">
                             <span className="relative inline-flex overflow-hidden font-primary text-base">
-                              <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
-                                Cập nhật tiến độ
-                              </div>
-                              <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
-                                Cập nhật tiến độ
-                              </div>
+                              <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">Xem chi tiết</div>
+                              <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">Xem chi tiết</div>
                             </span>
                           </Button>
                         </div>
@@ -240,285 +677,29 @@ const Dashboard = () => {
                     </CardContent>
                   </Card>
                 </motion.div>
-              ))}
-            </div>
-          )}
-          {activeTab === 'completed' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold mb-4 font-heading text-corporate-accent">Completed Jobs</h2>
-              
-              {mockJobs.slice(3, 5).map((job) => (
-                <Card key={job.id} className="bg-gradient-to-br from-gray-900/70 to-gray-800/70 border border-white/10 shadow-xl rounded-2xl p-6">
-                  <CardHeader>
-                    <div className="flex flex-wrap justify-between items-start gap-2">
-                      <div>
-                        <CardTitle className="font-heading text-gray-100">{job.title}</CardTitle>
-                        <CardDescription className="mt-1 font-primary text-gray-400">
-                          {job.budget.min}-{job.budget.max} {job.budget.currency} • Completed 3 weeks ago
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={job.client.avatar} />
-                          <AvatarFallback className="bg-gray-700 text-blue-500">{job.client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="text-sm font-primary text-gray-100">{job.client.name}</div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <div className="mb-4">
-                      <div className="flex justify-between mb-1">
-                        <span className="text-sm font-medium font-primary text-gray-300">Rating</span>
-                        <span className="text-sm font-medium font-primary text-blue-500">5.0</span>
-                      </div>
-                      <div className="flex">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <svg key={star} xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="bg-gray-700 p-3 rounded-md">
-                      <p className="text-sm italic text-gray-300 font-primary">
-                        "Excellent work! Delivered ahead of schedule and the smart contract passed our audit with flying colors. Would definitely work with again!"
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              )}
             </div>
           )}
           {activeTab === 'earnings' && (
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold mb-4 font-heading text-corporate-accent">Earnings History</h2>
-              
+              <h2 className="text-2xl font-bold text-white mb-4">Tổng quan thu nhập</h2>
               <Card className="bg-gradient-to-br from-gray-900/70 to-gray-800/70 border border-white/10 shadow-xl rounded-2xl p-6">
-                <CardHeader>
-                  <CardTitle className="font-heading text-gray-100">Earnings Overview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] flex items-center justify-center text-gray-400 font-primary">
-                    [Earnings Chart Placeholder]
-                  </div>
+                <CardTitle className="text-xl text-blue-400 mb-4">Biểu đồ thu nhập (Sắp ra mắt)</CardTitle>
+                <CardContent className="text-gray-400 text-center py-10">
+                  Tính năng này sẽ sớm có mặt!
                 </CardContent>
               </Card>
-              
-              <h3 className="text-lg font-semibold mt-6 mb-3 font-heading text-corporate-accent">Recent Transactions</h3>
-              
-              <div className="bg-gradient-to-br from-gray-900/70 to-gray-800/70 border border-white/10 shadow-xl rounded-2xl p-6">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-corporate-light">
-                    <thead className="bg-corporate-light">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider font-primary">
-                          Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider font-primary">
-                          Project
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider font-primary">
-                          Client
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider font-primary">
-                          Amount
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider font-primary">
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-corporate-white divide-y divide-corporate-light">
-                      <tr>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-primary">
-                          Apr 20, 2023
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-primary">
-                          Smart Contract Audit
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-primary">
-                          NFT Creators Guild
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-primary">
-                          4,500 USDC
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-corporate-success/10 text-corporate-success border border-corporate-success/20">
-                            Completed
-                          </span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-primary">
-                          Apr 5, 2023
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-primary">
-                          DeFi Dashboard UI
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-primary">
-                          CryptoDesign Co
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-primary">
-                          2,200 USDC
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-corporate-success/10 text-corporate-success border border-corporate-success/20">
-                            Completed
-                          </span>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-primary">
-                          Mar 22, 2023
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 font-primary">
-                          NFT Marketplace
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-primary">
-                          Decentralia Labs
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-primary">
-                          1,545 USDC
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-corporate-accent/10 text-corporate-accent border border-corporate-accent/20">
-                            In Escrow
-                          </span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
           )}
           {activeTab === 'reputation' && (
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold mb-4 font-heading text-corporate-accent">Reputation & Credentials</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="bg-gradient-to-br from-gray-900/70 to-gray-800/70 border border-white/10 shadow-xl rounded-2xl p-6">
-                  <CardHeader>
-                    <CardTitle className="font-heading text-gray-100">Reputation Score</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center mb-4">
-                      <div className="bg-blue-500 text-white text-4xl font-bold rounded-full w-20 h-20 flex items-center justify-center mr-4">
-                        4.8
-                      </div>
-                      <div>
-                        <div className="flex mb-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <svg key={star} xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${star <= 4.8 ? 'text-yellow-500' : 'text-gray-600'}`} viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          ))}
-                        </div>
-                        <p className="text-sm text-gray-400 font-primary">Based on 12 completed jobs</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <div className="text-sm font-primary text-gray-300">Communication</div>
-                          <div className="text-sm font-medium font-primary text-blue-500">4.9</div>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-gray-700 overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: '98%' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <div className="text-sm font-primary text-gray-300">Quality of Work</div>
-                          <div className="text-sm font-medium font-primary text-blue-500">5.0</div>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-gray-700 overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: '100%' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <div className="text-sm font-primary text-gray-300">Timeliness</div>
-                          <div className="text-sm font-medium font-primary text-blue-500">4.7</div>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-gray-700 overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: '94%' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <div className="text-sm font-primary text-gray-300">Code Quality</div>
-                          <div className="text-sm font-medium font-primary text-blue-500">4.8</div>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-gray-700 overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: '96%' }} />
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-gradient-to-br from-gray-900/70 to-gray-800/70 border border-white/10 shadow-xl rounded-2xl p-6">
-                  <CardHeader>
-                    <CardTitle className="font-heading text-gray-100">Web3 Credentials</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-start">
-                        <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-medium font-primary text-gray-100">Verified DID (Decentralized ID)</h3>
-                          <p className="text-xs text-gray-400 mt-1 font-primary">did:ethr:0x1a2b3c...</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start">
-                        <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-medium font-primary text-gray-100">Lens Protocol Verification</h3>
-                          <p className="text-xs text-gray-400 mt-1 font-primary">@web3dev.lens</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start">
-                        <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a4 4 0 00-4-4H8.8a4 4 0 00-2.6 1L3 6v7M3 13h18" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-medium font-primary text-gray-100">Skill NFTs</h3>
-                          <p className="text-xs text-gray-400 mt-1 font-primary">3 verified skill credentials</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-start">
-                        <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center mr-3 flex-shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-medium font-primary text-gray-100">Gitcoin Passport</h3>
-                          <p className="text-xs text-gray-400 mt-1 font-primary">24 stamps verified</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <h2 className="text-2xl font-bold text-white mb-4">Tổng quan danh tiếng</h2>
+              <Card className="bg-gradient-to-br from-gray-900/70 to-gray-800/70 border border-white/10 shadow-xl rounded-2xl p-6">
+                <CardTitle className="text-xl text-violet-400 mb-4">Điểm danh tiếng của bạn</CardTitle>
+                <CardContent className="text-gray-400 text-center py-10">
+                  Thông tin chi tiết về danh tiếng của bạn sẽ được hiển thị tại đây.
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
