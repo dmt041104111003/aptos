@@ -4,9 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  TrendingUp, 
-  Star, 
+import {
+  TrendingUp,
+  Star,
   DollarSign,
   Clock,
   CheckCircle,
@@ -19,12 +19,57 @@ import {
   CalendarCheck
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
-import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { useWallet } from '../context/WalletContext';
 import { convertIPFSURL } from '@/utils/ipfs';
-import { JobPost } from '../pages/Jobs'; // Import JobPost interface
 import { toast } from '@/components/ui/sonner';
-import { fetchProfileDetails, ProfileDataFromChain } from '@/utils/aptosUtils';
+import { aptos, fetchProfileDetails } from '@/utils/aptosUtils';
+
+// Define JobPost interface locally to ensure consistency
+interface JobPost {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  skills: string[];
+  budget: { min: number; max: number; currency: string };
+  duration: string;
+  location: "remote" | "onsite" | "hybrid";
+  immediate: boolean;
+  experience: string;
+  attachments: string[];
+  poster: string;
+  posterProfile: string;
+  postedAt: string;
+  initialFundAmount: number;
+  client: {
+    id: string;
+    name: string;
+    avatar: string;
+  };
+  start_time: number;
+  end_time: number;
+  milestones: number[];
+  duration_per_milestone: number[];
+  worker: string | null;
+  approved: boolean;
+  active: boolean;
+  current_milestone: number;
+  milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } };
+  submit_time: number | null;
+  escrowed_amount: number;
+  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfileAvatar: string }[];
+  approve_time: number | null;
+  poster_did: string;
+  poster_profile_cid: string;
+  completed: boolean;
+  rejected_count: number;
+  job_expired: boolean;
+  auto_confirmed: boolean[];
+  milestone_deadlines: number[];
+  application_deadline: number;
+  selected_application_index: number | null;
+  last_reject_time: number | null;
+}
 
 const CONTRACT_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
 const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242"; // Same as contract address for now
@@ -32,17 +77,15 @@ const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v5";
 const PROFILE_MODULE_NAME = "web3_profiles_v7";
 const PROFILE_RESOURCE_NAME = "ProfileRegistryV7";
 
-const aptosConfig = new AptosConfig({ network: Network.TESTNET });
-const aptos = new Aptos(aptosConfig);
-
 const Dashboard = () => {
   const { account, accountType } = useWallet();
   const [activeTab, setActiveTab] = useState<string>('in-progress');
   const [inProgressJobs, setInProgressJobs] = useState<JobPost[]>([]);
   const [completedJobs, setCompletedJobs] = useState<JobPost[]>([]);
+  const [jobsWithApplications, setJobsWithApplications] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Animation refs
   const heroRef = useRef(null);
   const statsRef = useRef(null);
@@ -66,6 +109,7 @@ const Dashboard = () => {
     try {
       const fetchedInProgressJobs: JobPost[] = [];
       const fetchedCompletedJobs: JobPost[] = [];
+      const fetchedJobsWithApplications: JobPost[] = [];
 
       console.log("Dashboard: Fetching Events resource...");
       const eventsResource = await aptos.getAccountResource({
@@ -89,6 +133,26 @@ const Dashboard = () => {
       });
       console.log("Dashboard: Fetched raw JobPostedEvents:", rawPostedEvents);
 
+      // Fetch all application and approval events directly
+      console.log("Dashboard: Fetching all WorkerAppliedEvent...");
+      const rawAppliedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerAppliedEvent`,
+        options: {
+          limit: 100,
+        }
+      });
+      console.log("Dashboard: Fetched raw WorkerAppliedEvents:", rawAppliedEvents);
+
+      console.log("Dashboard: Fetching all WorkerApprovedEvent...");
+      const rawApprovedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
+        options: {
+          limit: 100,
+        }
+      });
+      console.log("Dashboard: Fetched raw WorkerApprovedEvents:", rawApprovedEvents);
+
+
       const allJobIds = new Set(rawPostedEvents.map((e: any) => e.data.job_id.toString()));
       const jobDetailsMap = new Map<string, any>();
 
@@ -98,9 +162,9 @@ const Dashboard = () => {
           try {
             const jobDetailsUrl = convertIPFSURL(jobCid);
             const response = await fetch(jobDetailsUrl);
-            
+
             const contentType = response.headers.get('content-type');
-            
+
             if (!response.ok) {
               const errorText = await response.text();
               console.error(`Dashboard: IPFS fetch failed for CID ${jobCid}. Status: ${response.status}. Response text: ${errorText.slice(0, 500)}`);
@@ -165,7 +229,7 @@ const Dashboard = () => {
             console.warn(`Dashboard: No on-chain data found for job ${jobId}.`);
             continue; // Skip if job resource is not found
           }
-        
+
           const jobDataFromIPFS: Record<string, any> = jobDetailsMap.get(jobId) || {};
           console.log(`Dashboard: IPFS data for job ${jobId}:`, jobDataFromIPFS);
 
@@ -173,16 +237,26 @@ const Dashboard = () => {
           const posterProfile = await fetchProfileDetails(jobOnChain.poster);
           console.log(`Dashboard: Poster profile for ${jobOnChain.poster}:`, posterProfile);
 
-          // Populate applications with profile data using aptosUtils.ts (which has caching)
-          const applicationsWithProfiles = await Promise.all(jobOnChain.applications.map(async (app: any) => {
-            const workerProfile = await fetchProfileDetails(app.worker);
-            console.log(`Dashboard: Worker profile for application ${app.worker}:`, workerProfile);
+          // Build applications for this job from WorkerAppliedEvents
+          const jobAppliedEvents = rawAppliedEvents.filter((e: any) => e.data.job_id.toString() === jobId);
+          const applicationsWithProfiles = await Promise.all(jobAppliedEvents.map(async (appEvent: any) => {
+            const workerProfile = await fetchProfileDetails(appEvent.data.worker);
+            console.log(`Dashboard: Worker profile for application ${appEvent.data.worker}:`, workerProfile);
             return {
-              ...app,
+              worker: appEvent.data.worker,
+              apply_time: Number(appEvent.data.apply_time),
+              did: appEvent.data.did,
+              profile_cid: appEvent.data.profile_cid,
               workerProfileName: workerProfile.name,
               workerProfileAvatar: workerProfile.avatar,
             };
           }));
+
+          // Determine approved worker from WorkerApprovedEvents
+          const approvalEvent = rawApprovedEvents.find((e: any) => e.data.job_id.toString() === jobId);
+          const approvedWorkerAddress = approvalEvent ? approvalEvent.data.worker : null;
+          const isApproved = !!approvalEvent;
+          const approveTime = approvalEvent ? Number(approvalEvent.data.approve_time) : null;
 
           const jobPost: JobPost = {
             id: jobId,
@@ -213,8 +287,8 @@ const Dashboard = () => {
             end_time: Number(jobOnChain.end_time || 0),
             milestones: jobOnChain.milestones ? jobOnChain.milestones.map(Number) : [],
             duration_per_milestone: jobOnChain.duration_per_milestone ? jobOnChain.duration_per_milestone.map(Number) : [],
-            worker: jobOnChain.worker,
-            approved: jobOnChain.approved,
+            worker: approvedWorkerAddress, // Use derived approved worker
+            approved: isApproved, // Use derived approved status
             active: jobOnChain.active,
             current_milestone: Number(jobOnChain.current_milestone),
             milestone_states: Object.fromEntries(
@@ -230,8 +304,8 @@ const Dashboard = () => {
             ),
             submit_time: jobOnChain.submit_time ? Number(jobOnChain.submit_time) : null,
             escrowed_amount: Number(jobOnChain.escrowed_amount),
-            applications: applicationsWithProfiles,
-            approve_time: jobOnChain.approve_time ? Number(jobOnChain.approve_time) : null,
+            applications: applicationsWithProfiles, // Use applications built from events
+            approve_time: approveTime, // Use derived approve time
             poster_did: jobOnChain.poster_did,
             poster_profile_cid: jobOnChain.poster_profile_cid,
             completed: jobOnChain.completed,
@@ -248,7 +322,16 @@ const Dashboard = () => {
           const isPoster = jobPost.poster.toLowerCase() === userAddress;
           const isWorker = jobPost.worker && jobPost.worker.toLowerCase() === userAddress;
           const isApplicant = jobPost.applications.some(app => app.worker && app.worker.toLowerCase() === userAddress);
-          console.log(`Dashboard: Job ${jobId} - isPoster: ${isPoster}, isWorker: ${isWorker}, isApplicant: ${isApplicant}`);
+
+          // Detailed logging for classification
+          console.log(`Dashboard: --- Processing Job ID: ${jobId} ---`);
+          console.log(`Dashboard: Job Poster (on-chain): ${jobOnChain.poster}, Is Current User Poster: ${isPoster}`);
+          console.log(`Dashboard: Current Account: ${userAddress}`);
+          console.log(`Dashboard: Job Worker (derived): ${jobPost.worker}, Is Current User Worker: ${isWorker}`); // Using derived worker
+          console.log(`Dashboard: Number of applications for Job ${jobId}: ${jobPost.applications.length}, Is Current User Applicant: ${isApplicant}`);
+          console.log(`Dashboard: Job Active: ${jobOnChain.active}, Completed: ${jobOnChain.completed}, Expired: ${jobOnChain.job_expired}`);
+          console.log(`Dashboard: Applications array for Job ${jobId}:`, jobPost.applications);
+
 
           if (isPoster || isWorker || isApplicant) {
             if (jobPost.completed || jobPost.job_expired || !jobPost.active) {
@@ -260,15 +343,29 @@ const Dashboard = () => {
             }
           }
 
+          // Logic for 'jobsWithApplications' tab
+          // A job is in "applications" tab if the current user is the poster, it has applications, and no worker has been approved yet.
+          if (isPoster && jobPost.applications.length > 0 && !jobPost.worker) {
+            fetchedJobsWithApplications.push(jobPost);
+            console.log(`Dashboard: Job ${jobId} ADDED to jobs with applications. Current count: ${fetchedJobsWithApplications.length}`);
+          } else {
+            console.log(`Dashboard: Job ${jobId} NOT ADDED to jobs with applications. Conditions (isPoster && applications.length > 0 && !jobPost.worker): ${isPoster} && ${jobPost.applications.length > 0} && ${!jobPost.worker}`);
+          }
+
         } catch (jobFetchError) {
           console.error(`Dashboard: Error fetching on-chain data for job ${jobId}:`, jobFetchError);
         }
       }
 
-      console.log("Dashboard: Final inProgressJobs:", fetchedInProgressJobs);
-      console.log("Dashboard: Final completedJobs:", fetchedCompletedJobs);
+      console.log("Dashboard: Final job arrays: ", {
+        inProgress: fetchedInProgressJobs.length,
+        completed: fetchedCompletedJobs.length,
+        withApplications: fetchedJobsWithApplications.length
+      });
+
       setInProgressJobs(fetchedInProgressJobs);
       setCompletedJobs(fetchedCompletedJobs);
+      setJobsWithApplications(fetchedJobsWithApplications);
       setLoading(false);
 
     } catch (error: any) {
@@ -302,7 +399,7 @@ const Dashboard = () => {
 
   const getMilestoneBadgeVariant = (job: JobPost, index: number) => {
     const milestoneData = job.milestone_states[index];
-    if (!milestoneData) return 'default';
+    if (!milestoneData) return 'secondary'; // Default to secondary if no data
     if (milestoneData.accepted) return 'default';
     if (milestoneData.submitted) return 'secondary';
     if (milestoneData.reject_count > 0) return 'destructive';
@@ -335,7 +432,7 @@ const Dashboard = () => {
     }
   };
 
-  const renderJobCard = (job: JobPost, type: 'in-progress' | 'completed') => (
+  const renderJobCard = (job: JobPost, type: 'in-progress' | 'completed' | 'applications') => (
     <motion.div
       key={job.id}
       initial={{ opacity: 0, y: 20 }}
@@ -409,7 +506,7 @@ const Dashboard = () => {
                 )}
 
                 {/* Milestones for active jobs */}
-                {type === 'in-progress' && job.milestones.length > 0 && (
+                {type === 'in-progress' && job.milestones.length > 0 && ( // Apply only to in-progress tab
                   <div className="mt-4">
                     <h4 className="font-medium text-white mb-2 flex items-center gap-2"><Hourglass size={16} className="text-yellow-400" />Tiến độ dự án ({job.current_milestone}/{job.milestones.length})</h4>
                     <ul className="space-y-2">
@@ -424,7 +521,8 @@ const Dashboard = () => {
                 )}
 
                 {/* Application List (for posters) */}
-                {job.poster.toLowerCase() === account?.toLowerCase() && !job.worker && job.applications.length > 0 && (
+                {/* This block is now controlled by the 'applications' tab logic for display */}
+                {(type === 'applications' || (type === 'in-progress' && job.poster.toLowerCase() === account?.toLowerCase() && !job.worker)) && job.applications.length > 0 && (
                   <div className="mt-4 p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
                     <h4 className="font-semibold text-white mb-3 flex items-center gap-2"><Users size={16} className="text-blue-300" />Đơn ứng tuyển ({job.applications.length})</h4>
                     <ul className="space-y-3">
@@ -440,9 +538,9 @@ const Dashboard = () => {
                               <p className="text-xs text-gray-400">Ứng tuyển lúc: {formatPostedTime(app.apply_time)}</p>
                             </div>
                           </div>
-                          <Button 
-                            size="sm" 
-                            className="bg-green-600 hover:bg-green-700 text-white" 
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => handleApproveWorker(job.id, index)}
                           >
                             Chấp nhận
@@ -453,7 +551,7 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {job.poster.toLowerCase() === account?.toLowerCase() && !job.worker && job.applications.length === 0 && (
+                {(type === 'applications' || (type === 'in-progress' && job.poster.toLowerCase() === account?.toLowerCase() && !job.worker)) && job.applications.length === 0 && ( // Apply to applications tab and in-progress tab for poster
                   <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-white/10 text-center text-gray-400 text-sm">
                     Chưa có đơn ứng tuyển nào.
                   </div>
@@ -471,7 +569,7 @@ const Dashboard = () => {
       <Navbar />
 
       <section ref={heroRef} className="relative py-20 bg-gradient-to-br from-blue-900/20 via-violet-900/30 to-black">
-        <div className="absolute inset-0 bg-[url('/img/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0)))" />
+        <div className="absolute inset-0 bg-[url('/img/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -500,15 +598,15 @@ const Dashboard = () => {
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-400">{inProgressJobs.length}</div>
               <div className="text-gray-400">Dự án đang tiến hành</div>
-              </div>
+            </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-violet-400">{completedJobs.length}</div>
+              <div className="text-3xl font-bold text-violet-400">{jobsWithApplications.length}</div>
+              <div className="text-gray-400">Dự án đang ứng tuyển</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-purple-400">{completedJobs.length}</div>
               <div className="text-gray-400">Dự án đã hoàn thành</div>
-              </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-purple-400">24/7</div>
-              <div className="text-gray-400">Hỗ trợ</div>
-              </div>
+            </div>
           </motion.div>
 
           <div className="flex border-b border-white/10 mb-8">
@@ -523,6 +621,16 @@ const Dashboard = () => {
               Đang tiến hành
             </button>
             <button
+              onClick={() => setActiveTab('applications')}
+              className={`px-6 py-3 text-lg font-semibold ${
+                activeTab === 'applications'
+                  ? 'text-blue-400 border-b-2 border-blue-400'
+                  : 'text-gray-400 hover:text-white'
+              } transition-colors duration-200`}
+            >
+              Đang ứng tuyển ({jobsWithApplications.length})
+            </button>
+            <button
               onClick={() => setActiveTab('completed')}
               className={`px-6 py-3 text-lg font-semibold ${
                 activeTab === 'completed'
@@ -533,7 +641,7 @@ const Dashboard = () => {
               Đã hoàn thành
             </button>
           </div>
-          
+
           {loading && (
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400"></div>
@@ -559,10 +667,22 @@ const Dashboard = () => {
                   ) : (
                     <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
                       Bạn chưa có dự án nào đang tiến hành.
-                  </div>
+                    </div>
                   )}
-            </div>
-          )}
+                </div>
+              )}
+
+              {activeTab === 'applications' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {jobsWithApplications.length > 0 ? (
+                    jobsWithApplications.map(job => renderJobCard(job, 'applications'))
+                  ) : (
+                    <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
+                      Chưa có đơn ứng tuyển nào.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {activeTab === 'completed' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -573,7 +693,7 @@ const Dashboard = () => {
                       Bạn chưa có dự án nào đã hoàn thành.
                     </div>
                   )}
-                        </div>
+                </div>
               )}
             </motion.div>
           )}
