@@ -44,10 +44,16 @@ declare global { interface Window { ethereum?: any } }
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_JOBS_CONTRACT_ADDRESS;
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
-const MODULE_NAME = "web3_profiles_v2";
-const RESOURCE_NAME = "ProfileRegistryV2";
+const MODULE_NAME = "web3_profiles_v4";
+const RESOURCE_NAME = "ProfileRegistryV4";
 const aptosConfig = new AptosConfig({ network: Network.TESTNET });
 const aptos = new Aptos(aptosConfig);
+
+interface ProfileDataFromChain {
+  cid: string;
+  cccd: number;
+  did: string;
+}
 
 export interface JobPost {
   id: string;
@@ -196,7 +202,6 @@ const Jobs = () => {
     if (!profileAddress.trim()) {
       setProfileError("Vui lòng nhập địa chỉ ví Aptos để tra cứu.");
       setProfileLoading(false);
-      
       return;
     }
 
@@ -217,7 +222,6 @@ const Jobs = () => {
         if (!registryResource) {
           setProfileError("Hệ thống đăng ký hồ sơ không tìm thấy. Vui lòng kiểm tra lại cấu hình hoặc module.");
           setProfileLoading(false);
-          
           return;
         }
 
@@ -225,19 +229,18 @@ const Jobs = () => {
         if (!profiles?.handle) {
           setProfileError("Không tìm thấy Event Handle của bảng hồ sơ. Vui lòng kiểm tra lại cấu hình hoặc module.");
           setProfileLoading(false);
-          
           return;
         }
         registryResourceHandle = profiles.handle;
       } catch (err: any) {
         setProfileError(`Lỗi khi truy xuất thông tin Registry: ${err.message || String(err)}`);
         setProfileLoading(false);
-        
         return;
       }
 
       if (registryResourceHandle) {
         try {
+          // Check if profile exists by attempting to get the table item
           await aptos.getTableItem({
             handle: registryResourceHandle,
             data: {
@@ -246,8 +249,8 @@ const Jobs = () => {
               key: profileAddress,
             },
           });
-          setProfileResult("Đã đăng ký hồ sơ");
           profileExists = true;
+          setProfileResult("Đã đăng ký hồ sơ");
           setProfileError(null); 
           
         } catch (e: any) {
@@ -265,12 +268,12 @@ const Jobs = () => {
 
       if (profileExists) {
         const updateEventsRes = await fetch(
-          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v2::ProfileRegistryV2/update_events`
+          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v4::ProfileRegistryV4/update_events`
         );
         const updateEvents = await updateEventsRes.json();
 
         const transferEventsRes = await fetch(
-          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v2::ProfileRegistryV2/transfer_events`
+          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v4::ProfileRegistryV4/transfer_events`
         );
         const transferEvents = await transferEventsRes.json();
 
@@ -433,6 +436,7 @@ const Jobs = () => {
                                 <div className="text-sm text-gray-300"><b>Người dùng:</b> <span className="break-all text-gray-400">{item.data.user}</span></div>
                                 <div className="text-sm text-gray-300"><b>CID mới:</b> <span className="break-all text-gray-400">{item.data.cid}</span></div>
                                 <div className="text-sm text-gray-300"><b>CCCD mới:</b> <span className="break-all text-gray-400">{item.data.cccd}</span></div>
+                                <div className="text-sm text-gray-300"><b>DID mới:</b> <span className="break-all text-gray-400">{item.data.did}</span></div>
                               </>
                             ) : (
                               <>

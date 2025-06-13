@@ -8,8 +8,8 @@ import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { motion } from "framer-motion";
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
-const MODULE_NAME = "web3_profiles_v2";
-const RESOURCE_NAME = "ProfileRegistryV2";
+const MODULE_NAME = "web3_profiles_v4";
+const RESOURCE_NAME = "ProfileRegistryV4";
 
 const config = new AptosConfig({ network: Network.TESTNET });
 const aptos = new Aptos(config);
@@ -17,6 +17,7 @@ const aptos = new Aptos(config);
 interface ProfileDataFromChain {
   cid: string;
   cccd: number;
+  did: string;
 }
 
 export default function MyProfile() {
@@ -89,67 +90,85 @@ export default function MyProfile() {
     const fetchProfile = async () => {
       if (!account || accountType !== 'aptos') {
         setLoading(false);
+        console.log("MyProfile: No Aptos account connected.");
         return;
       }
       try {
-
+        console.log("MyProfile: Attempting to fetch registry resource from:", MODULE_ADDRESS);
         const registryResource = await aptos.getAccountResource({
           accountAddress: MODULE_ADDRESS,
-          resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME}`,
+          resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME}` as `${string}::${string}::${string}`,
         });
 
         if (!registryResource) {
+          console.log("MyProfile: Profile registry resource not found for module.");
           throw new Error("Profile not registered: Resource data missing.");
         }
 
+        console.log("MyProfile: Registry resource found.", registryResource);
         const profiles = (registryResource as any)?.profiles;
         if (!profiles?.handle) {
+          console.log("MyProfile: Profiles table handle missing from registry resource.");
           throw new Error("Profile not registered: Profiles table handle missing.");
         }
 
         const profilesTableHandle = profiles.handle;
+        console.log("MyProfile: Profiles table handle:", profilesTableHandle);
 
+        console.log("MyProfile: Attempting to get table item for account:", account);
         const profileDataFromChain = await aptos.getTableItem({
           handle: profilesTableHandle,
           data: {
             key_type: "address",
-            value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::ProfileData`,
+            value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`,
             key: account,
           },
         }) as ProfileDataFromChain;
 
+        console.log("MyProfile: Profile data from chain:", profileDataFromChain);
         const profileCID = profileDataFromChain.cid;
         const cccdData = profileDataFromChain.cccd;
+        const didData = profileDataFromChain.did;
 
         if (!profileCID) {
-          throw new Error("Profile not registered");
+          console.log("MyProfile: Profile CID is empty.");
+          throw new Error("Profile not registered: CID is empty.");
         }
 
+        console.log("MyProfile: Fetching profile data from IPFS using CID:", profileCID);
         const url = convertIPFSURL(profileCID);
         const response = await fetch(url);
         const text = await response.text();
         if (!response.ok || text.startsWith("<!DOCTYPE")) {
+          console.error(`MyProfile: IPFS fetch failed: ${response.status} - ${text.slice(0, 50)}...`);
           throw new Error(`IPFS fetch failed: ${text.slice(0, 50)}...`);
         }
         const profileData = JSON.parse(text);
+        console.log("MyProfile: Profile data from IPFS:", profileData);
         setProfile({
           ...profileData,
           cccd: cccdData,
+          did: didData,
         });
-      } catch (err) {
-        console.error("Lỗi khi tải hồ sơ:", err);
+        console.log("MyProfile: Profile set successfully.");
+      } catch (err: any) {
+        console.error("MyProfile: Lỗi khi tải hồ sơ tổng thể:", err);
         if (
           err.toString().includes("Profile not registered") ||
           err.toString().includes("TableItemNotFound") ||
           err.toString().includes("Resource not found") ||
-          err.toString().includes("Cannot read properties of undefined")
+          err.toString().includes("Cannot read properties of undefined") ||
+          err.message.includes("CID is empty") // Thêm lỗi CID rỗng
         ) {
           setError("PROFILE_NOT_FOUND");
+          console.log("MyProfile: Setting error to PROFILE_NOT_FOUND.");
           return;
         }
         setError("Đã xảy ra lỗi khi tải hồ sơ. Vui lòng thử lại.");
+        console.log("MyProfile: Setting generic error.");
       } finally {
         setLoading(false);
+        console.log("MyProfile: Loading finished.");
       }
     };
     fetchProfile();
@@ -171,21 +190,26 @@ export default function MyProfile() {
       const moduleAddress = import.meta.env.VITE_MODULE_ADDRESS;
       
       // Fetch ProfileUpdated events
+      console.log(`Fetching ProfileUpdated events for module: ${moduleAddress}`);
       const updateEventsRes = await fetch(
-        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v2::ProfileRegistryV2/update_events`
+        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v4::ProfileRegistryV4/update_events`
       );
       const updateEvents = await updateEventsRes.json();
+      console.log("Raw ProfileUpdated events:", updateEvents);
 
       // Fetch ProfileOwnershipTransferred events
+      console.log(`Fetching ProfileOwnershipTransferred events for module: ${moduleAddress}`);
       const transferEventsRes = await fetch(
-        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v2::ProfileRegistryV2/transfer_events`
+        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v4::ProfileRegistryV4/transfer_events`
       );
       const transferEvents = await transferEventsRes.json();
+      console.log("Raw ProfileOwnershipTransferred events:", transferEvents);
 
       let allEvents: any[] = [];
 
       if (Array.isArray(updateEvents)) {
         const filteredUpdates = updateEvents.filter((e: any) => e.data.user?.toLowerCase() === address.toLowerCase());
+        console.log("Filtered ProfileUpdated events for address:", address, filteredUpdates);
         allEvents = allEvents.concat(filteredUpdates.map((e: any) => ({ ...e, type: 'ProfileUpdated' })));
       }
 
@@ -194,6 +218,7 @@ export default function MyProfile() {
           e.data.from?.toLowerCase() === address.toLowerCase() || 
           e.data.to?.toLowerCase() === address.toLowerCase()
         );
+        console.log("Filtered ProfileOwnershipTransferred events for address:", address, filteredTransfers);
         allEvents = allEvents.concat(filteredTransfers.map((e: any) => ({ ...e, type: 'ProfileOwnershipTransferred' })));
       }
 
@@ -321,11 +346,6 @@ export default function MyProfile() {
                     <span className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
                       Ví: {profile.wallet.slice(0, 6)}...{profile.wallet.slice(-4)}
                     </span>
-                    {profile.cccd && (
-                      <span className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
-                        CCCD: {profile.cccd}
-                      </span>
-                    )}
                   </div>
                   <div className="flex gap-3 mt-4 justify-center">
                     {profile.social.github && (
@@ -405,7 +425,7 @@ export default function MyProfile() {
                         <span>
                           <span className="font-medium font-primary text-white">DID đã xác thực</span>
                           <br />
-                          <span className="text-xs text-gray-400 font-primary">{profile.did}</span>
+                          <span className="text-xs text-gray-400 font-primary break-all">{profile.did}</span>
                         </span>
                       </li>
                       <li className="flex items-center gap-3">
@@ -462,11 +482,6 @@ export default function MyProfile() {
                     ))}
                   </ul>
                 </div>
-                {profile.lastCID && (
-                  <div className="mt-6 text-center text-xs text-gray-500 font-mono">
-                    CID hồ sơ: <span>{profile.lastCID}</span>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -504,6 +519,7 @@ export default function MyProfile() {
                             <div className="text-sm text-gray-300"><b>Người dùng:</b> <span className="break-all text-gray-400">{item.data.user}</span></div>
                             <div className="text-sm text-gray-300"><b>CID mới:</b> <span className="break-all text-gray-400">{item.data.cid}</span></div>
                             <div className="text-sm text-gray-300"><b>CCCD mới:</b> <span className="break-all text-gray-400">{item.data.cccd}</span></div>
+                            <div className="text-sm text-gray-300"><b>DID mới:</b> <span className="break-all text-gray-400">{item.data.did}</span></div>
                           </>
                         ) : (
                           <>

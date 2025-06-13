@@ -6,7 +6,43 @@ import { uploadJSONToIPFS, uploadFileToIPFS } from "@/utils/pinata";
 import { useProfile } from '../contexts/ProfileContext';
 import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 
-const MODULE_NAME = "web3_profiles_v2";
+interface Profile {
+  name: string;
+  bio: string;
+  profilePic: string;
+  wallet: string;
+  did: string;
+  verified: boolean;
+  social: {
+    github: string;
+    linkedin: string;
+    twitter: string;
+  };
+  reputation: {
+    score: number;
+    jobs: number;
+    breakdown: { label: string; value: number }[];
+  };
+  lens: string;
+  skillNFTs: string[];
+  gitcoinStamps: number;
+  skills: string[];
+  portfolio: { name: string; link: string; rating: number }[];
+  reviews: { client: string; date: string; comment: string }[];
+  lastCID?: string;
+  cccd: number; // Stored on-chain in ProfileData struct
+  lastUpdated: string; // Add this field
+  [key: string]: unknown; // Add index signature
+}
+
+interface ProfileDataFromChain {
+  cid: string;
+  cccd: number;
+  did: string;
+}
+
+const MODULE_NAME = "web3_profiles_v4";
+const RESOURCE_NAME = "ProfileRegistryV4";
 
 const config = new AptosConfig({ network: Network.TESTNET });
 const aptos = new Aptos(config);
@@ -22,6 +58,7 @@ export default function Settings() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
   const [cccd, setCccd] = useState("");
+  const [isProfileExistInState, setIsProfileExistInState] = useState(false);
   const [newOwnerAddress, setNewOwnerAddress] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
@@ -29,7 +66,59 @@ export default function Settings() {
   useEffect(() => {
     setProfile(savedProfile);
     setImagePreview(savedProfile.profilePic);
-  }, [savedProfile]);
+
+    const checkProfileExistence = async () => {
+      if (!account || accountType !== 'aptos') {
+        setIsProfileExistInState(false);
+        return;
+      }
+      try {
+        console.log("Attempting to fetch full profile data from blockchain...");
+        const registryResource = await aptos.getAccountResource({
+          accountAddress: import.meta.env.VITE_MODULE_ADDRESS,
+          resourceType: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME}`,
+        });
+
+        if (!registryResource) {
+          console.log("Profile registry resource not found.");
+          setIsProfileExistInState(false);
+          return;
+        }
+
+        const profiles = (registryResource as any)?.profiles;
+        if (!profiles?.handle) {
+          console.error("Profile registry handle missing.");
+          setIsProfileExistInState(false);
+          return;
+        }
+
+        const profilesTableHandle = profiles.handle;
+
+        const profileDataFromChain = await aptos.getTableItem({
+          handle: profilesTableHandle,
+          data: {
+            key_type: "address",
+            value_type: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::ProfileData`,
+            key: account,
+          },
+        }) as ProfileDataFromChain;
+
+        console.log("Profile data from chain:", profileDataFromChain);
+        setCccd(profileDataFromChain.cccd.toString());
+        setProfile(prev => ({ ...prev, did: profileDataFromChain.did }));
+        setIsProfileExistInState(true); // Profile exists if we successfully fetch data
+
+      } catch (error: any) {
+        console.warn("Lỗi khi lấy ProfileData từ blockchain. Coi là chưa đăng ký:", error);
+        setIsProfileExistInState(false);
+        // Optionally, set initial CCCD value to empty string if profile not found
+        setCccd(''); 
+        setProfile(prev => ({ ...prev, did: `did:aptos:${account}` })); // Set default DID
+      }
+    };
+    checkProfileExistence();
+
+  }, [savedProfile, account, accountType]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -106,7 +195,7 @@ export default function Settings() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (accountType !== 'aptos' || !window.aptos) {
+    if (accountType !== 'aptos' || !window.aptos || !account) {
       setStatus({ type: 'error', message: 'Vui lòng kết nối ví Aptos để lưu hồ sơ.' });
       return;
     }
@@ -114,6 +203,12 @@ export default function Settings() {
     if (!cccd.trim()) {
       setStatus({ type: 'error', message: 'Vui lòng nhập số CCCD để lưu hồ sơ.' });
       return;
+    }
+
+    const cccdAsU64 = parseInt(cccd, 10);
+    if (isNaN(cccdAsU64) || cccdAsU64 < 0) {
+        setStatus({ type: 'error', message: 'Số CCCD không hợp lệ. Vui lòng nhập một số nguyên dương.' });
+        return;
     }
 
     setUploading(true);
@@ -140,31 +235,47 @@ export default function Settings() {
       }
 
       setStatus({ type: null, message: 'Đang chuẩn bị dữ liệu hồ sơ...' });
-      const updatedProfile = {
+      const currentDID = `did:aptos:${account}`;
+      const updatedProfileFull: Profile = {
         ...profile,
         profilePic: profilePicCID,
         wallet: account,
-        lastUpdated: new Date().toISOString()
+        did: currentDID,
+        lastUpdated: new Date().toISOString(),
+        cccd: cccdAsU64,
       };
 
+      const { cccd, did, ...updatedProfileForIPFS } = updatedProfileFull;
+
       setStatus({ type: null, message: 'Đang tải hồ sơ lên IPFS...' });
-      const cid = await uploadJSONToIPFS(updatedProfile);
+      const cid = await uploadJSONToIPFS(updatedProfileForIPFS);
       if (!cid) throw new Error('Tải hồ sơ lên IPFS thất bại.');
 
       setStatus({ type: null, message: 'Đang gửi giao dịch lên blockchain...' });
-      const txnPayload = {
-        type: "entry_function_payload",
-        function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::update_profile`,
-        type_arguments: [],
-        arguments: [cid, cccd]
-      };
 
+      let txnPayload;
+      if (isProfileExistInState) {
+        txnPayload = {
+          type: "entry_function_payload",
+          function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::update_profile`,
+          type_arguments: [],
+          arguments: [cid]
+        };
+      } else {
+        txnPayload = {
+          type: "entry_function_payload",
+          function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::register_profile`,
+          type_arguments: [],
+          arguments: [cid, cccdAsU64, currentDID]
+        };
+      }
+      
       const txnHash = await window.aptos.signAndSubmitTransaction(txnPayload);
 
       setStatus({ type: null, message: 'Đang chờ xác nhận giao dịch...' });
       await aptos.waitForTransaction({ transactionHash: txnHash.hash });
 
-      if (profile.lastCID) {
+      if (profile.lastCID && isProfileExistInState) {
         try {
           const options = {
             method: 'DELETE',
@@ -179,14 +290,24 @@ export default function Settings() {
       }
 
       updateProfile({
-        ...updatedProfile,
+        ...updatedProfileFull,
         lastCID: cid
       });
 
-      setStatus({ type: 'success', message: 'Cập nhật hồ sơ thành công!' });
+      setIsProfileExistInState(true);
+
+      setStatus({ type: 'success', message: 'Lưu hồ sơ thành công!' });
     } catch (error: any) {
       console.error("Lưu hồ sơ thất bại:", error);
-      setStatus({ type: 'error', message: error?.message || 'Lỗi khi lưu hồ sơ. Vui lòng thử lại.' });
+      let errorMessage = 'Đã xảy ra lỗi khi lưu hồ sơ. Vui lòng thử lại.';
+      if (error.message.includes("ETINY_FEE_NOT_ENOUGH")) {
+          errorMessage = "Số APT trong ví không đủ để thực hiện giao dịch (phí đăng ký/cập nhật). Vui lòng nạp thêm APT.";
+      } else if (error.message.includes("EPROFILE_ALREADY_REGISTERED")) {
+          errorMessage = "Hồ sơ đã được đăng ký. Vui lòng sử dụng cập nhật hồ sơ.";
+      } else if (error.message.includes("EPROFILE_NOT_REGISTERED")) {
+          errorMessage = "Hồ sơ chưa được đăng ký. Vui lòng đăng ký hồ sơ trước.";
+      }
+      setStatus({ type: 'error', message: errorMessage });
     } finally {
       setUploading(false);
     }
@@ -230,10 +351,10 @@ export default function Settings() {
 
                 <div className="flex flex-col gap-2 w-full mt-2">
                   <div className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
-                    <span className="truncate">{account || "Chưa kết nối ví"}</span>
+                    <span className="truncate break-all">{account || "Chưa kết nối ví"}</span>
                   </div>
                   <div className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
-                    {profile.did}
+                    <span className="truncate break-all">{profile.did}</span>
                   </div>
                 </div>
 
@@ -291,7 +412,7 @@ export default function Settings() {
                           name="name"
                           value={profile.name}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 mt-1 font-primary"
+                          className={`w-full px-3 py-2 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 mt-1 font-primary ${uploading ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400'}`}
                           required
                           disabled={uploading}
                         />
@@ -305,14 +426,15 @@ export default function Settings() {
                           value={cccd}
                           onChange={(e) => {
                             const value = e.target.value;
-                            if (value === '' || /^\d+$/.test(value)) {
+                            // Limit to 12 digits
+                            if (value === '' || (/^\d+$/.test(value) && value.length <= 12)) {
                               setCccd(value);
                             }
                           }}
-                          className="w-full px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 mt-1 font-primary"
+                          className={`w-full px-3 py-2 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 mt-1 font-primary ${uploading || isProfileExistInState ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400'}`}
                           placeholder="Nhập số CCCD của bạn"
-                          required
-                          disabled={uploading}
+                          required={!isProfileExistInState}
+                          disabled={uploading || isProfileExistInState}
                           min="0"
                           step="1"
                         />
@@ -494,7 +616,7 @@ export default function Settings() {
                     ) : (
                       <>
                         <Save size={20} />
-                        <span>Lưu thay đổi</span>
+                        <span>{isProfileExistInState ? 'Lưu thay đổi' : 'Đăng ký hồ sơ'}</span>
                       </>
                     )}
                   </button>
@@ -518,9 +640,46 @@ export default function Settings() {
                       setTransferStatus({ type: 'error', message: 'Vui lòng nhập địa chỉ ví mới để chuyển quyền sở hữu.' });
                       return;
                     }
+
                     setTransferring(true);
                     setTransferStatus({ type: null, message: '' });
+
                     try {
+                      // Check if new owner address already has a profile
+                      const moduleAddress = import.meta.env.VITE_MODULE_ADDRESS;
+                      const resourceType = `${moduleAddress}::${MODULE_NAME}::${RESOURCE_NAME}` as `${string}::${string}::${string}`;
+                      const profileDataType = `${moduleAddress}::${MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`;
+
+                      try {
+                        const registryResource = await aptos.getAccountResource({
+                          accountAddress: moduleAddress,
+                          resourceType: resourceType,
+                        });
+
+                        if (registryResource) {
+                          const profiles = (registryResource as any)?.profiles;
+                          if (profiles?.handle) {
+                            await aptos.getTableItem({
+                              handle: profiles.handle,
+                              data: {
+                                key_type: "address",
+                                value_type: profileDataType,
+                                key: newOwnerAddress.trim(),
+                              },
+                            });
+                            // If we reach here, it means a profile exists for newOwnerAddress
+                            setTransferStatus({ type: 'error', message: 'Địa chỉ nhận đã có hồ sơ. Không thể chuyển quyền sở hữu.' });
+                            setTransferring(false);
+                            return; // Stop the transfer process
+                          }
+                        }
+                      } catch (checkError: any) {
+                        // If TableItemNotFound or Resource not found, it's fine, profile doesn't exist for new owner
+                        if (!checkError.message.includes("TableItemNotFound") && !checkError.message.includes("Resource not found")) {
+                            console.warn("Lỗi khi kiểm tra hồ sơ địa chỉ nhận:", checkError);
+                        }
+                      }
+
                       const txnPayload = {
                         type: 'entry_function_payload',
                         function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::transfer_ownership`,

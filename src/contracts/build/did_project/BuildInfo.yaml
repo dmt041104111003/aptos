@@ -11,8 +11,8 @@ compiled_package_info:
     std: "0000000000000000000000000000000000000000000000000000000000000001"
     vm: "0000000000000000000000000000000000000000000000000000000000000000"
     vm_reserved: "0000000000000000000000000000000000000000000000000000000000000000"
-    work_profiles_addr: 2be9b4c599f0233833c893e16241f4ba5a040916258c49f50d6d94ceaf236b48
-  source_digest: E577494EF780BF3DF7E1DDC2070F31932E08B57CAC3BB2810F54883EBAE560AE
+    work_profiles_addr: f9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242
+  source_digest: B1E1EFEEA204593097B051FC92A9A5A5BFF591074FCD622D86086E3B5D2B9564
   build_flags:
     dev_mode: false
     test_mode: false
@@ -24,7 +24,7 @@ compiled_package_info:
     install_dir: ~
     force_recompilation: false
     additional_named_addresses:
-      work_profiles_addr: 2be9b4c599f0233833c893e16241f4ba5a040916258c49f50d6d94ceaf236b48
+      work_profiles_addr: f9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242
     fetch_deps_only: false
     skip_fetch_latest_git_deps: false
     compiler_config:

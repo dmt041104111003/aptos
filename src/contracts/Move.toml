@@ -3,7 +3,7 @@ name = "did_project"
 version = "1.0.0"
 
 [addresses]
-work_profiles_addr = "0x2be9b4c599f0233833c893e16241f4ba5a040916258c49f50d6d94ceaf236b48" 
+work_profiles_addr = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242" 
 
 [dependencies]
 AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "mainnet", subdir = "aptos-move/framework/aptos-framework" }
