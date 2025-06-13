@@ -42,10 +42,11 @@ import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 
 declare global { interface Window { ethereum?: any } }
 
-const CONTRACT_ADDRESS = import.meta.env.VITE_JOBS_CONTRACT_ADDRESS;
-const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
-const MODULE_NAME = "web3_profiles_v4";
-const RESOURCE_NAME = "ProfileRegistryV4";
+const CONTRACT_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
+const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v5";
+const PROFILE_MODULE_NAME = "web3_profiles_v7";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV7";
 const aptosConfig = new AptosConfig({ network: Network.TESTNET });
 const aptos = new Aptos(aptosConfig);
 
@@ -65,11 +66,14 @@ export interface JobPost {
   duration: string;
   location: "remote" | "onsite" | "hybrid";
   immediate: boolean;
-  companyName: string;
-  website: string;
+  experience: string;
+  attachments: string[];
   poster: string;
   posterProfile: string;
   postedAt: string;
+  applicationDeadline: string;
+  initialFundAmount: number;
+  posterDid: string;
   client: {
     id: string;
     name: string;
@@ -134,7 +138,127 @@ const Jobs = () => {
   }, [controls, heroInView]);
 
   const loadJobs = async () => {
-    
+    setLoading(true);
+    try {
+      const eventsResource = await aptos.getAccountResource({
+        accountAddress: CONTRACT_ADDRESS,
+        resourceType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Events`,
+      });
+
+      if (!eventsResource || !(eventsResource as any).post_event?.guid?.id) {
+        console.warn("JobPostedEvent handle not found or marketplace not initialized.");
+        setLoading(false);
+        return;
+      }
+
+      const postEventHandle = (eventsResource as any).post_event;
+
+      const rawEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+        options: {
+          limit: 50, // Fetch a reasonable number of recent events
+          orderBy: { transaction_version: "desc" } // Fetch newest events first
+        }
+      });
+
+      console.log("Fetched raw JobPostedEvents:", rawEvents);
+
+      const fetchedJobs: JobPost[] = [];
+      for (const event of rawEvents) {
+        const eventData = event.data as any; // JobPostedEvent data from blockchain
+        const jobCid = eventData.cid; // CID pointing to job details on IPFS
+
+        if (jobCid) {
+          try {
+            const jobDetailsUrl = convertIPFSURL(jobCid);
+            const response = await fetch(jobDetailsUrl);
+            if (!response.ok) {
+              console.error(`Failed to fetch job details from IPFS for CID ${jobCid}: ${response.statusText}`);
+              continue;
+            }
+            const jobDataFromIPFS = await response.json(); // Job details JSON from IPFS
+
+            // Fetch poster profile data for client name/avatar
+            let posterName = "Client";
+            let posterAvatar = "";
+            try {
+              const profileRegistryResource = await aptos.getAccountResource({
+                accountAddress: MODULE_ADDRESS,
+                resourceType: `${MODULE_ADDRESS}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}`,
+              });
+
+              if (profileRegistryResource && (profileRegistryResource as any).profiles?.handle) {
+                const profileTableHandle = (profileRegistryResource as any).profiles.handle;
+
+                const profileDataFromChain = await aptos.getTableItem({
+                  handle: profileTableHandle,
+                  data: {
+                    key_type: "address",
+                    value_type: `${MODULE_ADDRESS}::${PROFILE_MODULE_NAME}::ProfileData`,
+                    key: eventData.poster, // Poster address from the job event
+                  },
+                }) as ProfileDataFromChain;
+
+                if (profileDataFromChain.cid) {
+                  const profileJsonUrl = convertIPFSURL(profileDataFromChain.cid);
+                  const profileResponse = await fetch(profileJsonUrl);
+                  if (profileResponse.ok) {
+                    const profileJson = await profileResponse.json();
+                    posterName = profileJson.name || "Client";
+                    posterAvatar = profileJson.profilePic || "";
+                  }
+                }
+              }
+            } catch (profileError) {
+              console.warn(`Could not fetch profile for ${eventData.poster}:`, profileError);
+            }
+
+            // Construct jobPost object, ensuring all fields from JobPost interface are populated
+            const jobPost: JobPost = {
+              id: eventData.job_id.toString(),
+              title: jobDataFromIPFS.title || "Untitled Job",
+              description: jobDataFromIPFS.description || "No description provided.",
+              category: jobDataFromIPFS.category || "Uncategorized",
+              skills: jobDataFromIPFS.skills || [],
+              budget: {
+                min: jobDataFromIPFS.budgetMin || 0,
+                max: jobDataFromIPFS.budgetMax || 0,
+                currency: "USDC" // Assuming USDC
+              },
+              duration: jobDataFromIPFS.duration || "Flexible",
+              location: jobDataFromIPFS.location || "remote",
+              immediate: jobDataFromIPFS.immediate || false,
+              experience: jobDataFromIPFS.experience || "Any",
+              attachments: jobDataFromIPFS.attachments || [],
+              poster: eventData.poster,
+              posterProfile: jobDataFromIPFS.posterProfile || "", // This should be a CID
+              postedAt: new Date(Number(eventData.start_time) * 1000).toISOString(),
+              applicationDeadline: new Date(Number(eventData.start_time) * 1000 + Number(jobDataFromIPFS.applicationDeadlineDays) * 24 * 60 * 60 * 1000).toISOString(),
+              initialFundAmount: jobDataFromIPFS.initialFundAmount || 0,
+              posterDid: jobDataFromIPFS.posterDid || "",
+              client: {
+                id: eventData.poster,
+                name: posterName,
+                avatar: posterAvatar
+              }
+            };
+            fetchedJobs.push(jobPost);
+
+          } catch (ipfsError) {
+            console.error(`Error processing job from IPFS CID ${jobCid}:`, ipfsError);
+          }
+        }
+      }
+
+      setJobs(fetchedJobs);
+      setFilteredJobs(fetchedJobs); // Keep filteredJobs in sync initially
+      setLoading(false);
+
+    } catch (error) {
+      console.error("Failed to load jobs:", error);
+      setLoading(false);
+      toast.error("Failed to load jobs. Please try again later.");
+    }
   };
 
   useEffect(() => {
@@ -207,8 +331,8 @@ const Jobs = () => {
 
     try {
       const moduleAddress = MODULE_ADDRESS;
-      const resourceType = `${moduleAddress}::${MODULE_NAME}::${RESOURCE_NAME}` as `${string}::${string}::${string}`;
-      const profileDataType = `${moduleAddress}::${MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`;
+      const resourceType = `${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}` as `${string}::${string}::${string}`;
+      const profileDataType = `${moduleAddress}::${PROFILE_MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`;
 
       let profileExists = false;
       let registryResourceHandle: string | null = null;
@@ -268,12 +392,12 @@ const Jobs = () => {
 
       if (profileExists) {
         const updateEventsRes = await fetch(
-          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v4::ProfileRegistryV4/update_events`
+          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/update_events`
         );
         const updateEvents = await updateEventsRes.json();
 
         const transferEventsRes = await fetch(
-          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v4::ProfileRegistryV4/transfer_events`
+          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/transfer_events`
         );
         const transferEvents = await transferEventsRes.json();
 

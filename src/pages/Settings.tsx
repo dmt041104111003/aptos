@@ -30,19 +30,21 @@ interface Profile {
   portfolio: { name: string; link: string; rating: number }[];
   reviews: { client: string; date: string; comment: string }[];
   lastCID?: string;
-  cccd: number; // Stored on-chain in ProfileData struct
-  lastUpdated: string; // Add this field
-  [key: string]: unknown; // Add index signature
+  cccd: number;
+  createdAt: number;
+  lastUpdated: string;
+  [key: string]: unknown;
 }
 
 interface ProfileDataFromChain {
   cid: string;
   cccd: number;
   did: string;
+  created_at: number;
 }
 
-const MODULE_NAME = "web3_profiles_v4";
-const RESOURCE_NAME = "ProfileRegistryV4";
+const MODULE_NAME = "web3_profiles_v7";
+const RESOURCE_NAME = "ProfileRegistryV7";
 
 const config = new AptosConfig({ network: Network.TESTNET });
 const aptos = new Aptos(config);
@@ -200,114 +202,65 @@ export default function Settings() {
       return;
     }
 
-    if (!cccd.trim()) {
-      setStatus({ type: 'error', message: 'Vui lòng nhập số CCCD để lưu hồ sơ.' });
-      return;
-    }
-
-    const cccdAsU64 = parseInt(cccd, 10);
-    if (isNaN(cccdAsU64) || cccdAsU64 < 0) {
-        setStatus({ type: 'error', message: 'Số CCCD không hợp lệ. Vui lòng nhập một số nguyên dương.' });
-        return;
-    }
-
     setUploading(true);
     setStatus({ type: null, message: '' });
 
     try {
-      let profilePicCID = profile.profilePic;
+      // Upload profile image if changed
+      let profilePicUrl = profile.profilePic;
       if (imageFile) {
-        setStatus({ type: null, message: 'Đang tải ảnh đại diện lên...' });
-        try {
-          const imageCID = await uploadFileToIPFS(imageFile);
-          if (!imageCID) throw new Error('Tải ảnh đại diện thất bại.');
-          profilePicCID = `https://${import.meta.env.VITE_PINATA_GATEWAY}/ipfs/${imageCID}`;
-          const img = new Image();
-          img.src = profilePicCID;
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = () => reject(new Error('Không tìm thấy ảnh trên IPFS.'));
-          });
-        } catch (error) {
-          console.error('Xác minh tải ảnh đại diện thất bại:', error);
-          throw new Error("Tải ảnh đại diện thất bại. Vui lòng thử lại.");
-        }
+        const imageCID = await uploadFileToIPFS(imageFile);
+        profilePicUrl = `ipfs://${imageCID}`;
       }
 
-      setStatus({ type: null, message: 'Đang chuẩn bị dữ liệu hồ sơ...' });
-      const currentDID = `did:aptos:${account}`;
-      const updatedProfileFull: Profile = {
+      // Prepare profile data
+      const profileData = {
         ...profile,
-        profilePic: profilePicCID,
-        wallet: account,
-        did: currentDID,
+        profilePic: profilePicUrl,
         lastUpdated: new Date().toISOString(),
-        cccd: cccdAsU64,
       };
 
-      const { cccd, did, ...updatedProfileForIPFS } = updatedProfileFull;
+      // Upload to IPFS
+      const cid = await uploadJSONToIPFS(profileData);
 
-      setStatus({ type: null, message: 'Đang tải hồ sơ lên IPFS...' });
-      const cid = await uploadJSONToIPFS(updatedProfileForIPFS);
-      if (!cid) throw new Error('Tải hồ sơ lên IPFS thất bại.');
+      // Prepare transaction payload
+      const payload = {
+        type: "entry_function_payload",
+        function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::${isProfileExistInState ? 'update_profile' : 'register_profile'}`,
+        type_arguments: [],
+        arguments: isProfileExistInState 
+          ? [cid] // For update_profile
+          : [cid, parseInt(cccd), `did:aptos:${account}`], // For register_profile
+      };
 
-      setStatus({ type: null, message: 'Đang gửi giao dịch lên blockchain...' });
-
-      let txnPayload;
-      if (isProfileExistInState) {
-        txnPayload = {
-          type: "entry_function_payload",
-          function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::update_profile`,
-          type_arguments: [],
-          arguments: [cid]
-        };
-      } else {
-        txnPayload = {
-          type: "entry_function_payload",
-          function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::register_profile`,
-          type_arguments: [],
-          arguments: [cid, cccdAsU64, currentDID]
-        };
-      }
-      
-      const txnHash = await window.aptos.signAndSubmitTransaction(txnPayload);
-
-      setStatus({ type: null, message: 'Đang chờ xác nhận giao dịch...' });
+      // Sign and submit transaction
+      const txnHash = await window.aptos.signAndSubmitTransaction(payload);
       await aptos.waitForTransaction({ transactionHash: txnHash.hash });
 
-      if (profile.lastCID && isProfileExistInState) {
-        try {
-          const options = {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`
-            }
-          };
-          await fetch(`https://api.pinata.cloud/pinning/unpin/${profile.lastCID}`, options);
-        } catch (unpinError) {
-          console.error("Lỗi khi hủy ghim CID:", unpinError);
-        }
-      }
+      // Update local state
+      setProfile(prev => ({
+        ...prev,
+        lastCID: cid,
+        profilePic: profilePicUrl,
+      }));
 
+      // Update context
       updateProfile({
-        ...updatedProfileFull,
-        lastCID: cid
+        ...profileData,
+        lastCID: cid,
       });
 
-      setIsProfileExistInState(true);
+      setStatus({ 
+        type: 'success', 
+        message: isProfileExistInState ? 'Hồ sơ đã được cập nhật thành công!' : 'Hồ sơ đã được đăng ký thành công!' 
+      });
 
-      setStatus({ type: 'success', message: 'Lưu hồ sơ thành công!' });
     } catch (error: any) {
-      console.error("Lưu hồ sơ thất bại:", error);
-      let errorMessage = 'Đã xảy ra lỗi khi lưu hồ sơ. Vui lòng thử lại.';
-      if (error.message.includes("ETINY_FEE_NOT_ENOUGH")) {
-          errorMessage = "Số APT trong ví không đủ để thực hiện giao dịch (phí đăng ký/cập nhật). Vui lòng nạp thêm APT.";
-      } else if (error.message.includes("EPROFILE_ALREADY_REGISTERED")) {
-          errorMessage = "Hồ sơ đã được đăng ký. Vui lòng sử dụng cập nhật hồ sơ.";
-      } else if (error.message.includes("EPROFILE_NOT_REGISTERED")) {
-          errorMessage = "Hồ sơ chưa được đăng ký. Vui lòng đăng ký hồ sơ trước.";
-      }
-      setStatus({ type: 'error', message: errorMessage });
+      console.error('Error saving profile:', error);
+      setStatus({ 
+        type: 'error', 
+        message: `Lỗi khi lưu hồ sơ: ${error.message || 'Vui lòng thử lại sau.'}` 
+      });
     } finally {
       setUploading(false);
     }

@@ -8,8 +8,8 @@ import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { motion } from "framer-motion";
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
-const MODULE_NAME = "web3_profiles_v4";
-const RESOURCE_NAME = "ProfileRegistryV4";
+const MODULE_NAME = "web3_profiles_v7";
+const RESOURCE_NAME = "ProfileRegistryV7";
 
 const config = new AptosConfig({ network: Network.TESTNET });
 const aptos = new Aptos(config);
@@ -18,6 +18,7 @@ interface ProfileDataFromChain {
   cid: string;
   cccd: number;
   did: string;
+  created_at: number;
 }
 
 export default function MyProfile() {
@@ -47,6 +48,7 @@ export default function MyProfile() {
     reviews: { client: string; date: string; comment: string }[];
     lastCID?: string;
     cccd: number;
+    createdAt: number;
   }
 
   const [profile, setProfile] = useState<Profile>({
@@ -73,6 +75,7 @@ export default function MyProfile() {
     portfolio: [],
     reviews: [],
     cccd: 0,
+    createdAt: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -130,13 +133,15 @@ export default function MyProfile() {
         const profileCID = profileDataFromChain.cid;
         const cccdData = profileDataFromChain.cccd;
         const didData = profileDataFromChain.did;
+        const createdAt = profileDataFromChain.created_at;
 
         // Populate basic profile data from chain first
         setProfile(prev => ({
           ...prev,
           cccd: cccdData,
           did: didData,
-          wallet: account, // Ensure wallet is set
+          wallet: account,
+          createdAt: createdAt,
         }));
 
         if (!profileCID) {

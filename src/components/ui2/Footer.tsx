@@ -112,7 +112,7 @@ const Footer = () => {
         {/* Copyright & Policy */}
         <div className="flex-1 flex flex-col items-center md:items-end gap-1 mt-6 md:mt-0 pr-4 md:pr-12">
           <span className="text-xs text-blue-200 font-primary">
-            © 2024 APT - UTC. Mọi quyền được bảo lưu.
+            © 2025 APT - UTC. Mọi quyền được bảo lưu.
           </span>
           <a
             href="#privacy-policy"
