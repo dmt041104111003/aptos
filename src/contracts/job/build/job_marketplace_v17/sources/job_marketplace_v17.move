@@ -1,4 +1,4 @@
-module work_board::job_marketplace_v15 {
+module work_board::job_marketplace_v17 {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
@@ -9,7 +9,7 @@ module work_board::job_marketplace_v15 {
     use aptos_framework::account::{Self, SignerCapability};
     use std::vector;
     use aptos_framework::timestamp;
-    use work_profiles_addr::web3_profiles_v12;
+    use work_board::web3_profiles_v14;
 
     const EJOB_NOT_FOUND: u64 = 0;
     const EALREADY_HAS_WORKER: u64 = 1;
@@ -43,7 +43,7 @@ module work_board::job_marketplace_v15 {
     const ENOT_AUTHORIZED: u64 = 29;
     const ETOO_EARLY_AUTO_CONFIRM: u64 = 30;
 
-    const APPLY_FEE: u64 = 100_000_000;
+    const APPLY_FEE: u64 = 1000000;
     const MAX_REJECTIONS: u8 = 3;
     const AUTO_CONFIRM_DELAY: u64 = 5 * 60;
     const ONE_APT: u64 = 100_000_000;
@@ -271,7 +271,7 @@ module work_board::job_marketplace_v15 {
     }
 
     public entry fun post_job(
-        account: &signer,
+        poster: &signer,
         job_details_cid: String,
         application_deadline: u64,
         initial_fund_amount: u64,
@@ -280,7 +280,7 @@ module work_board::job_marketplace_v15 {
         milestone_amounts: vector<u64>,
         milestone_durations: vector<u64>
     ) acquires Jobs, Events, UserReputation, MarketplaceCapability {
-        let sender = signer::address_of(account);
+        let sender = signer::address_of(poster);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs_res = borrow_global_mut<Jobs>(@work_board);
 
@@ -294,10 +294,8 @@ module work_board::job_marketplace_v15 {
 
         // Initial fund must be positive
         assert!(initial_fund_amount > 0, EINVALID_AMOUNT);
-        // Funds are transferred by the poster to the escrow account
-        coin::transfer<AptosCoin>(account, escrow_address, initial_fund_amount);
-        // Assert that escrow account has enough funds (redundant if transfer above passes)
-        assert!(coin::balance<AptosCoin>(escrow_address) >= initial_fund_amount, EINSUFFICIENT_FUNDS);
+        // Transfer funds from poster to the marketplace escrow account
+        coin::transfer<AptosCoin>(poster, escrow_address, initial_fund_amount);
 
         // Calculate total milestone amount
         let i = 0;
@@ -401,8 +399,8 @@ module work_board::job_marketplace_v15 {
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
 
         // Verify worker's profile and DID
-        assert!(web3_profiles_v12::has_profile(worker_addr), EINVALID_PROFILE);
-        let profile_did = web3_profiles_v12::get_profile_did(worker_addr);
+        assert!(web3_profiles_v14::has_profile(worker_addr), EINVALID_PROFILE);
+        let profile_did = web3_profiles_v14::get_profile_did(worker_addr);
         assert!(profile_did == worker_did, EINVALID_DID);
 
         // Check if job is active and within application deadline
@@ -681,7 +679,7 @@ module work_board::job_marketplace_v15 {
         assert!(!milestone_data.accepted, EALREADY_SUBMITTED);
         
         // Ensure auto-confirmation delay has passed
-        let auto_confirm_delay = *vector::borrow(&job.duration_per_milestone, milestone_index) / 2;
+        let auto_confirm_delay = 3 * 60; // Set to 3 minutes (180 seconds)
         assert!(timestamp::now_seconds() >= (milestone_data.submit_time + auto_confirm_delay), ETOO_EARLY_AUTO_CONFIRM);
 
         // Calculate milestone payment

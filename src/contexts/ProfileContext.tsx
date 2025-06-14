@@ -128,10 +128,10 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
 
       try {
         const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS; // Ensure this is correctly configured
-        const PROFILE_MODULE_NAME = "web3_profiles_v12";
-        const PROFILE_RESOURCE_NAME = "ProfileRegistryV12";
-        const JOBS_CONTRACT_ADDRESS = "0x107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a"; // Your jobs contract address
-        const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v15"; // Your jobs module name
+        const PROFILE_MODULE_NAME = "web3_profiles_v14";
+        const PROFILE_RESOURCE_NAME = "ProfileRegistryV14";
+        const JOBS_CONTRACT_ADDRESS = "0x97bd417572de0bda9b8657459d4863e5d0da70d81000619ddfc8c316408fc853"; // Your jobs contract address
+        const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v17"; // Your jobs module name
 
         const userReputationResource = await aptos.getAccountResource({
           accountAddress: account,
