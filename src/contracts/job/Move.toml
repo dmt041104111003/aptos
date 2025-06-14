@@ -1,12 +1,12 @@
 [package]
-name = "job_marketplace_v11"
+name = "job_marketplace_v14"
 version = "1.0.0"
 authors = []
 license = "MIT"
 
 [addresses]
-work_board = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3" 
-work_profiles_addr = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3"
+work_board = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe" 
+work_profiles_addr = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe"
 
 [dependencies]
 AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "mainnet" }

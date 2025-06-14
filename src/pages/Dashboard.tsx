@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { useWallet } from '../context/WalletContext';
+import { useProfile } from '../contexts/ProfileContext';
 import { convertIPFSURL } from '@/utils/ipfs';
 import { toast } from '@/components/ui/sonner';
 import { aptos, fetchProfileDetails } from '@/utils/aptosUtils';
@@ -72,14 +73,16 @@ interface JobPost {
   last_reject_time: number | null;
 }
 
-const CONTRACT_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
-const MODULE_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3"; // Same as contract address for now
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
-const PROFILE_MODULE_NAME = "web3_profiles_v8";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV8";
+const CONTRACT_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
+const MODULE_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v14";
+const PROFILE_MODULE_NAME = "web3_profiles_v11";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV11";
+const AUTO_CONFIRM_DELAY = 5 * 60; // 5 minutes in seconds
 
 const Dashboard = () => {
   const { account, accountType } = useWallet();
+  const { refetchProfile } = useProfile();
   const [activeTab, setActiveTab] = useState<string>('in-progress');
   const [inProgressJobs, setInProgressJobs] = useState<JobPost[]>([]);
   const [completedJobs, setCompletedJobs] = useState<JobPost[]>([]);
@@ -563,6 +566,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Ứng viên đã được chấp nhận thành công!');
       loadUserJobs(); // Reload jobs to reflect the approved worker
+      refetchProfile(); // Refresh profile/reputation
     } catch (error: any) {
       console.error('Chấp nhận ứng viên thất bại:', error);
       toast.error(`Chấp nhận ứng viên thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -589,6 +593,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success(`Cột mốc ${milestoneIndex + 1} đã được nộp thành công!`);
       loadUserJobs();
+      refetchProfile(); // Refresh profile/reputation
     } catch (error: any) {
       console.error('Nộp cột mốc thất bại:', error);
       toast.error(`Nộp cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -615,6 +620,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success(`Cột mốc ${milestoneIndex + 1} đã được chấp nhận thành công!`);
       loadUserJobs();
+      refetchProfile(); // Refresh profile/reputation
     } catch (error: any) {
       console.error('Chấp nhận cột mốc thất bại:', error);
       toast.error(`Chấp nhận cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -641,6 +647,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success(`Cột mốc ${milestoneIndex + 1} đã được từ chối.`);
       loadUserJobs();
+      refetchProfile(); // Refresh profile/reputation
     } catch (error: any) {
       console.error('Từ chối cột mốc thất bại:', error);
       toast.error(`Từ chối cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -667,6 +674,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success(`Cột mốc ${milestoneIndex + 1} đã được tự động xác nhận.`);
       loadUserJobs();
+      refetchProfile(); // Refresh profile/reputation
     } catch (error: any) {
       console.error('Tự động xác nhận cột mốc thất bại:', error);
       toast.error(`Tự động xác nhận cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -692,6 +700,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Dự án đã được hủy thành công!');
       loadUserJobs();
+      refetchProfile(); // Refresh profile/reputation
     } catch (error: any) {
       console.error('Hủy dự án thất bại:', error);
       toast.error(`Hủy dự án thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -717,6 +726,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Dự án đã được đánh dấu hoàn thành thành công!');
       loadUserJobs();
+      refetchProfile(); // Refresh profile/reputation
     } catch (error: any) {
       console.error('Hoàn thành dự án thất bại:', error);
       toast.error(`Hoàn thành dự án thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -742,6 +752,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Dự án đã được đánh dấu hết hạn thành công!');
       loadUserJobs();
+      refetchProfile(); // Refresh profile/reputation
     } catch (error: any) {
       console.error('Đánh dấu hết hạn dự án thất bại:', error);
       toast.error(`Đánh dấu hết hạn dự án thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -862,8 +873,8 @@ const Dashboard = () => {
                           
                           const showSubmitButton = isWorker && isCurrentMilestone && !isSubmitted && !isAccepted;
                           const showAcceptRejectButtons = isPoster && isCurrentMilestone && isSubmitted && !isAccepted;
-                          const autoConfirmThresholdReached = milestoneData?.submit_time && (Date.now() / 1000) >= (milestoneData.submit_time + (7 * 24 * 60 * 60)); // 7 days auto-confirm delay
-                          const showAutoConfirmButton = isPoster && isCurrentMilestone && isSubmitted && !isAccepted && autoConfirmThresholdReached; // If submitted, not accepted, and auto-confirm delay passed
+                          const autoConfirmThresholdReached = milestoneData?.submit_time && (Date.now() / 1000) >= (milestoneData.submit_time + AUTO_CONFIRM_DELAY);
+                          const showAutoConfirmButton = (isPoster || isWorker) && isCurrentMilestone && isSubmitted && !isAccepted && autoConfirmThresholdReached;
 
                           return (
                             <li key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-700/30 px-3 py-2 rounded-md">
@@ -923,8 +934,8 @@ const Dashboard = () => {
                           Đánh dấu hết hạn
                         </Button>
                       )}
-                    </div>
-                  )}
+                  </div>
+                )}
 
                 {/* Application List (for posters) */}
                   {(type === 'applications' || (type === 'in-progress' && isPoster && !job.worker)) && job.applications.length > 0 && (

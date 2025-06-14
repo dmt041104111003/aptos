@@ -46,8 +46,8 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 
-const JOBS_MODULE_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
-const JOBS_MODULE_NAME = "job_marketplace_v11";
+const JOBS_MODULE_ADDRESS = "0x9fe0f477de9e1f54d1e4bf596462f3ffe7949c66e55ae8542fbfacfbac57621d";
+const JOBS_MODULE_NAME = "job_marketplace_v13";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
@@ -72,7 +72,7 @@ interface FormState {
 const PostJob = () => {
   const navigate = useNavigate();
   const { account, accountType } = useWallet();
-  const { profile } = useProfile();
+  const { profile, refetchProfile } = useProfile();
   const [skill, setSkill] = useState<string>('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -190,6 +190,11 @@ const PostJob = () => {
       return;
     }
 
+    if (!profile || !profile.did || !profile.lastCID) {
+      toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi đăng dự án.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -246,6 +251,7 @@ const PostJob = () => {
       await aptos.waitForTransaction({ transactionHash: txnHash.hash });
   
       toast.success('Đăng dự án thành công!');
+      refetchProfile();
       navigate('/jobs');
     } catch (error) {
       console.error('Job post failed:', error);
