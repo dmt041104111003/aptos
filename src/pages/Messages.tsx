@@ -150,13 +150,54 @@ const Messages = () => {
       return;
     }
 
+    // Kiểm tra nội dung độc hại trước khi gửi
+    try {
+      const response = await fetch("https://api-inference.huggingface.co/models/unitary/toxic-bert", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer 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",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ inputs: messageInput }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Toxicity API error: ${response.status} - ${errorText}`);
+        toast.error('Không thể kiểm tra nội dung tin nhắn. Vui lòng thử lại sau.');
+        return;
+      }
+
+      const result = await response.json();
+      
+      let isToxic = false;
+      if (result && result[0] && Array.isArray(result[0])) {
+        result[0].forEach((item: any) => {
+          const scorePercentage = item.score * 100;
+          if (scorePercentage > 40) { // Kiểm tra nếu bất kỳ nhãn nào có điểm trên 40%
+            isToxic = true;
+          }
+        });
+      }
+
+      if (isToxic) {
+        toast.error('Tin nhắn của bạn có thể chứa nội dung không phù hợp. Vui lòng chỉnh sửa lại.');
+        setMessageInput(''); // Xóa nội dung tin nhắn độc hại
+        return;
+      }
+    } catch (error: any) {
+      console.error("Error checking toxicity:", error);
+      toast.error(`Đã xảy ra lỗi khi kiểm tra nội dung tin nhắn: ${error.message || 'Lỗi không xác định'}`);
+      return;
+    }
+
     setLoadingMessages(true);
 
     const currentParticipantId = conversations.find(c => c.id === activeConversation)?.participantId;
     if (!currentParticipantId) {
-        toast.error('Không tìm thấy người nhận cho cuộc trò chuyện này.');
-        setLoadingMessages(false);
-        return;
+      toast.error('Không tìm thấy người nhận cho cuộc trò chuyện này.');
+      setLoadingMessages(false);
+      return;
     }
 
     try {
@@ -165,16 +206,16 @@ const Messages = () => {
         function: `${MESSAGE_CONTRACT_ADDRESS}::${MESSAGE_MODULE_NAME}::send_message`,
         type_arguments: [],
         arguments: [
-          currentParticipantId, // receiver_address
-          messageInput, // content
-          activeConversation, // conversation_id
+          currentParticipantId,
+          messageInput,
+          activeConversation,
         ]
       });
 
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Tin nhắn đã được gửi thành công!');
       setMessageInput('');
-      fetchMessagesAndConversations(); // Re-fetch all messages to update the view
+      fetchMessagesAndConversations();
     } catch (error: any) {
       console.error('Gửi tin nhắn thất bại:', error);
       toast.error(`Gửi tin nhắn thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
