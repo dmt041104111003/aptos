@@ -4,7 +4,7 @@ import { Star, Shield, Tag, CheckCircle2, AlertCircle } from "lucide-react";
 import { useWallet } from "../context/WalletContext";
 import { convertIPFSURL } from "../utils/ipfs";
 import { Navigate } from "react-router-dom";
-import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
+import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { motion } from "framer-motion";
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
@@ -14,6 +14,9 @@ const RESOURCE_NAME = "ProfileRegistryV8";
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
 
+const JOBS_CONTRACT_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
+
 interface ProfileDataFromChain {
   cid: string;
   cccd: number;
@@ -21,36 +24,50 @@ interface ProfileDataFromChain {
   created_at: number;
 }
 
+interface Profile {
+  name: string;
+  bio: string;
+  profilePic: string;
+  wallet: string;
+  did: string;
+  verified: boolean;
+  social: {
+    github: string;
+    linkedin: string;
+    twitter: string;
+  };
+  reputation: {
+    score: number; // For overall reputation score (u64)
+    level: number; // For reputation level (u8)
+    metrics: {
+      total_jobs_completed: number;
+      total_jobs_cancelled: number;
+      total_amount_transacted: number;
+      last_activity_time: number;
+      total_milestones_completed: number;
+      total_milestones_rejected: number;
+      on_time_delivery_count: number;
+      total_milestones: number;
+      total_jobs_posted: number;
+      total_milestones_accepted: number;
+      total_milestones_rejected_by_client: number;
+      total_response_time: number;
+      response_count: number;
+    };
+  };
+  lens: string;
+  skillNFTs: string[];
+  gitcoinStamps: number;
+  skills: string[];
+  portfolio: { name: string; link: string; rating: number }[];
+  reviews: { client: string; date: string; comment: string }[];
+  lastCID?: string;
+  cccd: number;
+  createdAt: number;
+}
+
 export default function MyProfile() {
   const { account, accountType } = useWallet();
-  interface Profile {
-    name: string;
-    bio: string;
-    profilePic: string;
-    wallet: string;
-    did: string;
-    verified: boolean;
-    social: {
-      github: string;
-      linkedin: string;
-      twitter: string;
-    };
-    reputation: {
-      score: number;
-      jobs: number;
-      breakdown: { label: string; value: number }[];
-    };
-    lens: string;
-    skillNFTs: string[];
-    gitcoinStamps: number;
-    skills: string[];
-    portfolio: { name: string; link: string; rating: number }[];
-    reviews: { client: string; date: string; comment: string }[];
-    lastCID?: string;
-    cccd: number;
-    createdAt: number;
-  }
-
   const [profile, setProfile] = useState<Profile>({
     name: "",
     bio: "",
@@ -65,8 +82,22 @@ export default function MyProfile() {
     },
     reputation: {
       score: 0,
-      jobs: 0,
-      breakdown: [],
+      level: 0,
+      metrics: {
+        total_jobs_completed: 0,
+        total_jobs_cancelled: 0,
+        total_amount_transacted: 0,
+        last_activity_time: 0,
+        total_milestones_completed: 0,
+        total_milestones_rejected: 0,
+        on_time_delivery_count: 0,
+        total_milestones: 0,
+        total_jobs_posted: 0,
+        total_milestones_accepted: 0,
+        total_milestones_rejected_by_client: 0,
+        total_response_time: 0,
+        response_count: 0,
+      },
     },
     lens: "",
     skillNFTs: [],
@@ -141,6 +172,59 @@ export default function MyProfile() {
         const didData = profileDataFromChain.did;
         const createdAt = profileDataFromChain.created_at;
 
+        // Lấy dữ liệu danh tiếng (reputation)
+        let reputationScore = 0;
+        let reputationLevel = 0;
+        let reputationMetrics = {
+          total_jobs_completed: 0,
+          total_jobs_cancelled: 0,
+          total_amount_transacted: 0,
+          last_activity_time: 0,
+          total_milestones_completed: 0,
+          total_milestones_rejected: 0,
+          on_time_delivery_count: 0,
+          total_milestones: 0,
+          total_jobs_posted: 0,
+          total_milestones_accepted: 0,
+          total_milestones_rejected_by_client: 0,
+          total_response_time: 0,
+          response_count: 0,
+        };
+
+        try {
+          console.log("MyProfile: Fetching UserReputation resource for account:", account);
+          const userReputationResource = await aptos.getAccountResource({
+            accountAddress: account,
+            resourceType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::UserReputation`,
+          });
+          
+          if (userReputationResource) {
+            console.log("MyProfile: UserReputation resource found:", userReputationResource);
+            reputationScore = Number((userReputationResource as any).reputation_score);
+            reputationLevel = Number((userReputationResource as any).reputation_level);
+            reputationMetrics = {
+              total_jobs_completed: Number((userReputationResource as any).metrics?.total_jobs_completed || 0),
+              total_jobs_cancelled: Number((userReputationResource as any).metrics?.total_jobs_cancelled || 0),
+              total_amount_transacted: Number((userReputationResource as any).metrics?.total_amount_transacted || 0),
+              last_activity_time: Number((userReputationResource as any).metrics?.last_activity_time || 0),
+              total_milestones_completed: Number((userReputationResource as any).metrics?.total_milestones_completed || 0),
+              total_milestones_rejected: Number((userReputationResource as any).metrics?.total_milestones_rejected || 0),
+              on_time_delivery_count: Number((userReputationResource as any).metrics?.on_time_delivery_count || 0),
+              total_milestones: Number((userReputationResource as any).metrics?.total_milestones || 0),
+              total_jobs_posted: Number((userReputationResource as any).metrics?.total_jobs_posted || 0),
+              total_milestones_accepted: Number((userReputationResource as any).metrics?.total_milestones_accepted || 0),
+              total_milestones_rejected_by_client: Number((userReputationResource as any).metrics?.total_milestones_rejected_by_client || 0),
+              total_response_time: Number((userReputationResource as any).metrics?.total_response_time || 0),
+              response_count: Number((userReputationResource as any).metrics?.response_count || 0),
+            };
+          } else {
+            console.log("MyProfile: UserReputation resource not found for this account.");
+          }
+        } catch (repError: any) {
+          console.warn("MyProfile: Error fetching UserReputation resource:", repError);
+          // Continue without reputation data if there's an error
+        }
+
         // Populate basic profile data from chain first
         setProfile(prev => ({
           ...prev,
@@ -148,6 +232,11 @@ export default function MyProfile() {
           did: didData,
           wallet: account,
           createdAt: createdAt,
+          reputation: {
+            score: reputationScore,
+            level: reputationLevel,
+            metrics: reputationMetrics,
+          },
         }));
 
         if (!profileCID) {
@@ -297,35 +386,33 @@ export default function MyProfile() {
     setMyJobsApplied([]);
     try {
       // 1. Lấy tất cả JobPostedEvent
-      const CONTRACT_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
-      const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
       const rawPostedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+        eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
         options: { limit: 100 }
       });
       // 2. Lấy tất cả WorkerAppliedEvent
       const rawAppliedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerAppliedEvent`,
+        eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerAppliedEvent`,
         options: { limit: 100 }
       });
       // 3. Lấy tất cả WorkerApprovedEvent
       const rawApprovedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
+        eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
         options: { limit: 100 }
       });
       // 4. Lấy tất cả JobCompletedEvent
       const rawCompletedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
+        eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
         options: { limit: 100 }
       });
       // 5. Lấy tất cả JobCanceledEvent
       const rawCanceledEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCanceledEvent`,
+        eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCanceledEvent`,
         options: { limit: 100 }
       });
       // 6. Lấy tất cả JobExpiredEvent
       const rawExpiredEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobExpiredEvent`,
+        eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobExpiredEvent`,
         options: { limit: 100 }
       });
       // Map trạng thái job
@@ -362,19 +449,19 @@ export default function MyProfile() {
           let completedEvents = [];
           try {
             postedEvents = await aptos.event.getModuleEventsByEventType({
-              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+              eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
               options: { limit: 1000 }
             });
             approvedEvents = await aptos.event.getModuleEventsByEventType({
-              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
+              eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
               options: { limit: 1000 }
             });
             milestoneAcceptedEvents = await aptos.event.getModuleEventsByEventType({
-              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneAcceptedEvent`,
+              eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneAcceptedEvent`,
               options: { limit: 1000 }
             });
             completedEvents = await aptos.event.getModuleEventsByEventType({
-              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
+              eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
               options: { limit: 1000 }
             });
           } catch {}
@@ -628,30 +715,43 @@ export default function MyProfile() {
                           <Star
                             key={i}
                             size={18}
-                            className={i < Math.round(profile.reputation.score) ? "text-blue-400" : "text-gray-700"}
+                            className={i < Math.round(profile.reputation.level) ? "text-blue-400" : "text-gray-700"}
                           />
                         ))}
                       </div>
                     </div>
                     <span className="text-gray-400 text-sm font-primary">
-                      Dựa trên {profile.reputation.jobs} dự án đã hoàn thành
+                      Cấp độ: {profile.reputation.level} ({profile.reputation.metrics?.total_jobs_completed || 0} dự án đã hoàn thành)
                     </span>
                   </div>
                   <div className="space-y-2 mt-4">
-                    {profile.reputation.breakdown.map((item) => (
-                      <div key={item.label}>
-                        <div className="flex justify-between text-sm">
-                          <span className="font-primary text-white/80">{item.label}</span>
-                          <span className="font-semibold font-primary text-blue-400">{item.value}</span>
-                        </div>
-                        <div className="w-full h-2 bg-blue-600/10 rounded">
-                          <div
-                            className="h-2 bg-gradient-to-r from-blue-600 to-violet-600 rounded"
-                            style={{ width: `${(item.value / 5) * 100}%` }}
-                          />
-                        </div>
+                    <h3 className="text-sm font-semibold text-gray-300">Chỉ số danh tiếng:</h3>
+                    {profile.reputation.metrics?.total_jobs_completed !== undefined && (
+                      <div className="text-sm font-primary text-white/80">
+                        Tổng dự án hoàn thành: <span className="font-semibold text-blue-400">{profile.reputation.metrics?.total_jobs_completed}</span>
                       </div>
-                    ))}
+                    )}
+                    {profile.reputation.metrics?.total_jobs_posted !== undefined && (
+                      <div className="text-sm font-primary text-white/80">
+                        Tổng dự án đã đăng: <span className="font-semibold text-blue-400">{profile.reputation.metrics?.total_jobs_posted}</span>
+                      </div>
+                    )}
+                    {profile.reputation.metrics?.total_amount_transacted !== undefined && (
+                      <div className="text-sm font-primary text-white/80">
+                        Tổng số tiền giao dịch: <span className="font-semibold text-blue-400">{profile.reputation.metrics?.total_amount_transacted / 100_000_000} APT</span>
+                      </div>
+                    )}
+                    {profile.reputation.metrics?.on_time_delivery_count !== undefined && profile.reputation.metrics?.total_milestones !== undefined && profile.reputation.metrics.total_milestones > 0 && (
+                      <div className="text-sm font-primary text-white/80">
+                        Tỷ lệ hoàn thành đúng hạn: <span className="font-semibold text-blue-400">{((profile.reputation.metrics.on_time_delivery_count / profile.reputation.metrics.total_milestones) * 100).toFixed(2)}%</span>
+                      </div>
+                    )}
+                    {profile.reputation.metrics?.response_count !== undefined && profile.reputation.metrics?.response_count > 0 && (
+                      <div className="text-sm font-primary text-white/80">
+                        Thời gian phản hồi trung bình: <span className="font-semibold text-blue-400">{(profile.reputation.metrics.total_response_time / profile.reputation.metrics.response_count / 60).toFixed(2)} phút</span>
+                      </div>
+                    )}
+                    {/* Add more metrics as needed */}
                   </div>
                 </div>
                 <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
