@@ -43,8 +43,8 @@ interface ProfileDataFromChain {
   created_at: number;
 }
 
-const MODULE_NAME = "web3_profiles_v8";
-const RESOURCE_NAME = "ProfileRegistryV8";
+const MODULE_NAME = "web3_profiles_v9";
+const RESOURCE_NAME = "ProfileRegistryV9";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);

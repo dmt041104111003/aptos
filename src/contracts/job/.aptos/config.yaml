@@ -14,3 +14,17 @@ profiles:
     account: c2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3
     rest_url: "https://fullnode.testnet.aptoslabs.com"
     faucet_url: "https://faucet.testnet.aptoslabs.com"
+  testnet_new_v2:
+    network: Testnet
+    private_key: ed25519-priv-0xed2ca31a9f103593f4443316f2e27cc51ea38a72b62947b84a035232a8346309
+    public_key: ed25519-pub-0x5e7d9c6ef14fd697f472515e15067db43038f8f0a40bfb56392bfd2cd56f889d
+    account: 20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+    faucet_url: "https://faucet.testnet.aptoslabs.com"
+  testnet_new_v3:
+    network: Testnet
+    private_key: ed25519-priv-0x6e96c7a19f6e90a1169b0240f6195bc87c837489bea1a9ad227521cf765188f0
+    public_key: ed25519-pub-0xf9fff468f025f5257f0d246637d10dce4850cfb6706219f7c1bcf7660fad2379
+    account: 9fe0f477de9e1f54d1e4bf596462f3ffe7949c66e55ae8542fbfacfbac57621d
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+    faucet_url: "https://faucet.testnet.aptoslabs.com"

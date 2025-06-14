@@ -6,16 +6,17 @@ import { convertIPFSURL } from "../utils/ipfs";
 import { Navigate } from "react-router-dom";
 import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { motion } from "framer-motion";
+import { useProfile } from "../contexts/ProfileContext";
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
-const MODULE_NAME = "web3_profiles_v8";
-const RESOURCE_NAME = "ProfileRegistryV8";
+const MODULE_NAME = "web3_profiles_v9";
+const RESOURCE_NAME = "ProfileRegistryV9";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
 
-const JOBS_CONTRACT_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
+const JOBS_CONTRACT_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v12";
 
 interface ProfileDataFromChain {
   cid: string;
@@ -68,6 +69,7 @@ interface Profile {
 
 export default function MyProfile() {
   const { account, accountType } = useWallet();
+  const { profile: contextProfile, loading: profileLoadingContext, refetchProfile } = useProfile();
   const [profile, setProfile] = useState<Profile>({
     name: "",
     bio: "",
@@ -134,7 +136,12 @@ export default function MyProfile() {
         console.log("MyProfile: No Aptos account connected.");
         return;
       }
+      setLoading(true); // Bắt đầu tải cục bộ
+
       try {
+        // Kích hoạt refetch từ ProfileContext để đảm bảo context có dữ liệu mới nhất, bao gồm danh tiếng
+        await refetchProfile();
+
         console.log("MyProfile: Attempting to fetch registry resource from:", MODULE_ADDRESS);
         const registryResource = await aptos.getAccountResource({
           accountAddress: MODULE_ADDRESS,
@@ -172,58 +179,26 @@ export default function MyProfile() {
         const didData = profileDataFromChain.did;
         const createdAt = profileDataFromChain.created_at;
 
-        // Lấy dữ liệu danh tiếng (reputation)
-        let reputationScore = 0;
-        let reputationLevel = 0;
-        let reputationMetrics = {
-          total_jobs_completed: 0,
-          total_jobs_cancelled: 0,
-          total_amount_transacted: 0,
-          last_activity_time: 0,
-          total_milestones_completed: 0,
-          total_milestones_rejected: 0,
-          on_time_delivery_count: 0,
-          total_milestones: 0,
-          total_jobs_posted: 0,
-          total_milestones_accepted: 0,
-          total_milestones_rejected_by_client: 0,
-          total_response_time: 0,
-          response_count: 0,
+        // Sử dụng dữ liệu danh tiếng từ contextProfile
+        const reputationToUse = contextProfile?.reputation || {
+          score: 0,
+          level: 0,
+          metrics: {
+            total_jobs_completed: 0,
+            total_jobs_cancelled: 0,
+            total_amount_transacted: 0,
+            last_activity_time: 0,
+            total_milestones_completed: 0,
+            total_milestones_rejected: 0,
+            on_time_delivery_count: 0,
+            total_milestones: 0,
+            total_jobs_posted: 0,
+            total_milestones_accepted: 0,
+            total_milestones_rejected_by_client: 0,
+            total_response_time: 0,
+            response_count: 0,
+          },
         };
-
-        try {
-          console.log("MyProfile: Fetching UserReputation resource for account:", account);
-          const userReputationResource = await aptos.getAccountResource({
-            accountAddress: account,
-            resourceType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::UserReputation`,
-          });
-          
-          if (userReputationResource) {
-            console.log("MyProfile: UserReputation resource found:", userReputationResource);
-            reputationScore = Number((userReputationResource as any).reputation_score);
-            reputationLevel = Number((userReputationResource as any).reputation_level);
-            reputationMetrics = {
-              total_jobs_completed: Number((userReputationResource as any).metrics?.total_jobs_completed || 0),
-              total_jobs_cancelled: Number((userReputationResource as any).metrics?.total_jobs_cancelled || 0),
-              total_amount_transacted: Number((userReputationResource as any).metrics?.total_amount_transacted || 0),
-              last_activity_time: Number((userReputationResource as any).metrics?.last_activity_time || 0),
-              total_milestones_completed: Number((userReputationResource as any).metrics?.total_milestones_completed || 0),
-              total_milestones_rejected: Number((userReputationResource as any).metrics?.total_milestones_rejected || 0),
-              on_time_delivery_count: Number((userReputationResource as any).metrics?.on_time_delivery_count || 0),
-              total_milestones: Number((userReputationResource as any).metrics?.total_milestones || 0),
-              total_jobs_posted: Number((userReputationResource as any).metrics?.total_jobs_posted || 0),
-              total_milestones_accepted: Number((userReputationResource as any).metrics?.total_milestones_accepted || 0),
-              total_milestones_rejected_by_client: Number((userReputationResource as any).metrics?.total_milestones_rejected_by_client || 0),
-              total_response_time: Number((userReputationResource as any).metrics?.total_response_time || 0),
-              response_count: Number((userReputationResource as any).metrics?.response_count || 0),
-            };
-          } else {
-            console.log("MyProfile: UserReputation resource not found for this account.");
-          }
-        } catch (repError: any) {
-          console.warn("MyProfile: Error fetching UserReputation resource:", repError);
-          // Continue without reputation data if there's an error
-        }
 
         // Populate basic profile data from chain first
         setProfile(prev => ({
@@ -232,11 +207,7 @@ export default function MyProfile() {
           did: didData,
           wallet: account,
           createdAt: createdAt,
-          reputation: {
-            score: reputationScore,
-            level: reputationLevel,
-            metrics: reputationMetrics,
-          },
+          reputation: reputationToUse, // Sử dụng danh tiếng từ context
         }));
 
         if (!profileCID) {
@@ -261,6 +232,7 @@ export default function MyProfile() {
               cccd: cccdData,
               did: didData,
               wallet: account,
+              reputation: reputationToUse, // Đảm bảo danh tiếng vẫn từ context sau khi merge IPFS
             }));
             setIpfsError(null); // Clear any previous IPFS errors
             console.log("MyProfile: Profile set successfully (with IPFS data).");
@@ -291,7 +263,7 @@ export default function MyProfile() {
       }
     };
     fetchProfile();
-  }, [account, accountType]);
+  }, [account, accountType, refetchProfile, contextProfile]);
 
   // Trigger fetch history when tab changes or account changes
   useEffect(() => {
@@ -311,7 +283,7 @@ export default function MyProfile() {
       // Fetch ProfileUpdated events
       console.log(`Fetching ProfileUpdated events for module: ${moduleAddress}`);
       const updateEventsRes = await fetch(
-        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${MODULE_NAME}::ProfileRegistryV8/update_events`
+        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${MODULE_NAME}::${RESOURCE_NAME}/update_events`
       );
       const updateEvents = await updateEventsRes.json();
       console.log("Raw ProfileUpdated events:", updateEvents);
@@ -319,7 +291,7 @@ export default function MyProfile() {
       // Fetch ProfileOwnershipTransferred events
       console.log(`Fetching ProfileOwnershipTransferred events for module: ${moduleAddress}`);
       const transferEventsRes = await fetch(
-        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${MODULE_NAME}::ProfileRegistryV8/transfer_events`
+        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${MODULE_NAME}::${RESOURCE_NAME}/transfer_events`
       );
       const transferEvents = await transferEventsRes.json();
       console.log("Raw ProfileOwnershipTransferred events:", transferEvents);
@@ -545,7 +517,7 @@ export default function MyProfile() {
       .catch(() => {/* toast có thể thêm nếu muốn */});
   };
 
-  if (loading) {
+  if (loading || profileLoadingContext) { // Kết hợp loading cục bộ và loading từ context
     return (
       <div className="min-h-screen bg-black flex justify-center items-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>

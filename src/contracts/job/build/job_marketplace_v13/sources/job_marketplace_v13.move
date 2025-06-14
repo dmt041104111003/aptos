@@ -1,4 +1,4 @@
-module work_board::job_marketplace_v11 {
+module work_board::job_marketplace_v13 {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
@@ -9,7 +9,7 @@ module work_board::job_marketplace_v11 {
     use aptos_framework::account;
     use std::vector;
     use aptos_framework::timestamp;
-    use work_profiles_addr::web3_profiles_v8;
+    use work_profiles_addr::web3_profiles_v10;
 
     const EJOB_NOT_FOUND: u64 = 0;
     const EALREADY_HAS_WORKER: u64 = 1;
@@ -44,12 +44,24 @@ module work_board::job_marketplace_v11 {
     const APPLY_FEE: u64 = 100_000_000;
     const MAX_REJECTIONS: u8 = 3;
     const AUTO_CONFIRM_DELAY: u64 = 5 * 60;
+    const ONE_APT: u64 = 100_000_000;
+
+    // Constants for event_type for clarity
+    const EVENT_JOB_POSTED: u8 = 1;
+    const EVENT_WORKER_APPROVED: u8 = 2;
+    const EVENT_MILESTONE_SUBMITTED: u8 = 3;
+    const EVENT_MILESTONE_ACCEPTED: u8 = 4;
+    const EVENT_MILESTONE_REJECTED: u8 = 5;
+    const EVENT_MILESTONE_AUTO_CONFIRMED: u8 = 6;
+    const EVENT_JOB_CANCELED: u8 = 7;
+    const EVENT_JOB_COMPLETED: u8 = 8;
 
     struct MilestoneData has copy, drop, store {
         submitted: bool,
         accepted: bool,
         submit_time: u64,
-        reject_count: u8
+        reject_count: u8,
+        auto_confirm_timestamp: u64
     }
 
     struct Application has copy, drop, store {
@@ -206,6 +218,11 @@ module work_board::job_marketplace_v11 {
         timestamp: u64
     }
 
+    // Add capability for module signer
+    struct ModuleCapability has key {
+        signer_capability: account::SignerCapability
+    }
+
     public entry fun init_events(account: &signer) {
         move_to(account, Events {
             post_event: account::new_event_handle<JobPostedEvent>(account),
@@ -257,19 +274,31 @@ module work_board::job_marketplace_v11 {
         poster_profile_cid: String,
         milestone_amounts: vector<u64>,
         milestone_durations: vector<u64>
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, UserReputation {
         let sender = signer::address_of(account);
-        assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED); // Access Jobs resource from module address
+        assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs_res = borrow_global_mut<Jobs>(@work_board);
 
         let job_id = jobs_res.job_counter;
         jobs_res.job_counter = jobs_res.job_counter + 1;
 
-        // Frontend should transfer initial_fund_amount to @work_board before calling this
-        // This function only records the escrowed amount
+        // Initial fund must be positive
         assert!(initial_fund_amount > 0, EINVALID_AMOUNT);
-        assert!(coin::balance<AptosCoin>(@work_board) >= initial_fund_amount, EINSUFFICIENT_FUNDS); // Check module's balance
+        assert!(coin::balance<AptosCoin>(@work_board) >= initial_fund_amount, EINSUFFICIENT_FUNDS);
 
+        // Calculate total milestone amount
+        let i = 0;
+        let total_milestones = vector::length(&milestone_amounts);
+        let total_milestone_amount = 0u64;
+        while (i < total_milestones) {
+            let amount = *vector::borrow(&milestone_amounts, i);
+            assert!(amount > 0, EINVALID_AMOUNT); // Ensure each milestone amount is positive
+            total_milestone_amount = total_milestone_amount + amount;
+            i = i + 1;
+        };
+
+        // Verify initial fund amount is sufficient to cover all milestones
+        assert!(initial_fund_amount >= total_milestone_amount, EINSUFFICIENT_FUNDS);
 
         let start_time = timestamp::now_seconds();
         let end_time = 0u64;
@@ -279,7 +308,6 @@ module work_board::job_marketplace_v11 {
         let milestone_deadlines_vec = vector::empty<u64>();
 
         let i = 0;
-        let total_milestones = vector::length(&milestone_amounts);
         let cumulative_duration = 0u64;
 
         while (i < total_milestones) {
@@ -287,7 +315,8 @@ module work_board::job_marketplace_v11 {
                 submitted: false,
                 accepted: false,
                 submit_time: 0,
-                reject_count: 0
+                reject_count: 0,
+                auto_confirm_timestamp: 0
             });
 
             // Calculate milestone deadline
@@ -341,6 +370,9 @@ module work_board::job_marketplace_v11 {
                 end_time: end_time
             }
         );
+
+        // Update poster's reputation
+        update_user_reputation(sender, job_id, 0, true, false, EVENT_JOB_POSTED);
     }
 
     public entry fun apply_for_job(
@@ -356,8 +388,8 @@ module work_board::job_marketplace_v11 {
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
 
         // Verify worker's profile and DID
-        assert!(web3_profiles_v8::has_profile(worker_addr), EINVALID_PROFILE);
-        let profile_did = web3_profiles_v8::get_profile_did(worker_addr);
+        assert!(web3_profiles_v10::has_profile(worker_addr), EINVALID_PROFILE);
+        let profile_did = web3_profiles_v10::get_profile_did(worker_addr);
         assert!(profile_did == worker_did, EINVALID_DID);
 
         // Check if job is active and within application deadline
@@ -404,7 +436,7 @@ module work_board::job_marketplace_v11 {
         poster: &signer,
         job_id: u64,
         application_index: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, UserReputation {
         let poster_addr = signer::address_of(poster);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED); // Access Jobs resource from module address
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -438,13 +470,16 @@ module work_board::job_marketplace_v11 {
                 approve_time: timestamp::now_seconds()
             }
         );
+
+        // Update poster's reputation
+        update_user_reputation(poster_addr, job_id, 0, true, false, EVENT_WORKER_APPROVED);
     }
 
     public entry fun submit_milestone(
         worker: &signer,
         job_id: u64,
         milestone_index: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, UserReputation {
         let worker_addr = signer::address_of(worker);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED); // Access Jobs resource from module address
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -475,13 +510,16 @@ module work_board::job_marketplace_v11 {
                 submit_time: timestamp::now_seconds()
             }
         );
+
+        // Update worker's reputation
+        update_user_reputation(worker_addr, job_id, 0, false, true, EVENT_MILESTONE_SUBMITTED);
     }
 
     public entry fun accept_milestone(
         poster: &signer,
         job_id: u64,
         milestone_index: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, UserReputation, ModuleCapability {
         let poster_addr = signer::address_of(poster);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -501,12 +539,16 @@ module work_board::job_marketplace_v11 {
         assert!(!milestone_data.accepted, EALREADY_SUBMITTED);
 
         // Calculate milestone payment
-        let milestone_amount = vector::borrow(&job.milestones, milestone_index);
-        let worker_addr = option::borrow(&job.worker);
+        let milestone_amount = *vector::borrow(&job.milestones, milestone_index);
+        assert!(milestone_amount > 0, EINVALID_AMOUNT);
+        let worker_addr = *option::borrow(&job.worker);
 
-        // Transfer milestone payment to worker
-        transfer_from_module(poster, *worker_addr, *milestone_amount);
-        job.escrowed_amount = job.escrowed_amount - *milestone_amount;
+        // Acquire module signer and transfer funds
+        let module_cap = borrow_global<ModuleCapability>(@work_board);
+        let module_signer = account::create_signer_with_capability(&module_cap.signer_capability);
+        transfer_from_module(&module_signer, worker_addr, milestone_amount);
+
+        job.escrowed_amount = job.escrowed_amount - milestone_amount;
 
         // Update milestone state
         milestone_data.accepted = true;
@@ -536,18 +578,23 @@ module work_board::job_marketplace_v11 {
             &mut events.fund_flow_event,
             FundFlowEvent {
                 job_id,
-                to: *worker_addr,
-                amount: *milestone_amount,
+                to: worker_addr,
+                amount: milestone_amount,
                 time: timestamp::now_seconds()
             }
         );
+
+        // Update worker's reputation
+        update_user_reputation(worker_addr, job_id, milestone_amount, false, true, EVENT_MILESTONE_ACCEPTED);
+        // Update poster's reputation
+        update_user_reputation(poster_addr, job_id, 0, true, false, EVENT_MILESTONE_ACCEPTED);
     }
 
     public entry fun reject_milestone(
         poster: &signer,
         job_id: u64,
         milestone_index: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, UserReputation {
         let poster_addr = signer::address_of(poster);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED); // Access Jobs resource from module address
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -587,13 +634,19 @@ module work_board::job_marketplace_v11 {
                 reject_count: milestone_data.reject_count
             }
         );
+
+        // Update worker's reputation
+        let worker_addr = *option::borrow(&job.worker);
+        update_user_reputation(worker_addr, job_id, 0, false, true, EVENT_MILESTONE_REJECTED);
+        // Update poster's reputation
+        update_user_reputation(poster_addr, job_id, 0, true, false, EVENT_MILESTONE_REJECTED);
     }
 
     public entry fun auto_confirm_milestone(
         account: &signer,
         job_id: u64,
         milestone_index: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, UserReputation, ModuleCapability {
         let _account_addr = signer::address_of(account);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -616,19 +669,26 @@ module work_board::job_marketplace_v11 {
         assert!(timestamp::now_seconds() >= submit_time + AUTO_CONFIRM_DELAY, ENOT_READY_TO_AUTO_CONFIRM);
 
         // Calculate milestone payment
-        let milestone_amount = vector::borrow(&job.milestones, milestone_index);
-        let worker_addr = option::borrow(&job.worker);
+        let milestone_amount = *vector::borrow(&job.milestones, milestone_index);
+        assert!(milestone_amount > 0, EINVALID_AMOUNT);
+        let worker_addr = *option::borrow(&job.worker);
+        let poster_addr = job.poster; // Get poster's address
 
-        // Transfer milestone payment to worker
-        transfer_from_module(account, *worker_addr, *milestone_amount);
-        job.escrowed_amount = job.escrowed_amount - *milestone_amount;
+        // Acquire module signer and transfer funds
+        let module_cap = borrow_global<ModuleCapability>(@work_board);
+        let module_signer = account::create_signer_with_capability(&module_cap.signer_capability);
+        transfer_from_module(&module_signer, worker_addr, milestone_amount);
+
+        job.escrowed_amount = job.escrowed_amount - milestone_amount;
 
         // Update milestone state
         milestone_data.accepted = true;
+        milestone_data.auto_confirm_timestamp = timestamp::now_seconds();
 
         // Update job state
         job.current_milestone = milestone_index + 1;
-        vector::push_back(&mut job.auto_confirmed, true);
+        let auto_confirmed = vector::borrow_mut(&mut job.auto_confirmed, milestone_index);
+        *auto_confirmed = true;
 
         // Check if all milestones are completed
         if (job.current_milestone == vector::length(&job.milestones)) {
@@ -652,17 +712,22 @@ module work_board::job_marketplace_v11 {
             &mut events.fund_flow_event,
             FundFlowEvent {
                 job_id,
-                to: *worker_addr,
-                amount: *milestone_amount,
+                to: worker_addr,
+                amount: milestone_amount,
                 time: timestamp::now_seconds()
             }
         );
+
+        // Update worker's reputation
+        update_user_reputation(worker_addr, job_id, milestone_amount, false, true, EVENT_MILESTONE_AUTO_CONFIRMED);
+        // Update poster's reputation
+        update_user_reputation(poster_addr, job_id, 0, true, false, EVENT_MILESTONE_AUTO_CONFIRMED);
     }
 
     public entry fun cancel_job(
         account: &signer,
         job_id: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, UserReputation, ModuleCapability {
         let account_addr = signer::address_of(account);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -679,7 +744,9 @@ module work_board::job_marketplace_v11 {
         // Return remaining funds to poster
         let remaining_funds = job.escrowed_amount;
         if (remaining_funds > 0) {
-            transfer_from_module(account, account_addr, remaining_funds);
+            let module_cap = borrow_global<ModuleCapability>(@work_board);
+            let module_signer = account::create_signer_with_capability(&module_cap.signer_capability);
+            transfer_from_module(&module_signer, account_addr, remaining_funds);
             job.escrowed_amount = 0; // All escrowed funds returned
         };
 
@@ -709,12 +776,15 @@ module work_board::job_marketplace_v11 {
                 }
             );
         };
+
+        // Update poster's reputation
+        update_user_reputation(account_addr, job_id, 0, true, false, EVENT_JOB_CANCELED);
     }
 
     public entry fun complete_job(
         account: &signer,
         job_id: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, UserReputation {
         let account_addr = signer::address_of(account);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED); // Access Jobs resource from module address
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -743,6 +813,10 @@ module work_board::job_marketplace_v11 {
                 complete_time: timestamp::now_seconds()
             }
         );
+
+        // Update worker's reputation
+        let worker_addr = *option::borrow(&job.worker);
+        update_user_reputation(worker_addr, job_id, 0, false, true, EVENT_JOB_COMPLETED);
     }
 
     public entry fun expire_job(
@@ -786,15 +860,7 @@ module work_board::job_marketplace_v11 {
         if (option::is_none(&job.worker)) {
             let remaining_funds = job.escrowed_amount;
             if (remaining_funds > 0) {
-                event::emit_event(
-                    &mut events.fund_flow_event,
-                    FundFlowEvent {
-                        job_id,
-                        to: job.poster,
-                        amount: remaining_funds,
-                        time: timestamp::now_seconds()
-                    }
-                );
+                transfer_from_module(account, job.poster, remaining_funds);
             };
         };
     }
@@ -898,6 +964,78 @@ module work_board::job_marketplace_v11 {
                 reputation_level: 1,
                 last_updated: 0
             });
+        }
+    }
+
+    fun update_user_reputation(user_addr: address, job_id: u64, amount_transacted: u64, is_poster: bool, is_worker: bool, event_type: u8) acquires UserReputation, Events {
+        if (exists<UserReputation>(user_addr)) {
+            let user_rep = borrow_global_mut<UserReputation>(user_addr);
+            let metrics = &mut user_rep.metrics;
+            let current_time = timestamp::now_seconds();
+
+            if (event_type == EVENT_JOB_POSTED) {
+                metrics.total_jobs_posted = metrics.total_jobs_posted + 1;
+            } else if (event_type == EVENT_WORKER_APPROVED) {
+                // No direct metric change for poster/worker at approval for reputation score calculation for now
+            } else if (event_type == EVENT_MILESTONE_SUBMITTED) {
+                // No direct metric change for worker at submission for reputation score calculation for now
+            } else if (event_type == EVENT_MILESTONE_ACCEPTED) {
+                if (is_worker) {
+                    metrics.total_milestones_completed = metrics.total_milestones_completed + 1;
+                    metrics.total_milestones = metrics.total_milestones + 1; // Total milestones for on-time calculation
+                    metrics.total_amount_transacted = metrics.total_amount_transacted + amount_transacted;
+                    metrics.on_time_delivery_count = metrics.on_time_delivery_count + 1; // Assuming manual acceptance implies timely completion
+                };
+                if (is_poster) {
+                    metrics.total_milestones_accepted = metrics.total_milestones_accepted + 1;
+                }
+            } else if (event_type == EVENT_MILESTONE_REJECTED) {
+                if (is_worker) {
+                    metrics.total_milestones_rejected = metrics.total_milestones_rejected + 1;
+                };
+                if (is_poster) {
+                    metrics.total_milestones_rejected_by_client = metrics.total_milestones_rejected_by_client + 1;
+                }
+            } else if (event_type == EVENT_MILESTONE_AUTO_CONFIRMED) {
+                if (is_worker) {
+                    metrics.total_milestones_completed = metrics.total_milestones_completed + 1;
+                    metrics.total_milestones = metrics.total_milestones + 1; // Total milestones for on-time calculation
+                    metrics.total_amount_transacted = metrics.total_amount_transacted + amount_transacted;
+                    metrics.on_time_delivery_count = metrics.on_time_delivery_count + 1; // Auto-confirmed implies on-time
+                };
+                if (is_poster) {
+                    metrics.total_milestones_accepted = metrics.total_milestones_accepted + 1; // Still counted as accepted
+                }
+            } else if (event_type == EVENT_JOB_CANCELED) {
+                if (is_poster) {
+                    metrics.total_jobs_cancelled = metrics.total_jobs_cancelled + 1;
+                }
+            } else if (event_type == EVENT_JOB_COMPLETED) {
+                if (is_worker) {
+                    metrics.total_jobs_completed = metrics.total_jobs_completed + 1;
+                }
+                // Poster's total_jobs_posted already incremented in EVENT_JOB_POSTED
+            };
+
+            // Update last activity time
+            user_rep.last_updated = current_time;
+            metrics.last_activity_time = current_time;
+
+            // Recalculate score and level
+            user_rep.reputation_score = calculate_reputation_score(metrics);
+            user_rep.reputation_level = calculate_reputation_level(user_rep.reputation_score);
+
+            // Emit ReputationUpdatedEvent
+            let events = borrow_global_mut<Events>(@work_board);
+            event::emit_event(
+                &mut events.reputation_event,
+                ReputationUpdatedEvent {
+                    user: user_addr,
+                    new_score: user_rep.reputation_score,
+                    new_level: user_rep.reputation_level,
+                    timestamp: current_time
+                }
+            );
         }
     }
 }

@@ -45,11 +45,11 @@ import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 
 declare global { interface Window { ethereum?: any } }
 
-const CONTRACT_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
-const MODULE_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
-const PROFILE_MODULE_NAME = "web3_profiles_v8";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV8";
+const CONTRACT_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66";
+const MODULE_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v12";
+const PROFILE_MODULE_NAME = "web3_profiles_v9";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV9";
 
 export interface JobPost {
   id: string;
@@ -557,18 +557,18 @@ const Jobs = () => {
 
       // Lấy lịch sử cập nhật/chuyển quyền
       const moduleAddress = MODULE_ADDRESS;
-      const updateEventsRes = await fetch(
-        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/update_events`
-      );
-      const updateEvents = await updateEventsRes.json();
-      const transferEventsRes = await fetch(
-        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/transfer_events`
-      );
-      const transferEvents = await transferEventsRes.json();
-      let allEvents: any[] = [];
-      if (Array.isArray(updateEvents)) {
+        const updateEventsRes = await fetch(
+          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/update_events`
+        );
+        const updateEvents = await updateEventsRes.json();
+        const transferEventsRes = await fetch(
+          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/transfer_events`
+        );
+        const transferEvents = await transferEventsRes.json();
+        let allEvents: any[] = [];
+        if (Array.isArray(updateEvents)) {
         updateEvents.sort((a: any, b: any) => Number(a.data.timestamp_seconds) - Number(b.data.timestamp_seconds));
-        const filteredUpdates = updateEvents.filter((e: any) => e.data.user?.toLowerCase() === profileAddress.toLowerCase());
+          const filteredUpdates = updateEvents.filter((e: any) => e.data.user?.toLowerCase() === profileAddress.toLowerCase());
         filteredUpdates.forEach((e: any, index: number) => {
           if (index === 0) {
             allEvents.push({ ...e, type: 'ProfileRegistered' });
@@ -577,16 +577,16 @@ const Jobs = () => {
           }
         });
       }
-      if (Array.isArray(transferEvents)) {
-        const filteredTransfers = transferEvents.filter((e: any) => 
-          e.data.from?.toLowerCase() === profileAddress.toLowerCase() || 
-          e.data.to?.toLowerCase() === profileAddress.toLowerCase()
-        );
-        allEvents = allEvents.concat(filteredTransfers.map((e: any) => ({ ...e, type: 'ProfileOwnershipTransferred' })));
-      }
-      allEvents.sort((a, b) => Number(b.data.timestamp_seconds) - Number(a.data.timestamp_seconds));
-      setHistoryResult(allEvents);
-      setCurrentPage(1);
+        if (Array.isArray(transferEvents)) {
+          const filteredTransfers = transferEvents.filter((e: any) => 
+            e.data.from?.toLowerCase() === profileAddress.toLowerCase() || 
+            e.data.to?.toLowerCase() === profileAddress.toLowerCase()
+          );
+          allEvents = allEvents.concat(filteredTransfers.map((e: any) => ({ ...e, type: 'ProfileOwnershipTransferred' })));
+        }
+        allEvents.sort((a, b) => Number(b.data.timestamp_seconds) - Number(a.data.timestamp_seconds));
+        setHistoryResult(allEvents);
+        setCurrentPage(1); 
 
       // --- Truy vấn các job liên quan đến address ---
       // 1. Lấy tất cả JobPostedEvent
@@ -895,8 +895,8 @@ const Jobs = () => {
                               {queriedProfile.reputation_metrics.total_jobs_completed > 0 && (
                                 <div className="text-sm font-primary text-white/80">
                                   Tổng dự án hoàn thành: <span className="font-semibold text-blue-400">{queriedProfile.reputation_metrics.total_jobs_completed}</span>
-                                </div>
-                              )}
+                    </div>
+                  )}
                               {queriedProfile.reputation_metrics.total_jobs_posted > 0 && (
                                 <div className="text-sm font-primary text-white/80">
                                   Tổng dự án đã đăng: <span className="font-semibold text-blue-400">{queriedProfile.reputation_metrics.total_jobs_posted}</span>
@@ -935,9 +935,9 @@ const Jobs = () => {
                                 {item.data.did && <div className="text-xs text-gray-400">DID mới: {item.data.did}</div>}
                                 {item.data.from && <div className="text-xs text-gray-400">Từ: {item.data.from}</div>}
                                 {item.data.to && <div className="text-xs text-gray-400">Đến: {item.data.to}</div>}
-                              </li>
-                            ))}
-                          </ul>
+                          </li>
+                        ))}
+                      </ul>
                         </div>
                       )}
                       {profileJobsCreated.length > 0 && (
@@ -949,7 +949,7 @@ const Jobs = () => {
                                 <div className="flex justify-between items-start mb-2">
                                   <span className="text-white font-medium">{job.title}</span>
                                   <span className="text-xs px-2 py-1 rounded bg-blue-700/30 text-blue-300">{job.status}</span>
-                                </div>
+                    </div>
                                 <div className="text-sm text-gray-400 space-y-1">
                                   <div><b>Thời gian tạo:</b> {job.createdAt ? new Date(job.createdAt * 1000).toLocaleString() : '-'}</div>
                                   <div><b>Thời gian hoàn thành:</b> {job.completedAt ? new Date(job.completedAt * 1000).toLocaleString() : '-'}</div>
