@@ -128,7 +128,7 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
       try {
         const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS; // Ensure this is correctly configured
         const JOBS_CONTRACT_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66"; // Your jobs contract address
-        const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v12"; // Your jobs module name
+        const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v13"; // Your jobs module name
 
         const userReputationResource = await aptos.getAccountResource({
           accountAddress: account,

@@ -75,9 +75,9 @@ interface JobPost {
 
 const CONTRACT_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66";
 const MODULE_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66"; // Same as contract address for now
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v12";
-const PROFILE_MODULE_NAME = "web3_profiles_v9";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV8";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v13";
+const PROFILE_MODULE_NAME = "web3_profiles_v10";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV10";
 const AUTO_CONFIRM_DELAY = 5 * 60; // 5 minutes in seconds
 
 const Dashboard = () => {

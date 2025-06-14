@@ -47,9 +47,9 @@ declare global { interface Window { ethereum?: any } }
 
 const CONTRACT_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66";
 const MODULE_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v12";
-const PROFILE_MODULE_NAME = "web3_profiles_v9";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV9";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v13";
+const PROFILE_MODULE_NAME = "web3_profiles_v10";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV10";
 
 export interface JobPost {
   id: string;
