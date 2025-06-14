@@ -6,39 +6,35 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageCircle } from 'lucide-react';
-import { useWallet } from '../context/WalletContext'; // Import useWallet
-import { aptos } from '../utils/aptosUtils'; // Import aptos client
-import { toast } from '@/components/ui/sonner'; // Import toast for notifications
+import { useWallet } from '../context/WalletContext';
+import { aptos } from '../utils/aptosUtils';
+import { toast } from '@/components/ui/sonner';
 
-// Hardcode the message contract address and module name
+
 const MESSAGE_CONTRACT_ADDRESS = "0x3afc92d246a6d03ac951dc01dbe9257a150d09804b6ebc20a7bf2aaedb4d36eb";
 const MESSAGE_MODULE_NAME = "web3_messaging_v1";
 
 interface Message {
   id: string;
-  senderId: string; // Aptos address
-  receiverId: string; // Aptos address
+  senderId: string; 
+  receiverId: string; 
   content: string;
-  timestamp: string; // ISO string
+  timestamp: string; 
 }
 
 interface Conversation {
-  id: string; // Formed by sorting and concatenating two participant addresses
-  participantId: string; // The other participant's address
+  id: string; 
+  participantId: string; 
   lastMessagePreview: string;
   unread: number;
-  lastMessageTime: string; // Relative time or formatted date
+  lastMessageTime: string; 
 }
 
-// Mock client data (we'll enhance this later with profile fetching)
-const mockClients = [
-    { id: '0x1', name: 'Công ty A', avatar: '/img/client-a.png', lensHandle: '@congtyA' }, // Placeholder client IDs
-    { id: '0x2', name: 'Dự án Blockchain XYZ', avatar: '/img/client-b.png', lensHandle: '@duanXYZ' },
-    { id: '0x3', name: 'Tổ chức Web3 Talent', avatar: '/img/client-c.png', lensHandle: '@web3talent' },
-];
+
+
 
 const Messages = () => {
-  const { account, accountType } = useWallet(); // Get current user's account
+  const { account, accountType } = useWallet(); 
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -46,10 +42,10 @@ const Messages = () => {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [newChatAddress, setNewChatAddress] = useState(''); // New state for new chat input
+  const [newChatAddress, setNewChatAddress] = useState(''); 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Function to generate a consistent conversation ID
+
   const getConversationId = (addr1: string, addr2: string): string => {
     const addresses = [addr1.toLowerCase(), addr2.toLowerCase()].sort();
     return `conv_${addresses[0]}_${addresses[1]}`;
@@ -60,13 +56,13 @@ const Messages = () => {
     if (!account) return;
     setLoadingConversations(true);
     setError(null);
-    setIsRefreshing(true); // Set refreshing to true when starting fetch
+    setIsRefreshing(true); 
 
     try {
       const allMessageEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${MESSAGE_CONTRACT_ADDRESS}::${MESSAGE_MODULE_NAME}::MessageSentEvent`,
         options: {
-          limit: 1000, // Fetch a large number of events to cover history
+          limit: 1000, 
         }
       });
 
@@ -238,12 +234,7 @@ const Messages = () => {
   };
 
   const getParticipant = (participantId: string) => {
-    // In a real app, this would fetch profile data for the participantId
-    // For now, use mockClients and extend if needed for new participant IDs
-    const found = mockClients.find(client => client.id === participantId);
-    if (found) return found;
 
-    // If participant is not in mockClients, create a placeholder
     return { id: participantId, name: `Người dùng ${participantId.slice(0, 6)}...`, avatar: '', lensHandle: '' };
   };
 

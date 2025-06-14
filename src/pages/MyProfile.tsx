@@ -113,34 +113,33 @@ export default function MyProfile() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("profile"); // 'profile', 'history', 'myjobs'
+  const [activeTab, setActiveTab] = useState("profile");
 
-  // State cho truy vấn lịch sử theo địa chỉ
-  const [queryAddress, setQueryAddress] = useState(""); // Sẽ không còn dùng cho input search
+  const [queryAddress, setQueryAddress] = useState(""); 
   const [historyResult, setHistoryResult] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1); // Thêm state cho trang hiện tại
-  const itemsPerPage = 2; // Số mục mỗi trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 2; 
   const [ipfsError, setIpfsError] = useState<string | null>(null);
 
-  // --- Thêm state cho jobs của tôi ---
+
   const [myJobsLoading, setMyJobsLoading] = useState(false);
   const [myJobsError, setMyJobsError] = useState<string | null>(null);
   const [myJobsCreated, setMyJobsCreated] = useState<any[]>([]);
   const [myJobsApplied, setMyJobsApplied] = useState<any[]>([]);
 
-  // Pagination states for My Jobs tab
+
   const [myJobsCreatedCurrentPage, setMyJobsCreatedCurrentPage] = useState(1);
   const [myJobsAppliedCurrentPage, setMyJobsAppliedCurrentPage] = useState(1);
 
-  // Pagination handlers for My Jobs tab
+
   const handleMyJobsCreatedPageChange = (page: number) => setMyJobsCreatedCurrentPage(page);
   const handleMyJobsAppliedPageChange = (page: number) => setMyJobsAppliedCurrentPage(page);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Add new function to fetch reputation data
+
   const fetchReputationData = useCallback(async (address: string) => {
     try {
       const userReputationResource = await aptos.getAccountResource({
@@ -186,10 +185,10 @@ export default function MyProfile() {
     setLoading(true);
 
     try {
-      // Fetch reputation data independently
+
       const reputationData = await fetchReputationData(account);
       
-      // Fetch profile data from chain
+
       console.log("MyProfile: Attempting to fetch registry resource from:", MODULE_ADDRESS);
       const registryResource = await aptos.getAccountResource({
         accountAddress: MODULE_ADDRESS,
@@ -220,7 +219,7 @@ export default function MyProfile() {
       const didData = profileDataFromChain.did;
       const createdAt = profileDataFromChain.created_at;
 
-      // Use reputation data from independent fetch
+
       const reputationToUse = reputationData || {
         score: 0,
         level: 0,
@@ -241,7 +240,7 @@ export default function MyProfile() {
         },
       };
 
-      // Update profile state with fetched data
+  
       setProfile(prevProfile => ({
         ...prevProfile,
         wallet: account,
@@ -261,16 +260,16 @@ export default function MyProfile() {
 
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]); // Refetch when fetchProfile dependency changes (stable due to useCallback)
+  }, [fetchProfile]); 
 
-  // Refetch profile when `refetchProfile` from context changes (e.g., after an update)
+
   useEffect(() => {
     if (refetchProfile) {
       fetchProfile();
     }
-  }, [refetchProfile, fetchProfile]); // Add fetchProfile to dependency array
+  }, [refetchProfile, fetchProfile]);
 
-  // Add reload button function
+
   const handleReloadProfile = useCallback(async () => {
     setIsRefreshing(true);
     try {
@@ -282,14 +281,14 @@ export default function MyProfile() {
     }
   }, [fetchProfile]);
 
-  // Trigger fetch history when tab changes or account changes
+ 
   useEffect(() => {
     if (activeTab === 'history' && account) {
       fetchHistoryByAddress(account);
     }
   }, [activeTab, account]);
 
-  // Hàm truy vấn lịch sử cập nhật hồ sơ theo địa chỉ (dùng endpoint đúng)
+
   const fetchHistoryByAddress = async (address: string) => {
     setHistoryLoading(true);
     setHistoryError(null);
@@ -297,7 +296,7 @@ export default function MyProfile() {
     try {
       const moduleAddress = import.meta.env.VITE_MODULE_ADDRESS;
       
-      // Fetch ProfileUpdated events
+
       console.log(`Fetching ProfileUpdated events for module: ${moduleAddress}`);
       const updateEventsRes = await fetch(
         `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${MODULE_NAME}::${RESOURCE_NAME}/update_events`
@@ -305,7 +304,6 @@ export default function MyProfile() {
       const updateEvents = await updateEventsRes.json();
       console.log("Raw ProfileUpdated events:", updateEvents);
 
-      // Fetch ProfileOwnershipTransferred events
       console.log(`Fetching ProfileOwnershipTransferred events for module: ${moduleAddress}`);
       const transferEventsRes = await fetch(
         `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${MODULE_NAME}::${RESOURCE_NAME}/transfer_events`
@@ -316,16 +314,16 @@ export default function MyProfile() {
       let allEvents: any[] = [];
 
       if (Array.isArray(updateEvents)) {
-        // Sort updates by timestamp to identify the first one as registration
+
         updateEvents.sort((a: any, b: any) => Number(a.data.timestamp_seconds) - Number(b.data.timestamp_seconds));
 
         const filteredUpdates = updateEvents.filter((e: any) => e.data.user?.toLowerCase() === address.toLowerCase());
         
         filteredUpdates.forEach((e: any, index: number) => {
           if (index === 0) {
-            allEvents.push({ ...e, type: 'ProfileRegistered' }); // Mark the first as Registered
+            allEvents.push({ ...e, type: 'ProfileRegistered' }); 
           } else {
-            allEvents.push({ ...e, type: 'ProfileUpdated' });    // Mark subsequent as Updated
+            allEvents.push({ ...e, type: 'ProfileUpdated' });    
           }
         });
         console.log("Filtered and categorized ProfileUpdated/Registered events for address:", address, allEvents.filter(e => e.type !== 'ProfileOwnershipTransferred'));
@@ -360,12 +358,12 @@ export default function MyProfile() {
     }
   };
 
-  // --- Fetch jobs khi vào tab "myjobs" ---
+
   useEffect(() => {
     if (activeTab === 'myjobs' && account) {
       fetchMyJobs(account);
     }
-    // eslint-disable-next-line
+
   }, [activeTab, account]);
 
   const fetchMyJobs = async (address: string) => {
@@ -374,37 +372,37 @@ export default function MyProfile() {
     setMyJobsCreated([]);
     setMyJobsApplied([]);
     try {
-      // 1. Lấy tất cả JobPostedEvent
+
       const rawPostedEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
         options: { limit: 100 }
       });
-      // 2. Lấy tất cả WorkerAppliedEvent
+   
       const rawAppliedEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerAppliedEvent`,
         options: { limit: 100 }
       });
-      // 3. Lấy tất cả WorkerApprovedEvent
+   
       const rawApprovedEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
         options: { limit: 100 }
       });
-      // 4. Lấy tất cả JobCompletedEvent
+    
       const rawCompletedEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
         options: { limit: 100 }
       });
-      // 5. Lấy tất cả JobCanceledEvent
+ 
       const rawCanceledEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCanceledEvent`,
         options: { limit: 100 }
       });
-      // 6. Lấy tất cả JobExpiredEvent
+  
       const rawExpiredEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobExpiredEvent`,
         options: { limit: 100 }
       });
-      // Map trạng thái job
+
       const jobStatusMap = {};
       rawCompletedEvents.forEach(e => { jobStatusMap[e.data.job_id.toString()] = 'Đã hoàn thành'; });
       rawCanceledEvents.forEach(e => { jobStatusMap[e.data.job_id.toString()] = 'Đã hủy'; });
@@ -417,13 +415,13 @@ export default function MyProfile() {
         const id = e.data.job_id.toString();
         if (!jobStatusMap[id]) jobStatusMap[id] = 'Đang tuyển';
       });
-      // Lọc job đã tạo
+
       const jobsCreated = rawPostedEvents.filter(e => e.data.poster.toLowerCase() === address.toLowerCase());
-      // Lọc job đã apply
+
       const jobsApplied = rawAppliedEvents.filter(e => e.data.worker.toLowerCase() === address.toLowerCase());
-      // Lọc job đã được nhận (worker)
+ 
       const jobsWorked = rawApprovedEvents.filter(e => e.data.worker.toLowerCase() === address.toLowerCase());
-      // Lấy thông tin chi tiết job (từ IPFS)
+  
       const getJobInfo = async (event) => {
         try {
           const jobIdStr = event.data.job_id.toString();
@@ -431,7 +429,7 @@ export default function MyProfile() {
           const response = await fetch(jobDetailsUrl);
           if (!response.ok) return null;
           const jobData = await response.json();
-          // 1. Lấy tất cả event liên quan
+    
           let postedEvents = [];
           let approvedEvents = [];
           let milestoneAcceptedEvents = [];
