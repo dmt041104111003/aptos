@@ -297,8 +297,8 @@ export default function MyProfile() {
     setMyJobsApplied([]);
     try {
       // 1. Lấy tất cả JobPostedEvent
-      const CONTRACT_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
-      const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v6";
+      const CONTRACT_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
+      const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
       const rawPostedEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
         options: { limit: 100 }

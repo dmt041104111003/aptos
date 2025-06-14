@@ -45,12 +45,11 @@ import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 
 declare global { interface Window { ethereum?: any } }
 
-const CONTRACT_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
-const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v6";
+const CONTRACT_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
+const MODULE_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
 const PROFILE_MODULE_NAME = "web3_profiles_v8";
 const PROFILE_RESOURCE_NAME = "ProfileRegistryV8";
-const APPLY_FEE = 1000000; // 0.01 APT in micro-APT
 
 export interface JobPost {
   id: string;
