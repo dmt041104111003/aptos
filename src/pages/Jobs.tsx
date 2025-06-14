@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { aptos, aptosConfig, fetchProfileDetails, ProfileDataFromChain } from '@/utils/aptosUtils';
+import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 
 declare global { interface Window { ethereum?: any } }
 

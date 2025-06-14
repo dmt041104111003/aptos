@@ -1,11 +1,11 @@
-import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
+import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 import { convertIPFSURL } from "@/utils/ipfs";
 
 const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
 const PROFILE_MODULE_NAME = "web3_profiles_v7";
 const PROFILE_RESOURCE_NAME = "ProfileRegistryV7";
 
-export const aptosConfig = new AptosConfig({ network: Network.TESTNET });
+export const aptosConfig = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 export const aptos = new Aptos(aptosConfig);
 
 export interface ProfileDataFromChain {
