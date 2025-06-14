@@ -90,6 +90,7 @@ const Dashboard = () => {
   const [jobsWithApplications, setJobsWithApplications] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Animation refs
   const heroRef = useRef(null);
@@ -768,6 +769,19 @@ const Dashboard = () => {
       .catch(() => toast.error("Không thể sao chép."));
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadUserJobs();
+      toast.success('Đã làm mới dữ liệu thành công!');
+    } catch (error) {
+      console.error('Lỗi khi làm mới dữ liệu:', error);
+      toast.error('Không thể làm mới dữ liệu. Vui lòng thử lại sau.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const renderJobCard = (job: JobPost, type: 'in-progress' | 'completed' | 'applications') => {
     const userAddress = account?.toLowerCase();
     const isPoster = job.poster.toLowerCase() === userAddress;
@@ -1011,6 +1025,22 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
+
+      {/* Fixed Refresh Button */}
+      <div className="fixed bottom-8 right-8 z-50">
+        <Button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 shadow-lg rounded-full w-12 h-12 p-0"
+          title="Làm mới dữ liệu"
+        >
+          {isRefreshing ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9V3a10 10 0 0 1 10 10Z"/><path d="M3 12a9 9 0 0 0 9 9V21a10 10 0 0 1-10-10Z"/><path d="M8 17.924L5.1 14.85a2 2 0 0 1-.3-2.004L6.083 10"/><path d="M16 6.076L18.9 9.15a2 2 0 0 1 .3 2.004L17.917 14"/></svg>
+          )}
+        </Button>
+      </div>
 
       <section ref={heroRef} className="relative py-20 bg-gradient-to-br from-blue-900/20 via-violet-900/30 to-black">
         <div className="absolute inset-0 bg-[url('/img/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
