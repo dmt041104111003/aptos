@@ -4,14 +4,14 @@ import { Star, Shield, Tag, CheckCircle2, AlertCircle } from "lucide-react";
 import { useWallet } from "../context/WalletContext";
 import { convertIPFSURL } from "../utils/ipfs";
 import { Navigate } from "react-router-dom";
-import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
+import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 import { motion } from "framer-motion";
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
 const MODULE_NAME = "web3_profiles_v7";
 const RESOURCE_NAME = "ProfileRegistryV7";
 
-const config = new AptosConfig({ network: Network.TESTNET });
+const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
 
 interface ProfileDataFromChain {

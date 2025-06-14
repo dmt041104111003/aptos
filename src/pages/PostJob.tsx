@@ -19,7 +19,7 @@ import { useWallet } from '../context/WalletContext';
 import { useProfile } from '../contexts/ProfileContext';
 import { uploadJSONToIPFS } from '@/utils/pinata';
 import { uploadFileToIPFS } from '@/utils/pinata';
-import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
+import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 
 import { motion } from 'framer-motion';
 import { 
@@ -49,7 +49,7 @@ import Navbar from '@/components/ui2/Navbar';
 const JOBS_MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
 const JOBS_MODULE_NAME = "job_marketplace_v5";
 
-const config = new AptosConfig({ network: Network.TESTNET });
+const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
 
 interface FormState {
