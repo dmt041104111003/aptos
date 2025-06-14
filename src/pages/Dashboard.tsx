@@ -770,46 +770,46 @@ const Dashboard = () => {
 
 
     return (
-      <motion.div
-        key={job.id}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full"
-      >
-        <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border border-white/10 backdrop-blur-sm p-6 rounded-2xl shadow-xl hover:border-blue-500/30 transition-all duration-300 flex flex-col h-full">
-          <CardHeader className="px-0 pt-0 pb-4">
-            <CardTitle className="text-xl font-bold text-white mb-2">{job.title}</CardTitle>
-            <CardDescription className="text-gray-400 text-sm line-clamp-2">{job.description}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 px-0 py-0">
-            <div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300 mb-4">
-                <div className="flex items-center gap-2"><Briefcase size={16} className="text-blue-400" /><span>{job.category}</span></div>
-                <div className="flex items-center gap-2"><DollarSign size={16} className="text-green-400" /><span>${job.budget.min.toLocaleString()} - ${job.budget.max.toLocaleString()} {job.budget.currency}</span></div>
-                <div className="flex items-center gap-2"><Clock size={16} className="text-orange-400" /><span>{job.duration}</span></div>
-                <div className="flex items-center gap-2"><CalendarCheck size={16} className="text-purple-400" /><span>Thời hạn ứng tuyển: {new Date(job.application_deadline * 1000).toLocaleDateString()}</span></div>
-              </div>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {job.skills.map((skill, idx) => (
-                  <Badge key={idx} variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/30">{skill}</Badge>
-                ))}
-              </div>
+    <motion.div
+      key={job.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full"
+    >
+      <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border border-white/10 backdrop-blur-sm p-6 rounded-2xl shadow-xl hover:border-blue-500/30 transition-all duration-300 flex flex-col h-full">
+        <CardHeader className="px-0 pt-0 pb-4">
+          <CardTitle className="text-xl font-bold text-white mb-2">{job.title}</CardTitle>
+          <CardDescription className="text-gray-400 text-sm line-clamp-2">{job.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex-1 px-0 py-0">
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300 mb-4">
+              <div className="flex items-center gap-2"><Briefcase size={16} className="text-blue-400" /><span>{job.category}</span></div>
+              <div className="flex items-center gap-2"><DollarSign size={16} className="text-green-400" /><span>${job.budget.min.toLocaleString()} - ${job.budget.max.toLocaleString()} {job.budget.currency}</span></div>
+              <div className="flex items-center gap-2"><Clock size={16} className="text-orange-400" /><span>{job.duration}</span></div>
+              <div className="flex items-center gap-2"><CalendarCheck size={16} className="text-purple-400" /><span>Thời hạn ứng tuyển: {new Date(job.application_deadline * 1000).toLocaleDateString()}</span></div>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {job.skills.map((skill, idx) => (
+                <Badge key={idx} variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/30">{skill}</Badge>
+              ))}
+            </div>
 
-              {/* Hiển thị thông tin Poster/Worker/Applications */}
-              <div className="mb-4 p-4 bg-gray-800/50 rounded-lg border border-white/10">
-                <h3 className="font-semibold text-white mb-3 flex items-center gap-2"><Users size={18} className="text-violet-400" />Thông tin liên quan</h3>
-                <div className="space-y-3">
-                  {/* Poster Info */}
+            {/* Hiển thị thông tin Poster/Worker/Applications */}
+            <div className="mb-4 p-4 bg-gray-800/50 rounded-lg border border-white/10">
+              <h3 className="font-semibold text-white mb-3 flex items-center gap-2"><Users size={18} className="text-violet-400" />Thông tin liên quan</h3>
+              <div className="space-y-3">
+                {/* Poster Info */}
                   {(isPoster || isWorker || isApplicant) && ( // Show poster info to all relevant parties
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-10 h-10 border-2 border-blue-500">
-                        <AvatarImage src={job.client.avatar} alt={job.client.name} />
-                        <AvatarFallback>{job.client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-10 h-10 border-2 border-blue-500">
+                      <AvatarImage src={job.client.avatar} alt={job.client.name} />
+                      <AvatarFallback>{job.client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div>
                         <p className="font-medium text-white">Người đăng: {isPoster ? 'Bạn' : job.client.name}</p>
-                        <p className="text-xs text-gray-400">Đăng lúc: {formatPostedTime(job.start_time)}</p>
+                      <p className="text-xs text-gray-400">Đăng lúc: {formatPostedTime(job.start_time)}</p>
                         <div className="flex items-center gap-1 text-xs text-gray-400">
                           <span>Địa chỉ ví: {job.poster.slice(0, 6)}...{job.poster.slice(-4)}</span>
                           <button
@@ -820,20 +820,20 @@ const Dashboard = () => {
                             <Copy size={12} />
                           </button>
                         </div>
-                      </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* Worker Info */}
+                {/* Worker Info */}
                   {job.worker && (
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3">
                       <Avatar className={`w-10 h-10 border-2 ${isWorker ? 'border-green-500' : 'border-gray-500'}`}>
-                        <AvatarImage src={job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfileAvatar} alt="Worker Avatar" />
-                        <AvatarFallback>WK</AvatarFallback>
-                      </Avatar>
-                      <div>
+                      <AvatarImage src={job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfileAvatar} alt="Worker Avatar" />
+                      <AvatarFallback>WK</AvatarFallback>
+                    </Avatar>
+                    <div>
                         <p className="font-medium text-white">Người thực hiện: {isWorker ? 'Bạn' : (job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfileName || 'Ẩn danh')}</p>
-                        <p className="text-xs text-gray-400">Được chấp nhận lúc: {formatPostedTime(job.approve_time || 0)}</p>
+                      <p className="text-xs text-gray-400">Được chấp nhận lúc: {formatPostedTime(job.approve_time || 0)}</p>
                         <div className="flex items-center gap-1 text-xs text-gray-400">
                           <span>Địa chỉ ví: {job.worker.slice(0, 6)}...{job.worker.slice(-4)}</span>
                           <button
@@ -843,16 +843,16 @@ const Dashboard = () => {
                           >
                             <Copy size={12} />
                           </button>
-                        </div>
-                      </div>
                     </div>
-                  )}
+                    </div>
+                  </div>
+                )}
 
-                  {/* Milestones for active jobs */}
+                {/* Milestones for active jobs */}
                   {hasMilestonesToDisplay && (
-                    <div className="mt-4">
-                      <h4 className="font-medium text-white mb-2 flex items-center gap-2"><Hourglass size={16} className="text-yellow-400" />Tiến độ dự án ({job.current_milestone}/{job.milestones.length})</h4>
-                      <ul className="space-y-2">
+                  <div className="mt-4">
+                    <h4 className="font-medium text-white mb-2 flex items-center gap-2"><Hourglass size={16} className="text-yellow-400" />Tiến độ dự án ({job.current_milestone}/{job.milestones.length})</h4>
+                    <ul className="space-y-2">
                         {job.milestones.map((amount, index) => {
                           const milestoneData = job.milestone_states[index];
                           const isCurrentMilestone = job.current_milestone === index;
@@ -869,7 +869,7 @@ const Dashboard = () => {
                             <li key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-700/30 px-3 py-2 rounded-md">
                               <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 sm:mb-0">
                                 <span className="text-sm text-gray-300">Giai đoạn {index + 1}: ${amount / 1_000_000} APT</span>
-                                <Badge variant={getMilestoneBadgeVariant(job, index)}>{getMilestoneStatus(job, index)}</Badge>
+                          <Badge variant={getMilestoneBadgeVariant(job, index)}>{getMilestoneStatus(job, index)}</Badge>
                               </div>
                               <div className="flex flex-wrap gap-2 justify-end">
                                 {showSubmitButton && (
@@ -893,12 +893,12 @@ const Dashboard = () => {
                                   </Button>
                                 )}
                               </div>
-                            </li>
+                        </li>
                           );
                         })}
-                      </ul>
-                    </div>
-                  )}
+                    </ul>
+                  </div>
+                )}
                   {!hasMilestonesToDisplay && job.milestones.length === 0 && type === 'in-progress' && (
                     <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-white/10 text-center text-gray-400 text-sm">
                       Dự án này chưa có cột mốc nào được định nghĩa.
@@ -926,21 +926,21 @@ const Dashboard = () => {
                     </div>
                   )}
 
-                  {/* Application List (for posters) */}
+                {/* Application List (for posters) */}
                   {(type === 'applications' || (type === 'in-progress' && isPoster && !job.worker)) && job.applications.length > 0 && (
-                    <div className="mt-4 p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
-                      <h4 className="font-semibold text-white mb-3 flex items-center gap-2"><Users size={16} className="text-blue-300" />Đơn ứng tuyển ({job.applications.length})</h4>
-                      <ul className="space-y-3">
-                        {job.applications.map((app, index) => (
-                          <li key={index} className="flex items-center justify-between bg-blue-800/30 p-3 rounded-md">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="w-9 h-9">
-                                <AvatarImage src={app.workerProfileAvatar} alt={app.workerProfileName} />
-                                <AvatarFallback>{app.workerProfileName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="font-medium text-white">{app.workerProfileName}</p>
-                                <p className="text-xs text-gray-400">Ứng tuyển lúc: {formatPostedTime(app.apply_time)}</p>
+                  <div className="mt-4 p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
+                    <h4 className="font-semibold text-white mb-3 flex items-center gap-2"><Users size={16} className="text-blue-300" />Đơn ứng tuyển ({job.applications.length})</h4>
+                    <ul className="space-y-3">
+                      {job.applications.map((app, index) => (
+                        <li key={index} className="flex items-center justify-between bg-blue-800/30 p-3 rounded-md">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-9 h-9">
+                              <AvatarImage src={app.workerProfileAvatar} alt={app.workerProfileName} />
+                              <AvatarFallback>{app.workerProfileName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-white">{app.workerProfileName}</p>
+                              <p className="text-xs text-gray-400">Ứng tuyển lúc: {formatPostedTime(app.apply_time)}</p>
                                 <div className="flex items-center gap-1 text-xs text-gray-400">
                                   <span>Địa chỉ ví: {app.worker.slice(0, 6)}...{app.worker.slice(-4)}</span>
                                   <button
@@ -951,33 +951,33 @@ const Dashboard = () => {
                                     <Copy size={12} />
                                   </button>
                                 </div>
-                              </div>
                             </div>
-                            <Button
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => handleApproveWorker(job.id, index)}
-                            >
-                              Chấp nhận
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                          </div>
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleApproveWorker(job.id, index)}
+                          >
+                            Chấp nhận
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                   {(type === 'applications' || (type === 'in-progress' && isPoster && !job.worker)) && job.applications.length === 0 && (
-                    <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-white/10 text-center text-gray-400 text-sm">
-                      Chưa có đơn ứng tuyển nào.
-                    </div>
-                  )}
-                </div>
+                  <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-white/10 text-center text-gray-400 text-sm">
+                    Chưa có đơn ứng tuyển nào.
+                  </div>
+                )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    );
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
   };
 
   return (
