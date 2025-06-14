@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Navbar from "@/components/ui2/Navbar";
 import { Star, Shield, Tag, CheckCircle2, AlertCircle } from "lucide-react";
 import { useWallet } from "../context/WalletContext";
@@ -7,6 +7,7 @@ import { Navigate } from "react-router-dom";
 import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { motion } from "framer-motion";
 import { useProfile } from "../contexts/ProfileContext";
+import { Button } from "@/components/ui/button";
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
 const MODULE_NAME = "web3_profiles_v14";
@@ -130,7 +131,7 @@ export default function MyProfile() {
   const [myJobsApplied, setMyJobsApplied] = useState<any[]>([]);
 
   // Add new function to fetch reputation data
-  const fetchReputationData = async (address: string) => {
+  const fetchReputationData = useCallback(async (address: string) => {
     try {
       const userReputationResource = await aptos.getAccountResource({
         accountAddress: address,
@@ -164,93 +165,105 @@ export default function MyProfile() {
       console.error("Error fetching reputation data:", error);
       return null;
     }
-  };
+  }, [aptos, JOBS_CONTRACT_ADDRESS, JOBS_MARKETPLACE_MODULE_NAME]);
+
+  const fetchProfile = useCallback(async () => {
+    if (!account || accountType !== 'aptos') {
+      setLoading(false);
+      console.log("MyProfile: No Aptos account connected.");
+      return;
+    }
+    setLoading(true);
+
+    try {
+      // Fetch reputation data independently
+      const reputationData = await fetchReputationData(account);
+      
+      // Fetch profile data from chain
+      console.log("MyProfile: Attempting to fetch registry resource from:", MODULE_ADDRESS);
+      const registryResource = await aptos.getAccountResource({
+        accountAddress: MODULE_ADDRESS,
+        resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME}` as `${string}::${string}::${string}`,
+      });
+
+      if (!registryResource) {
+        throw new Error("Profile not registered: Resource data missing.");
+      }
+
+      const profiles = (registryResource as any)?.profiles;
+      if (!profiles?.handle) {
+        throw new Error("Profile not registered: Profiles table handle missing.");
+      }
+
+      const profilesTableHandle = profiles.handle;
+      const profileDataFromChain = await aptos.getTableItem({
+        handle: profilesTableHandle,
+        data: {
+          key_type: "address",
+          value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`,
+          key: account,
+        },
+      }) as ProfileDataFromChain;
+
+      const profileCID = profileDataFromChain.cid;
+      const cccdData = profileDataFromChain.cccd;
+      const didData = profileDataFromChain.did;
+      const createdAt = profileDataFromChain.created_at;
+
+      // Use reputation data from independent fetch
+      const reputationToUse = reputationData || {
+        score: 0,
+        level: 0,
+        metrics: {
+          total_jobs_completed: 0,
+          total_jobs_cancelled: 0,
+          total_amount_transacted: 0,
+          last_activity_time: 0,
+          total_milestones_completed: 0,
+          total_milestones_rejected: 0,
+          on_time_delivery_count: 0,
+          total_milestones: 0,
+          total_jobs_posted: 0,
+          total_milestones_accepted: 0,
+          total_milestones_rejected_by_client: 0,
+          total_response_time: 0,
+          response_count: 0,
+        },
+      };
+
+      // Update profile state with fetched data
+      setProfile(prevProfile => ({
+        ...prevProfile,
+        wallet: account,
+        did: didData,
+        cccd: cccdData,
+        createdAt: createdAt,
+        reputation: reputationToUse,
+      }));
+
+    } catch (error) {
+      console.error("Error in fetchProfile:", error);
+      setError(error instanceof Error ? error.message : "Failed to load profile");
+    } finally {
+      setLoading(false);
+    }
+  }, [account, accountType, fetchReputationData, aptos, MODULE_ADDRESS, MODULE_NAME, RESOURCE_NAME, setLoading, setError, setProfile]);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!account || accountType !== 'aptos') {
-        setLoading(false);
-        console.log("MyProfile: No Aptos account connected.");
-        return;
-      }
-      setLoading(true);
-
-      try {
-        // Fetch reputation data independently
-        const reputationData = await fetchReputationData(account);
-        
-        // Fetch profile data from chain
-        console.log("MyProfile: Attempting to fetch registry resource from:", MODULE_ADDRESS);
-        const registryResource = await aptos.getAccountResource({
-          accountAddress: MODULE_ADDRESS,
-          resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME}` as `${string}::${string}::${string}`,
-        });
-
-        if (!registryResource) {
-          throw new Error("Profile not registered: Resource data missing.");
-        }
-
-        const profiles = (registryResource as any)?.profiles;
-        if (!profiles?.handle) {
-          throw new Error("Profile not registered: Profiles table handle missing.");
-        }
-
-        const profilesTableHandle = profiles.handle;
-        const profileDataFromChain = await aptos.getTableItem({
-          handle: profilesTableHandle,
-          data: {
-            key_type: "address",
-            value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`,
-            key: account,
-          },
-        }) as ProfileDataFromChain;
-
-        const profileCID = profileDataFromChain.cid;
-        const cccdData = profileDataFromChain.cccd;
-        const didData = profileDataFromChain.did;
-        const createdAt = profileDataFromChain.created_at;
-
-        // Use reputation data from independent fetch
-        const reputationToUse = reputationData || {
-          score: 0,
-          level: 0,
-          metrics: {
-            total_jobs_completed: 0,
-            total_jobs_cancelled: 0,
-            total_amount_transacted: 0,
-            last_activity_time: 0,
-            total_milestones_completed: 0,
-            total_milestones_rejected: 0,
-            on_time_delivery_count: 0,
-            total_milestones: 0,
-            total_jobs_posted: 0,
-            total_milestones_accepted: 0,
-            total_milestones_rejected_by_client: 0,
-            total_response_time: 0,
-            response_count: 0,
-          },
-        };
-
-        // Update profile state with fetched data
-        setProfile(prevProfile => ({
-          ...prevProfile,
-          wallet: account,
-          did: didData,
-          cccd: cccdData,
-          createdAt: createdAt,
-          reputation: reputationToUse,
-        }));
-
-      } catch (error) {
-        console.error("Error in fetchProfile:", error);
-        setError(error instanceof Error ? error.message : "Failed to load profile");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProfile();
-  }, [account, accountType]);
+  }, [fetchProfile]); // Refetch when fetchProfile dependency changes (stable due to useCallback)
+
+  // Refetch profile when `refetchProfile` from context changes (e.g., after an update)
+  useEffect(() => {
+    if (refetchProfile) {
+      fetchProfile();
+    }
+  }, [refetchProfile, fetchProfile]); // Add fetchProfile to dependency array
+
+  // Add reload button function
+  const handleReloadProfile = useCallback(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
   // Trigger fetch history when tab changes or account changes
   useEffect(() => {
@@ -542,16 +555,15 @@ export default function MyProfile() {
       <Navbar />
       <section className="py-16 bg-gradient-to-br from-blue-900/20 via-violet-900/30 to-black min-h-[80vh]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-2xl font-bold font-heading text-white">Hồ sơ của tôi</h1>
-            {error && (
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                error === 'PROFILE_NOT_FOUND' ? 'bg-red-500/20 text-red-400' : 'bg-red-500/20 text-red-400'
-              }`}>
-                <AlertCircle size={20} /> 
-                <span>{error === 'PROFILE_NOT_FOUND' ? 'Hồ sơ không tồn tại' : 'Đã xảy ra lỗi khi tải hồ sơ. Vui lòng thử lại.'}</span>
-              </div>
-            )}
+          <div className="flex items-center justify-between">
+            <h1 className="text-4xl font-extrabold text-white font-heading">Hồ sơ của tôi</h1>
+            <Button
+              onClick={handleReloadProfile}
+              className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white p-2 w-10 h-10 flex items-center justify-center rounded-full shadow-lg"
+              title="Làm mới hồ sơ"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9V3a10 10 0 0 1 10 10Z"/><path d="M3 12a9 9 0 0 0 9 9V21a10 10 0 0 1-10-10Z"/><path d="M8 17.924L5.1 14.85a2 2 0 0 1-.3-2.004L6.083 10"/><path d="M16 6.076L18.9 9.15a2 2 0 0 1 .3 2.004L17.917 14"/></svg>
+            </Button>
           </div>
 
     
