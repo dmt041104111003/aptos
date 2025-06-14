@@ -1,4 +1,4 @@
-module work_profiles_addr::web3_profiles_v7 {
+module work_profiles_addr::web3_profiles_v8 {
 
     use std::signer;
     use std::string::{String};
@@ -6,7 +6,7 @@ module work_profiles_addr::web3_profiles_v7 {
     use aptos_std::table;
     use aptos_framework::timestamp;
     use aptos_framework::account;
-    use aptos_framework::coin::{Self, Coin};
+    use aptos_framework::coin::{Self};
     use aptos_framework::aptos_coin::AptosCoin;
 
     const EPROFILE_NOT_REGISTERED: u64 = 1;
@@ -21,9 +21,9 @@ module work_profiles_addr::web3_profiles_v7 {
     const REGISTRATION_FEE: u64 = 1000;
     const UPDATE_FEE: u64 = 100;
 
-    struct ProfileRegistryV7 has key {
+    struct ProfileRegistryV8 has key {
         profiles: table::Table<address, ProfileData>,
-        update_events: EventHandle<ProfileUpdatedV7>,
+        update_events: EventHandle<ProfileUpdatedV8>,
         transfer_events: EventHandle<ProfileOwnershipTransferred>,
     }
 
@@ -34,7 +34,7 @@ module work_profiles_addr::web3_profiles_v7 {
         created_at: u64,
     }
 
-    struct ProfileUpdatedV7 has drop, store {
+    struct ProfileUpdatedV8 has drop, store {
         user: address,
         cid: String,
         cccd: u64,
@@ -52,18 +52,18 @@ module work_profiles_addr::web3_profiles_v7 {
         let owner_addr = signer::address_of(sender);
         assert!(owner_addr == @work_profiles_addr, EINVALID_SIGNER_FOR_INIT);
 
-        let registry = ProfileRegistryV7 {
+        let registry = ProfileRegistryV8 {
             profiles: table::new<address, ProfileData>(),
-            update_events: account::new_event_handle<ProfileUpdatedV7>(sender),
+            update_events: account::new_event_handle<ProfileUpdatedV8>(sender),
             transfer_events: account::new_event_handle<ProfileOwnershipTransferred>(sender),
         };
         move_to(sender, registry);
     }
 
-    public entry fun register_profile(account: &signer, cid: String, cccd: u64, did: String) acquires ProfileRegistryV7 {
+    public entry fun register_profile(account: &signer, cid: String, cccd: u64, did: String) acquires ProfileRegistryV8 {
         let sender = signer::address_of(account);
-        assert!(exists<ProfileRegistryV7>(@work_profiles_addr), EMODULE_NOT_INITIALIZED);
-        let registry = borrow_global_mut<ProfileRegistryV7>(@work_profiles_addr);
+        assert!(exists<ProfileRegistryV8>(@work_profiles_addr), EMODULE_NOT_INITIALIZED);
+        let registry = borrow_global_mut<ProfileRegistryV8>(@work_profiles_addr);
 
         assert!(!table::contains(&registry.profiles, sender), EPROFILE_ALREADY_REGISTERED);
 
@@ -78,9 +78,9 @@ module work_profiles_addr::web3_profiles_v7 {
 
         table::add(&mut registry.profiles, sender, pdata);
 
-        emit_event<ProfileUpdatedV7>(
+        emit_event<ProfileUpdatedV8>(
             &mut registry.update_events,
-            ProfileUpdatedV7 {
+            ProfileUpdatedV8 {
                 user: sender,
                 cid: pdata.cid,
                 cccd: pdata.cccd,
@@ -90,10 +90,10 @@ module work_profiles_addr::web3_profiles_v7 {
         );
     }
 
-    public entry fun update_profile(account: &signer, new_cid: String) acquires ProfileRegistryV7 {
+    public entry fun update_profile(account: &signer, new_cid: String) acquires ProfileRegistryV8 {
         let sender = signer::address_of(account);
-        assert!(exists<ProfileRegistryV7>(@work_profiles_addr), EMODULE_NOT_INITIALIZED);
-        let registry = borrow_global_mut<ProfileRegistryV7>(@work_profiles_addr);
+        assert!(exists<ProfileRegistryV8>(@work_profiles_addr), EMODULE_NOT_INITIALIZED);
+        let registry = borrow_global_mut<ProfileRegistryV8>(@work_profiles_addr);
 
         assert!(table::contains(&registry.profiles, sender), EPROFILE_NOT_REGISTERED);
 
@@ -102,9 +102,9 @@ module work_profiles_addr::web3_profiles_v7 {
         let data_ref = table::borrow_mut(&mut registry.profiles, sender);
         *&mut data_ref.cid = new_cid;
 
-        emit_event<ProfileUpdatedV7>(
+        emit_event<ProfileUpdatedV8>(
             &mut registry.update_events,
-            ProfileUpdatedV7 {
+            ProfileUpdatedV8 {
                 user: sender,
                 cid: *&data_ref.cid,
                 cccd: *&data_ref.cccd,
@@ -114,11 +114,11 @@ module work_profiles_addr::web3_profiles_v7 {
         );
     }
 
-    public entry fun transfer_ownership(account: &signer, new_owner: address) acquires ProfileRegistryV7 {
+    public entry fun transfer_ownership(account: &signer, new_owner: address) acquires ProfileRegistryV8 {
         let sender = signer::address_of(account);
         let module_owner = @work_profiles_addr;
-        assert!(exists<ProfileRegistryV7>(module_owner), EMODULE_NOT_INITIALIZED);
-        let registry = borrow_global_mut<ProfileRegistryV7>(module_owner);
+        assert!(exists<ProfileRegistryV8>(module_owner), EMODULE_NOT_INITIALIZED);
+        let registry = borrow_global_mut<ProfileRegistryV8>(module_owner);
         assert!(table::contains(&registry.profiles, sender), ENOT_PROFILE_OWNER);
         let pdata = table::remove(&mut registry.profiles, sender);
         table::add(&mut registry.profiles, new_owner, pdata);
@@ -132,36 +132,36 @@ module work_profiles_addr::web3_profiles_v7 {
         );
     }
 
-    public fun get_profile_cid(user: address): String acquires ProfileRegistryV7 {
+    public fun get_profile_cid(user: address): String acquires ProfileRegistryV8 {
         let module_owner = @work_profiles_addr;
-        assert!(exists<ProfileRegistryV7>(module_owner), EMODULE_NOT_INITIALIZED);
-        let registry = borrow_global<ProfileRegistryV7>(module_owner);
+        assert!(exists<ProfileRegistryV8>(module_owner), EMODULE_NOT_INITIALIZED);
+        let registry = borrow_global<ProfileRegistryV8>(module_owner);
         assert!(table::contains(&registry.profiles, user), EPROFILE_NOT_REGISTERED);
         let pdata_ref = table::borrow(&registry.profiles, user);
         pdata_ref.cid
     }
 
-    public fun get_profile_data(user: address): ProfileData acquires ProfileRegistryV7 {
+    public fun get_profile_data(user: address): ProfileData acquires ProfileRegistryV8 {
         let module_owner = @work_profiles_addr;
-        assert!(exists<ProfileRegistryV7>(module_owner), EMODULE_NOT_INITIALIZED);
-        let registry = borrow_global<ProfileRegistryV7>(module_owner);
+        assert!(exists<ProfileRegistryV8>(module_owner), EMODULE_NOT_INITIALIZED);
+        let registry = borrow_global<ProfileRegistryV8>(module_owner);
         assert!(table::contains(&registry.profiles, user), EPROFILE_NOT_REGISTERED);
         *table::borrow(&registry.profiles, user)
     }
 
-    public fun has_profile(user: address): bool acquires ProfileRegistryV7 {
+    public fun has_profile(user: address): bool acquires ProfileRegistryV8 {
         let module_owner = @work_profiles_addr;
-        if (!exists<ProfileRegistryV7>(module_owner)) {
+        if (!exists<ProfileRegistryV8>(module_owner)) {
             return false;
         };
-        let registry = borrow_global<ProfileRegistryV7>(module_owner);
+        let registry = borrow_global<ProfileRegistryV8>(module_owner);
         table::contains(&registry.profiles, user)
     }
 
-    public fun get_profile_did(user: address): String acquires ProfileRegistryV7 {
+    public fun get_profile_did(user: address): String acquires ProfileRegistryV8 {
         let module_owner = @work_profiles_addr;
-        assert!(exists<ProfileRegistryV7>(module_owner), EMODULE_NOT_INITIALIZED);
-        let registry = borrow_global<ProfileRegistryV7>(module_owner);
+        assert!(exists<ProfileRegistryV8>(module_owner), EMODULE_NOT_INITIALIZED);
+        let registry = borrow_global<ProfileRegistryV8>(module_owner);
         assert!(table::contains(&registry.profiles, user), EPROFILE_NOT_REGISTERED);
         let pdata_ref = table::borrow(&registry.profiles, user);
         pdata_ref.did

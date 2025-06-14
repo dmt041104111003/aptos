@@ -1,6 +1,6 @@
 ---
 compiled_package_info:
-  package_name: job_marketplace_v5
+  package_name: job_marketplace_v6
   address_alias_instantiation:
     Extensions: "0000000000000000000000000000000000000000000000000000000000000001"
     aptos_framework: "0000000000000000000000000000000000000000000000000000000000000001"
@@ -13,7 +13,7 @@ compiled_package_info:
     vm_reserved: "0000000000000000000000000000000000000000000000000000000000000000"
     work_board: f9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242
     work_profiles_addr: f9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242
-  source_digest: 451A3F40071607878970C0903EFE8D20A7052772F1E06273DB3B1D0BE853F93E
+  source_digest: 14B7D03BD6F97F24D4575F01EB1CF86F037E82957A29B8A946A99A2C69BC1EEE
   build_flags:
     dev_mode: false
     test_mode: false
@@ -25,7 +25,7 @@ compiled_package_info:
     install_dir: ~
     force_recompilation: false
     additional_named_addresses:
-      work_profiles_addr: f9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242
+      work_board: f9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242
     fetch_deps_only: false
     skip_fetch_latest_git_deps: false
     compiler_config:

@@ -46,9 +46,9 @@ declare global { interface Window { ethereum?: any } }
 
 const CONTRACT_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
 const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v5";
-const PROFILE_MODULE_NAME = "web3_profiles_v7";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV7";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v6";
+const PROFILE_MODULE_NAME = "web3_profiles_v8";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV8";
 const APPLY_FEE = 1000000; // 0.01 APT in micro-APT
 
 export interface JobPost {
@@ -497,8 +497,18 @@ const Jobs = () => {
         let allEvents: any[] = [];
 
         if (Array.isArray(updateEvents)) {
+          // Sort updates by timestamp to identify the first one as registration
+          updateEvents.sort((a: any, b: any) => Number(a.data.timestamp_seconds) - Number(b.data.timestamp_seconds));
+
           const filteredUpdates = updateEvents.filter((e: any) => e.data.user?.toLowerCase() === profileAddress.toLowerCase());
-          allEvents = allEvents.concat(filteredUpdates.map((e: any) => ({ ...e, type: 'ProfileUpdated' })));
+          
+          filteredUpdates.forEach((e: any, index: number) => {
+            if (index === 0) {
+              allEvents.push({ ...e, type: 'ProfileRegistered' }); // Mark the first as Registered
+            } else {
+              allEvents.push({ ...e, type: 'ProfileUpdated' });    // Mark subsequent as Updated
+            }
+          });
         }
 
         if (Array.isArray(transferEvents)) {
@@ -646,7 +656,16 @@ const Jobs = () => {
                           currentPage * itemsPerPage
                         ).map((item, idx) => (
                           <li key={item.guid?.creation_number + '-' + item.sequence_number || idx} className="py-4 px-3 hover:bg-white/10 transition-colors duration-200 rounded-md">
-                            {item.type === 'ProfileUpdated' ? (
+                            {item.type === 'ProfileRegistered' ? (
+                              <>
+                                <div className="flex items-center gap-2 mb-1"><b>Loại sự kiện:</b> <span className="text-blue-400 font-semibold">Đăng ký hồ sơ</span></div>
+                                <div className="text-sm text-gray-300"><b>Thời gian:</b> {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>
+                                <div className="text-sm text-gray-300"><b>Người dùng:</b> <span className="break-all text-gray-400">{item.data.user}</span></div>
+                                <div className="text-sm text-gray-300"><b>CID mới:</b> <span className="break-all text-gray-400">{item.data.cid}</span></div>
+                                <div className="text-sm text-gray-300"><b>CCCD mới:</b> <span className="break-all text-gray-400">{item.data.cccd}</span></div>
+                                <div className="text-sm text-gray-300"><b>DID mới:</b> <span className="break-all text-gray-400">{item.data.did}</span></div>
+                              </>
+                            ) : item.type === 'ProfileUpdated' ? (
                               <>
                                 <div className="flex items-center gap-2 mb-1"><b>Loại sự kiện:</b> <span className="text-blue-400 font-semibold">Cập nhật hồ sơ</span></div>
                                 <div className="text-sm text-gray-300"><b>Thời gian:</b> {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>
