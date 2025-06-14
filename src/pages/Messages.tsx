@@ -6,39 +6,35 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageCircle } from 'lucide-react';
-import { useWallet } from '../context/WalletContext'; // Import useWallet
-import { aptos } from '../utils/aptosUtils'; // Import aptos client
-import { toast } from '@/components/ui/sonner'; // Import toast for notifications
+import { useWallet } from '../context/WalletContext';
+import { aptos } from '../utils/aptosUtils';
+import { toast } from '@/components/ui/sonner';
 
-// Hardcode the message contract address and module name
+
 const MESSAGE_CONTRACT_ADDRESS = "0x3afc92d246a6d03ac951dc01dbe9257a150d09804b6ebc20a7bf2aaedb4d36eb";
 const MESSAGE_MODULE_NAME = "web3_messaging_v1";
 
 interface Message {
   id: string;
-  senderId: string; // Aptos address
-  receiverId: string; // Aptos address
+  senderId: string; 
+  receiverId: string; 
   content: string;
-  timestamp: string; // ISO string
+  timestamp: string; 
 }
 
 interface Conversation {
-  id: string; // Formed by sorting and concatenating two participant addresses
-  participantId: string; // The other participant's address
+  id: string; 
+  participantId: string; 
   lastMessagePreview: string;
   unread: number;
-  lastMessageTime: string; // Relative time or formatted date
+  lastMessageTime: string; 
 }
 
-// Mock client data (we'll enhance this later with profile fetching)
-const mockClients = [
-    { id: '0x1', name: 'Công ty A', avatar: '/img/client-a.png', lensHandle: '@congtyA' }, // Placeholder client IDs
-    { id: '0x2', name: 'Dự án Blockchain XYZ', avatar: '/img/client-b.png', lensHandle: '@duanXYZ' },
-    { id: '0x3', name: 'Tổ chức Web3 Talent', avatar: '/img/client-c.png', lensHandle: '@web3talent' },
-];
+
+
 
 const Messages = () => {
-  const { account, accountType } = useWallet(); // Get current user's account
+  const { account, accountType } = useWallet(); 
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -46,9 +42,10 @@ const Messages = () => {
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [newChatAddress, setNewChatAddress] = useState(''); // New state for new chat input
+  const [newChatAddress, setNewChatAddress] = useState(''); 
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Function to generate a consistent conversation ID
+
   const getConversationId = (addr1: string, addr2: string): string => {
     const addresses = [addr1.toLowerCase(), addr2.toLowerCase()].sort();
     return `conv_${addresses[0]}_${addresses[1]}`;
@@ -59,12 +56,13 @@ const Messages = () => {
     if (!account) return;
     setLoadingConversations(true);
     setError(null);
+    setIsRefreshing(true); 
 
     try {
       const allMessageEvents = await aptos.event.getModuleEventsByEventType({
         eventType: `${MESSAGE_CONTRACT_ADDRESS}::${MESSAGE_MODULE_NAME}::MessageSentEvent`,
         options: {
-          limit: 1000, // Fetch a large number of events to cover history
+          limit: 1000, 
         }
       });
 
@@ -137,6 +135,7 @@ const Messages = () => {
       setError(`Không thể tải tin nhắn: ${err.message || 'Lỗi không xác định'}`);
     } finally {
       setLoadingConversations(false);
+      setIsRefreshing(false); // Set refreshing to false after fetch is complete
     }
   };
 
@@ -235,12 +234,7 @@ const Messages = () => {
   };
 
   const getParticipant = (participantId: string) => {
-    // In a real app, this would fetch profile data for the participantId
-    // For now, use mockClients and extend if needed for new participant IDs
-    const found = mockClients.find(client => client.id === participantId);
-    if (found) return found;
 
-    // If participant is not in mockClients, create a placeholder
     return { id: participantId, name: `Người dùng ${participantId.slice(0, 6)}...`, avatar: '', lensHandle: '' };
   };
 
@@ -339,6 +333,23 @@ const Messages = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
+
+      {/* Fixed Refresh Button */}
+      <div className="fixed bottom-8 right-8 z-50">
+        <Button
+          onClick={fetchMessagesAndConversations}
+          disabled={isRefreshing}
+          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 shadow-lg rounded-full w-12 h-12 p-0"
+          title="Làm mới tin nhắn"
+        >
+          {isRefreshing ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9V3a10 10 0 0 1 10 10Z"/><path d="M3 12a9 9 0 0 0 9 9V21a10 10 0 0 1-10-10Z"/><path d="M8 17.924L5.1 14.85a2 2 0 0 1-.3-2.004L6.083 10"/><path d="M16 6.076L18.9 9.15a2 2 0 0 1 .3 2.004L17.917 14"/></svg>
+          )}
+        </Button>
+      </div>
+
       <section className="py-10 bg-gradient-to-br from-blue-900/20 via-violet-900/30 to-black min-h-[80vh]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 shadow-xl overflow-hidden">
@@ -358,13 +369,6 @@ const Messages = () => {
                     className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white"
                   >
                     Mở Chat
-                  </Button>
-                  <Button
-                    onClick={fetchMessagesAndConversations}
-                    className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white p-2 w-10 h-10 flex items-center justify-center"
-                    title="Làm mới tin nhắn"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9V3a10 10 0 0 1 10 10Z"/><path d="M3 12a9 9 0 0 0 9 9V21a10 10 0 0 1-10-10Z"/><path d="M8 17.924L5.1 14.85a2 2 0 0 1-.3-2.004L6.083 10"/><path d="M16 6.076L18.9 9.15a2 2 0 0 1 .3 2.004L17.917 14"/></svg>
                   </Button>
                 </div>
                 <div className="overflow-y-auto h-full">
