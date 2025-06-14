@@ -176,6 +176,56 @@ const PostJob = () => {
     }));
   };
 
+  const checkToxicity = async (text: string, fieldName: string) => {
+    if (!text.trim()) return; // Don't check empty input
+
+    try {
+      const response = await fetch("https://api-inference.huggingface.co/models/unitary/toxic-bert", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer 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", // Your API token
+          "Content-Type": "application/json" // Ensure Content-Type is set
+        },
+        body: JSON.stringify({ inputs: text }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Toxicity API error (${fieldName}): ${response.status} - ${errorText}`);
+        toast.error(`Không thể kiểm tra nội dung ${fieldName}. Lỗi: ${response.status}.`);
+        return;
+      }
+
+      const result = await response.json();
+      
+      let isToxic = false;
+      if (result && result[0] && Array.isArray(result[0])) {
+        result[0].forEach((item: any) => {
+          const scorePercentage = item.score * 100;
+          if (scorePercentage > 40) { // Check if any label's score is over 40%
+            isToxic = true;
+          }
+        });
+      }
+
+      if (isToxic) {
+        toast.error(`Nội dung cho '${fieldName}' có thể mang tính tiêu cực. Vui lòng chỉnh sửa.`);
+        if (fieldName === 'Tiêu đề dự án') {
+          setForm(prev => ({ ...prev, title: '' }));
+        } else if (fieldName === 'Mô tả chi tiết') {
+          setForm(prev => ({ ...prev, description: '' }));
+        } else if (fieldName === 'Kỹ năng') {
+          setSkill(''); // Clear the skill input if toxic
+        }
+      } else {
+      
+      }
+    } catch (error: any) {
+      console.error("Error checking toxicity:", error);
+      toast.error(`Đã xảy ra lỗi khi kiểm tra nội dung ${fieldName}: ${error.message || 'Lỗi không xác định'}.`);
+    }
+  };
+
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
     if (!form.title.trim()) newErrors.title = 'Vui lòng nhập tiêu đề dự án';
@@ -225,7 +275,6 @@ const PostJob = () => {
     setIsSubmitting(true);
 
     try {
-      // Upload attachments to IPFS
       const attachmentCIDs = await Promise.all(
         attachments.map(file => uploadFileToIPFS(file))
       );
@@ -246,13 +295,13 @@ const PostJob = () => {
         function: `${JOBS_MODULE_ADDRESS}::${JOBS_MODULE_NAME}::post_job`,
         type_arguments: [],
         arguments: [
-          cid, // job_details_cid
-          Math.floor(Date.now() / 1000) + form.applicationDeadlineDays * 24 * 60 * 60, // application_deadline (seconds from now)
-          form.initialFundAmount * 100_000_000, // initial_fund_amount (convert APT to micro-APT)
-          profile.did || "", // poster_did (from user profile)
-          profile.profile_cid || "", // poster_profile_cid (from user profile)
-          form.milestones.map(m => m.amount * 100_000_000), // milestone_amounts
-          form.milestones.map(m => m.duration * 24 * 60 * 60) // milestone_durations (convert days to seconds)
+          cid, 
+          Math.floor(Date.now() / 1000) + form.applicationDeadlineDays * 24 * 60 * 60, 
+          form.initialFundAmount * 100_000_000, 
+          profile.did || "", 
+          profile.profile_cid || "", 
+          form.milestones.map(m => m.amount * 100_000_000), 
+          form.milestones.map(m => m.duration * 24 * 60 * 60) 
         ]
       };
 
@@ -333,7 +382,8 @@ const PostJob = () => {
                           name="title"
                           value={form.title}
                           onChange={handleInputChange}
-                    placeholder="Ví dụ: Cần phát triển smart contract cho marketplace"
+                          onBlur={() => checkToxicity(form.title, 'Tiêu đề dự án')}
+                          placeholder="Ví dụ: Cần phát triển smart contract cho marketplace"
                           className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.title ? 'border-red-500/50' : ''}`}
                         />
                   {errors.title && <p className="text-red-400 text-sm">{errors.title}</p>}
@@ -347,8 +397,9 @@ const PostJob = () => {
                           name="description"
                           value={form.description}
                           onChange={handleInputChange}
-                    placeholder="Mô tả chi tiết về dự án, yêu cầu và mục tiêu..."
-                    className={`min-h-[200px] bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.description ? 'border-red-500/50' : ''}`}
+                          onBlur={() => checkToxicity(form.description, 'Mô tả chi tiết')}
+                          placeholder="Mô tả chi tiết về dự án, yêu cầu và mục tiêu..."
+                          className={`min-h-[200px] bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.description ? 'border-red-500/50' : ''}`}
                         />
                   {errors.description && <p className="text-red-400 text-sm">{errors.description}</p>}
                       </div>
@@ -403,6 +454,7 @@ const PostJob = () => {
                     <Input
                       value={skill}
                       onChange={(e) => setSkill(e.target.value)}
+                      onBlur={() => checkToxicity(skill, 'Kỹ năng')}
                       placeholder="Thêm kỹ năng..."
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleSkillAdd())}
                       className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.skills ? 'border-red-500/50' : ''}`}
