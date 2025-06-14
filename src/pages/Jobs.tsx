@@ -37,7 +37,9 @@ import {
   RefreshCw,
   Info,
   AlertCircle,
-  Copy
+  Copy,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { aptos, aptosConfig, fetchProfileDetails, ProfileDataFromChain } from '@/utils/aptosUtils';
@@ -122,7 +124,7 @@ const Jobs = () => {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [showAptosLookup, setShowAptosLookup] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 3;
+  const jobsPerPage = 6;
 
   const [historyResult, setHistoryResult] = useState<any[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -191,6 +193,37 @@ const Jobs = () => {
     createdAt?: number;
     completedAt?: number | null;
   }[]>([]);
+
+  // State và logic phân trang cho Profile Jobs Created
+  const [profileJobsCreatedCurrentPage, setProfileJobsCreatedCurrentPage] = useState(1);
+  const profileJobsCreatedItemsPerPage = 1;
+  const indexOfLastProfileJobCreated = profileJobsCreatedCurrentPage * profileJobsCreatedItemsPerPage;
+  const indexOfFirstProfileJobCreated = indexOfLastProfileJobCreated - profileJobsCreatedItemsPerPage;
+  const currentProfileJobsCreated = profileJobsCreated.slice(indexOfFirstProfileJobCreated, indexOfLastProfileJobCreated);
+  const totalProfileJobsCreatedPages = Math.ceil(profileJobsCreated.length / profileJobsCreatedItemsPerPage);
+
+  // State và logic phân trang cho Profile Jobs Applied
+  const [profileJobsAppliedCurrentPage, setProfileJobsAppliedCurrentPage] = useState(1);
+  const profileJobsAppliedItemsPerPage = 1;
+  const indexOfLastProfileJobApplied = profileJobsAppliedCurrentPage * profileJobsAppliedItemsPerPage;
+  const indexOfFirstProfileJobApplied = indexOfLastProfileJobApplied - profileJobsAppliedItemsPerPage;
+  const currentProfileJobsApplied = profileJobsApplied.slice(indexOfFirstProfileJobApplied, indexOfLastProfileJobApplied);
+  const totalProfileJobsAppliedPages = Math.ceil(profileJobsApplied.length / profileJobsAppliedItemsPerPage);
+
+  // Tính toán jobs cho trang hiện tại
+  const indexOfLastJob = currentPage * jobsPerPage;
+  const indexOfFirstJob = indexOfLastJob - jobsPerPage;
+  const currentJobs = filteredJobs.slice(indexOfFirstJob, indexOfLastJob);
+  const totalPages = Math.ceil(filteredJobs.length / jobsPerPage);
+
+  const [profileCurrentPage, setProfileCurrentPage] = useState(1);
+  const profileItemsPerPage = 1;
+
+  // Tính toán kết quả cho trang hiện tại của profile
+  const indexOfLastProfileItem = profileCurrentPage * profileItemsPerPage;
+  const indexOfFirstProfileItem = indexOfLastProfileItem - profileItemsPerPage;
+  const currentProfileItems = historyResult.slice(indexOfFirstProfileItem, indexOfLastProfileItem);
+  const totalProfilePages = Math.ceil(historyResult.length / profileItemsPerPage);
 
   useEffect(() => {
     let filtered = jobs;
@@ -955,7 +988,7 @@ const Jobs = () => {
                         <div className="mb-4">
                           <h4 className="font-bold text-white mb-2">Lịch sử cập nhật và chuyển quyền:</h4>
                           <ul className="space-y-3">
-                            {historyResult.map((item, idx) => (
+                            {currentProfileItems.map((item, idx) => (
                               <li key={idx} className="bg-gray-800/50 rounded p-3">
                                 <div className="font-semibold text-blue-300">Loại sự kiện: {item.type === 'ProfileRegistered' ? 'Đăng ký hồ sơ' : item.type === 'ProfileUpdated' ? 'Cập nhật hồ sơ' : 'Chuyển quyền sở hữu'}</div>
                                 <div className="text-xs text-gray-400">Thời gian: {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>
@@ -967,19 +1000,59 @@ const Jobs = () => {
                                 {item.data.to && <div className="text-xs text-gray-400">Đến: {item.data.to}</div>}
                           </li>
                         ))}
-                      </ul>
+                          </ul>
+
+                          {/* Pagination for profile history */}
+                          {historyResult.length > profileItemsPerPage && (
+                            <div className="flex justify-center items-center gap-2 mt-4">
+                              <Button
+                                variant="outline"
+                                onClick={() => setProfileCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={profileCurrentPage === 1}
+                                className="bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </Button>
+                              
+                              <div className="flex items-center gap-2">
+                                {Array.from({ length: totalProfilePages }, (_, i) => i + 1).map((page) => (
+                                  <Button
+                                    key={page}
+                                    variant={profileCurrentPage === page ? "default" : "outline"}
+                                    onClick={() => setProfileCurrentPage(page)}
+                                    className={`${
+                                      profileCurrentPage === page
+                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                        : 'bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50'
+                                    }`}
+                                  >
+                                    {page}
+                                  </Button>
+                                ))}
+                              </div>
+
+                              <Button
+                                variant="outline"
+                                onClick={() => setProfileCurrentPage(prev => Math.min(prev + 1, totalProfilePages))}
+                                disabled={profileCurrentPage === totalProfilePages}
+                                className="bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
                       {profileJobsCreated.length > 0 && (
                         <div className="mt-6">
                           <h3 className="font-bold text-white mb-2">Dự án đã tạo</h3>
                           <ul className="space-y-4">
-                            {profileJobsCreated.map(job => (
+                            {currentProfileJobsCreated.map(job => (
                               <li key={job.id} className="bg-gray-800/50 rounded-lg p-4">
                                 <div className="flex justify-between items-start mb-2">
                                   <span className="text-white font-medium">{job.title}</span>
                                   <span className="text-xs px-2 py-1 rounded bg-blue-700/30 text-blue-300">{job.status}</span>
-                    </div>
+                                </div>
                                 <div className="text-sm text-gray-400 space-y-1">
                                   <div><b>Thời gian tạo:</b> {job.createdAt ? new Date(job.createdAt * 1000).toLocaleString() : '-'}</div>
                                   <div><b>Thời gian hoàn thành:</b> {job.completedAt ? new Date(job.completedAt * 1000).toLocaleString() : '-'}</div>
@@ -1033,13 +1106,49 @@ const Jobs = () => {
                               </li>
                             ))}
                           </ul>
+                          {profileJobsCreated.length > profileJobsCreatedItemsPerPage && (
+                            <div className="flex justify-center items-center gap-2 mt-4">
+                              <Button
+                                variant="outline"
+                                onClick={() => setProfileJobsCreatedCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={profileJobsCreatedCurrentPage === 1}
+                                className="bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </Button>
+                              <div className="flex items-center gap-2">
+                                {Array.from({ length: totalProfileJobsCreatedPages }, (_, i) => i + 1).map((page) => (
+                                  <Button
+                                    key={page}
+                                    variant={profileJobsCreatedCurrentPage === page ? "default" : "outline"}
+                                    onClick={() => setProfileJobsCreatedCurrentPage(page)}
+                                    className={`${
+                                      profileJobsCreatedCurrentPage === page
+                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                        : 'bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50'
+                                    }`}
+                                  >
+                                    {page}
+                                  </Button>
+                                ))}
+                              </div>
+                              <Button
+                                variant="outline"
+                                onClick={() => setProfileJobsCreatedCurrentPage(prev => Math.min(prev + 1, totalProfileJobsCreatedPages))}
+                                disabled={profileJobsCreatedCurrentPage === totalProfileJobsCreatedPages}
+                                className="bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
                       {profileJobsApplied.length > 0 && (
                         <div className="mt-6">
                           <h3 className="font-bold text-white mb-2">Dự án đã ứng tuyển/đã làm</h3>
                           <ul className="space-y-4">
-                            {profileJobsApplied.map(job => (
+                            {currentProfileJobsApplied.map(job => (
                               <li key={job.id} className="bg-gray-800/50 rounded-lg p-4">
                                 <div className="flex justify-between items-start mb-2">
                                   <span className="text-white font-medium">{job.title}</span>
@@ -1098,6 +1207,42 @@ const Jobs = () => {
                               </li>
                             ))}
                           </ul>
+                          {profileJobsApplied.length > profileJobsAppliedItemsPerPage && (
+                            <div className="flex justify-center items-center gap-2 mt-4">
+                              <Button
+                                variant="outline"
+                                onClick={() => setProfileJobsAppliedCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={profileJobsAppliedCurrentPage === 1}
+                                className="bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </Button>
+                              <div className="flex items-center gap-2">
+                                {Array.from({ length: totalProfileJobsAppliedPages }, (_, i) => i + 1).map((page) => (
+                                  <Button
+                                    key={page}
+                                    variant={profileJobsAppliedCurrentPage === page ? "default" : "outline"}
+                                    onClick={() => setProfileJobsAppliedCurrentPage(page)}
+                                    className={`${
+                                      profileJobsAppliedCurrentPage === page
+                                        ? 'bg-blue-600 hover:bg-blue-700'
+                                        : 'bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50'
+                                    }`}
+                                  >
+                                    {page}
+                                  </Button>
+                                ))}
+                              </div>
+                              <Button
+                                variant="outline"
+                                onClick={() => setProfileJobsAppliedCurrentPage(prev => Math.min(prev + 1, totalProfileJobsAppliedPages))}
+                                disabled={profileJobsAppliedCurrentPage === totalProfileJobsAppliedPages}
+                                className="bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1147,7 +1292,7 @@ const Jobs = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
             >
-              {filteredJobs.map((job, index) => (
+              {currentJobs.map((job, index) => (
                 <motion.div
                   key={job.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -1266,6 +1411,46 @@ const Jobs = () => {
                 </motion.div>
               ))}
             </motion.div>
+          )}
+
+          {/* Pagination */}
+          {!loading && filteredJobs.length > jobsPerPage && (
+            <div className="flex justify-center items-center gap-2 mt-8">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              
+              <div className="flex items-center gap-2">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    onClick={() => setCurrentPage(page)}
+                    className={`${
+                      currentPage === page
+                        ? 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50'
+                    }`}
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="bg-gray-800/50 border-gray-700 text-white hover:bg-gray-700/50"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           )}
 
           {!loading && filteredJobs.length === 0 && (

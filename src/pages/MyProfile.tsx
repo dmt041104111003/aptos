@@ -121,7 +121,7 @@ export default function MyProfile() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1); // Thêm state cho trang hiện tại
-  const itemsPerPage = 3; // Số mục mỗi trang
+  const itemsPerPage = 2; // Số mục mỗi trang
   const [ipfsError, setIpfsError] = useState<string | null>(null);
 
   // --- Thêm state cho jobs của tôi ---
@@ -129,6 +129,16 @@ export default function MyProfile() {
   const [myJobsError, setMyJobsError] = useState<string | null>(null);
   const [myJobsCreated, setMyJobsCreated] = useState<any[]>([]);
   const [myJobsApplied, setMyJobsApplied] = useState<any[]>([]);
+
+  // Pagination states for My Jobs tab
+  const [myJobsCreatedCurrentPage, setMyJobsCreatedCurrentPage] = useState(1);
+  const [myJobsAppliedCurrentPage, setMyJobsAppliedCurrentPage] = useState(1);
+
+  // Pagination handlers for My Jobs tab
+  const handleMyJobsCreatedPageChange = (page: number) => setMyJobsCreatedCurrentPage(page);
+  const handleMyJobsAppliedPageChange = (page: number) => setMyJobsAppliedCurrentPage(page);
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Add new function to fetch reputation data
   const fetchReputationData = useCallback(async (address: string) => {
@@ -261,8 +271,15 @@ export default function MyProfile() {
   }, [refetchProfile, fetchProfile]); // Add fetchProfile to dependency array
 
   // Add reload button function
-  const handleReloadProfile = useCallback(() => {
-    fetchProfile();
+  const handleReloadProfile = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchProfile();
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [fetchProfile]);
 
   // Trigger fetch history when tab changes or account changes
@@ -517,6 +534,45 @@ export default function MyProfile() {
       .catch(() => {/* toast có thể thêm nếu muốn */});
   };
 
+  const renderPaginationControls = (totalItems: number, currentPage: number, onPageChange: (page: number) => void) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+    if (totalPages <= 1) return null;
+
+    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    return (
+      <div className="flex justify-center items-center gap-2 mt-6">
+        <Button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          variant="outline"
+          className="bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
+        >
+          Trang trước
+        </Button>
+        {pages.map(page => (
+          <Button
+            key={page}
+            onClick={() => onPageChange(page)}
+            variant={currentPage === page ? "default" : "outline"}
+            className={`${currentPage === page ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 text-white hover:bg-gray-700'} border-blue-600`}
+          >
+            {page}
+          </Button>
+        ))}
+        <Button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          variant="outline"
+          className="bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
+        >
+          Trang sau
+        </Button>
+      </div>
+    );
+  };
+
   if (loading || profileLoadingContext) { // Kết hợp loading cục bộ và loading từ context
     return (
       <div className="min-h-screen bg-black flex justify-center items-center">
@@ -553,18 +609,26 @@ export default function MyProfile() {
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
+
+      {/* Fixed Refresh Button */}
+      <div className="fixed bottom-8 right-8 z-50">
+        <Button
+          onClick={handleReloadProfile}
+          disabled={isRefreshing}
+          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 shadow-lg rounded-full w-12 h-12 p-0"
+          title="Làm mới hồ sơ"
+        >
+          {isRefreshing ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9V3a10 10 0 0 1 10 10Z"/><path d="M3 12a9 9 0 0 0 9 9V21a10 10 0 0 1-10-10Z"/><path d="M8 17.924L5.1 14.85a2 2 0 0 1-.3-2.004L6.083 10"/><path d="M16 6.076L18.9 9.15a2 2 0 0 1 .3 2.004L17.917 14"/></svg>
+          )}
+        </Button>
+      </div>
+
       <section className="py-16 bg-gradient-to-br from-blue-900/20 via-violet-900/30 to-black min-h-[80vh]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <h1 className="text-4xl font-extrabold text-white font-heading">Hồ sơ của tôi</h1>
-            <Button
-              onClick={handleReloadProfile}
-              className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white p-2 w-10 h-10 flex items-center justify-center rounded-full shadow-lg"
-              title="Làm mới hồ sơ"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9V3a10 10 0 0 1 10 10Z"/><path d="M3 12a9 9 0 0 0 9 9V21a10 10 0 0 1-10-10Z"/><path d="M8 17.924L5.1 14.85a2 2 0 0 1-.3-2.004L6.083 10"/><path d="M16 6.076L18.9 9.15a2 2 0 0 1 .3 2.004L17.917 14"/></svg>
-            </Button>
-          </div>
+          <h1 className="text-4xl font-extrabold text-white font-heading">Hồ sơ của tôi</h1>
 
     
           <div className="flex border-b border-white/10 mb-8">
@@ -849,26 +913,8 @@ export default function MyProfile() {
                       </li>
                     ))}
                   </ul>
-                  {historyResult.length > itemsPerPage && (
-                    <div className="flex justify-center items-center mt-6 gap-4">
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={currentPage === 1}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Trang trước
-                      </button>
-                      <span className="text-gray-300">Trang {currentPage} / {Math.ceil(historyResult.length / itemsPerPage)}</span>
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(historyResult.length / itemsPerPage), prev + 1))}
-                        disabled={currentPage === Math.ceil(historyResult.length / itemsPerPage)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Trang sau
-                      </button>
-            </div>
-                  )}
-          </div>
+                  {renderPaginationControls(historyResult.length, currentPage, setCurrentPage)}
+              </div>
               )}
               {!historyLoading && !historyError && historyResult.length === 0 && (
                 <div className="text-gray-400 mt-2 text-center py-10">Không có lịch sử cập nhật cho địa chỉ này.</div>
@@ -894,7 +940,10 @@ export default function MyProfile() {
                     <div className="mb-8">
                       <h3 className="font-bold text-white mb-2">Dự án đã tạo</h3>
                       <ul className="space-y-4">
-                        {myJobsCreated.map(job => (
+                        {myJobsCreated.slice(
+                          (myJobsCreatedCurrentPage - 1) * itemsPerPage,
+                          myJobsCreatedCurrentPage * itemsPerPage
+                        ).map(job => (
                           <li key={job.id} className="bg-gray-800/50 rounded-lg p-4">
                             <div className="flex justify-between items-start mb-2">
                               <span className="text-white font-medium">{job.title}</span>
@@ -926,13 +975,17 @@ export default function MyProfile() {
                           </li>
                         ))}
                       </ul>
+                      {renderPaginationControls(myJobsCreated.length, myJobsCreatedCurrentPage, handleMyJobsCreatedPageChange)}
                     </div>
                   )}
                   {myJobsApplied.length > 0 && (
                     <div className="mb-8">
                       <h3 className="font-bold text-white mb-2">Dự án đã ứng tuyển/đã làm</h3>
                       <ul className="space-y-4">
-                        {myJobsApplied.map(job => (
+                        {myJobsApplied.slice(
+                          (myJobsAppliedCurrentPage - 1) * itemsPerPage,
+                          myJobsAppliedCurrentPage * itemsPerPage
+                        ).map(job => (
                           <li key={job.id} className="bg-gray-800/50 rounded-lg p-4">
                             <div className="flex justify-between items-start mb-2">
                               <span className="text-white font-medium">{job.title}</span>
@@ -964,6 +1017,7 @@ export default function MyProfile() {
                           </li>
                         ))}
                       </ul>
+                      {renderPaginationControls(myJobsApplied.length, myJobsAppliedCurrentPage, handleMyJobsAppliedPageChange)}
                     </div>
                   )}
                   {myJobsCreated.length === 0 && myJobsApplied.length === 0 && (

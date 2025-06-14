@@ -92,6 +92,17 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Pagination states
+  const itemsPerPage = 2; // Set a constant for items per page
+  const [inProgressCurrentPage, setInProgressCurrentPage] = useState(1);
+  const [applicationsCurrentPage, setApplicationsCurrentPage] = useState(1);
+  const [completedCurrentPage, setCompletedCurrentPage] = useState(1);
+
+  // Pagination handlers
+  const handleInProgressPageChange = (page: number) => setInProgressCurrentPage(page);
+  const handleApplicationsPageChange = (page: number) => setApplicationsCurrentPage(page);
+  const handleCompletedPageChange = (page: number) => setCompletedCurrentPage(page);
+
   // Animation refs
   const heroRef = useRef(null);
   const statsRef = useRef(null);
@@ -1022,6 +1033,45 @@ const Dashboard = () => {
   );
   };
 
+  const renderPaginationControls = (totalItems: number, currentPage: number, onPageChange: (page: number) => void) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+    if (totalPages <= 1) return null;
+
+    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    return (
+      <div className="flex justify-center items-center gap-2 mt-8">
+        <Button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          variant="outline"
+          className="bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
+        >
+          Trang trước
+        </Button>
+        {pages.map(page => (
+          <Button
+            key={page}
+            onClick={() => onPageChange(page)}
+            variant={currentPage === page ? "default" : "outline"}
+            className={`${currentPage === page ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 text-white hover:bg-gray-700'} border-blue-600`}
+          >
+            {page}
+          </Button>
+        ))}
+        <Button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          variant="outline"
+          className="bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
+        >
+          Trang sau
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
@@ -1137,7 +1187,13 @@ const Dashboard = () => {
               {activeTab === 'in-progress' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {inProgressJobs.length > 0 ? (
-                    inProgressJobs.map(job => renderJobCard(job, 'in-progress'))
+                    <>
+                      {inProgressJobs.slice(
+                        (inProgressCurrentPage - 1) * itemsPerPage,
+                        inProgressCurrentPage * itemsPerPage
+                      ).map(job => renderJobCard(job, 'in-progress'))}
+                      {renderPaginationControls(inProgressJobs.length, inProgressCurrentPage, handleInProgressPageChange)}
+                    </>
                   ) : (
                     <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
                       Bạn chưa có dự án nào đang tiến hành.
@@ -1149,7 +1205,13 @@ const Dashboard = () => {
               {activeTab === 'applications' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {jobsWithApplications.length > 0 ? (
-                    jobsWithApplications.map(job => renderJobCard(job, 'applications'))
+                    <>
+                      {jobsWithApplications.slice(
+                        (applicationsCurrentPage - 1) * itemsPerPage,
+                        applicationsCurrentPage * itemsPerPage
+                      ).map(job => renderJobCard(job, 'applications'))}
+                      {renderPaginationControls(jobsWithApplications.length, applicationsCurrentPage, handleApplicationsPageChange)}
+                    </>
                   ) : (
                     <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
                       Chưa có đơn ứng tuyển nào.
@@ -1161,7 +1223,13 @@ const Dashboard = () => {
               {activeTab === 'completed' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {completedJobs.length > 0 ? (
-                    completedJobs.map(job => renderJobCard(job, 'completed'))
+                    <>
+                      {completedJobs.slice(
+                        (completedCurrentPage - 1) * itemsPerPage,
+                        completedCurrentPage * itemsPerPage
+                      ).map(job => renderJobCard(job, 'completed'))}
+                      {renderPaginationControls(completedJobs.length, completedCurrentPage, handleCompletedPageChange)}
+                    </>
                   ) : (
                     <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
                       Bạn chưa có dự án nào đã hoàn thành.
