@@ -79,7 +79,7 @@ export default function MyProfile() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("profile"); // 'profile' or 'history'
+  const [activeTab, setActiveTab] = useState("profile"); // 'profile', 'history', 'myjobs'
 
   // State cho truy vấn lịch sử theo địa chỉ
   const [queryAddress, setQueryAddress] = useState(""); // Sẽ không còn dùng cho input search
@@ -89,6 +89,12 @@ export default function MyProfile() {
   const [currentPage, setCurrentPage] = useState(1); // Thêm state cho trang hiện tại
   const itemsPerPage = 3; // Số mục mỗi trang
   const [ipfsError, setIpfsError] = useState<string | null>(null);
+
+  // --- Thêm state cho jobs của tôi ---
+  const [myJobsLoading, setMyJobsLoading] = useState(false);
+  const [myJobsError, setMyJobsError] = useState<string | null>(null);
+  const [myJobsCreated, setMyJobsCreated] = useState<any[]>([]);
+  const [myJobsApplied, setMyJobsApplied] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -276,6 +282,182 @@ export default function MyProfile() {
     }
   };
 
+  // --- Fetch jobs khi vào tab "myjobs" ---
+  useEffect(() => {
+    if (activeTab === 'myjobs' && account) {
+      fetchMyJobs(account);
+    }
+    // eslint-disable-next-line
+  }, [activeTab, account]);
+
+  const fetchMyJobs = async (address: string) => {
+    setMyJobsLoading(true);
+    setMyJobsError(null);
+    setMyJobsCreated([]);
+    setMyJobsApplied([]);
+    try {
+      // 1. Lấy tất cả JobPostedEvent
+      const CONTRACT_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
+      const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v6";
+      const rawPostedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+        options: { limit: 100 }
+      });
+      // 2. Lấy tất cả WorkerAppliedEvent
+      const rawAppliedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerAppliedEvent`,
+        options: { limit: 100 }
+      });
+      // 3. Lấy tất cả WorkerApprovedEvent
+      const rawApprovedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
+        options: { limit: 100 }
+      });
+      // 4. Lấy tất cả JobCompletedEvent
+      const rawCompletedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
+        options: { limit: 100 }
+      });
+      // 5. Lấy tất cả JobCanceledEvent
+      const rawCanceledEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCanceledEvent`,
+        options: { limit: 100 }
+      });
+      // 6. Lấy tất cả JobExpiredEvent
+      const rawExpiredEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobExpiredEvent`,
+        options: { limit: 100 }
+      });
+      // Map trạng thái job
+      const jobStatusMap = {};
+      rawCompletedEvents.forEach(e => { jobStatusMap[e.data.job_id.toString()] = 'Đã hoàn thành'; });
+      rawCanceledEvents.forEach(e => { jobStatusMap[e.data.job_id.toString()] = 'Đã hủy'; });
+      rawExpiredEvents.forEach(e => { jobStatusMap[e.data.job_id.toString()] = 'Đã hết hạn'; });
+      rawApprovedEvents.forEach(e => {
+        const id = e.data.job_id.toString();
+        if (!jobStatusMap[id]) jobStatusMap[id] = 'Đang thực hiện';
+      });
+      rawPostedEvents.forEach(e => {
+        const id = e.data.job_id.toString();
+        if (!jobStatusMap[id]) jobStatusMap[id] = 'Đang tuyển';
+      });
+      // Lọc job đã tạo
+      const jobsCreated = rawPostedEvents.filter(e => e.data.poster.toLowerCase() === address.toLowerCase());
+      // Lọc job đã apply
+      const jobsApplied = rawAppliedEvents.filter(e => e.data.worker.toLowerCase() === address.toLowerCase());
+      // Lọc job đã được nhận (worker)
+      const jobsWorked = rawApprovedEvents.filter(e => e.data.worker.toLowerCase() === address.toLowerCase());
+      // Lấy thông tin chi tiết job (từ IPFS)
+      const getJobInfo = async (event) => {
+        try {
+          const jobIdStr = event.data.job_id.toString();
+          const jobDetailsUrl = convertIPFSURL(event.data.cid);
+          const response = await fetch(jobDetailsUrl);
+          if (!response.ok) return null;
+          const jobData = await response.json();
+          // 1. Lấy tất cả event liên quan
+          let postedEvents = [];
+          let approvedEvents = [];
+          let milestoneAcceptedEvents = [];
+          let completedEvents = [];
+          try {
+            postedEvents = await aptos.event.getModuleEventsByEventType({
+              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+              options: { limit: 1000 }
+            });
+            approvedEvents = await aptos.event.getModuleEventsByEventType({
+              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
+              options: { limit: 1000 }
+            });
+            milestoneAcceptedEvents = await aptos.event.getModuleEventsByEventType({
+              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneAcceptedEvent`,
+              options: { limit: 1000 }
+            });
+            completedEvents = await aptos.event.getModuleEventsByEventType({
+              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
+              options: { limit: 1000 }
+            });
+          } catch {}
+          // 2. Thời gian tạo job
+          const postedEvent = postedEvents.find(e => e.data.job_id.toString() === jobIdStr);
+          const createdAt = postedEvent ? Number(postedEvent.data.start_time) : null;
+          const poster = postedEvent ? postedEvent.data.poster : event.data.poster;
+          // 3. Người đã được duyệt (có thể nhiều lần)
+          const approvedWorkers = approvedEvents
+            .filter(e => e.data.job_id.toString() === jobIdStr)
+            .map(e => e.data.worker)
+            .filter((v, i, arr) => typeof v === 'string' && arr.indexOf(v) === i);
+          // 4. Milestone accepted cuối cùng
+          const jobMilestoneAccepted = milestoneAcceptedEvents
+            .filter(e => e.data.job_id.toString() === jobIdStr);
+          let completedAt: number | null = null;
+          let completedBy: string | null = null;
+          if (jobMilestoneAccepted.length > 0) {
+            // milestone cuối là milestone có index lớn nhất
+            const lastAccepted = jobMilestoneAccepted.reduce((a, b) => a.data.milestone > b.data.milestone ? a : b);
+            completedAt = Number(lastAccepted.data.accept_time);
+            // completedBy là worker đã được duyệt gần nhất trước thời điểm accept_time
+            const approvedBefore = approvedEvents
+              .filter(e => e.data.job_id.toString() === jobIdStr && Number(e.data.approve_time) <= completedAt)
+              .sort((a, b) => Number(b.data.approve_time) - Number(a.data.approve_time));
+            completedBy = approvedBefore.length > 0 ? approvedBefore[0].data.worker : null;
+          }
+          // Nếu không có milestone accepted, lấy từ JobCompletedEvent
+          if (!completedAt) {
+            const jobCompleted = completedEvents.find(e => e.data.job_id.toString() === jobIdStr);
+            if (jobCompleted) {
+              completedAt = Number(jobCompleted.data.complete_time);
+              // completedBy là worker đã được duyệt gần nhất trước thời điểm complete_time
+              const approvedBefore = approvedEvents
+                .filter(e => e.data.job_id.toString() === jobIdStr && Number(e.data.approve_time) <= completedAt)
+                .sort((a, b) => Number(b.data.approve_time) - Number(a.data.approve_time));
+              completedBy = approvedBefore.length > 0 ? approvedBefore[0].data.worker : null;
+            }
+          }
+          // 5. Trạng thái
+          let status = 'Đang tuyển';
+          if (completedAt && completedBy) status = 'Đã hoàn thành';
+          else if (approvedWorkers.length > 0) status = 'Đang thực hiện';
+          return {
+            id: jobIdStr,
+            title: jobData.title || 'Untitled Job',
+            status,
+            poster,
+            worker: completedBy,
+            milestones: [],
+            completedBy,
+            approvedWorkers,
+            createdAt,
+            completedAt
+          };
+        } catch (e) {
+          console.error('Lỗi khi lấy thông tin job:', e);
+          return null;
+        }
+      };
+      // Dự án đã tạo
+      const jobsCreatedInfo = await Promise.all(jobsCreated.map(getJobInfo));
+      setMyJobsCreated(jobsCreatedInfo.filter(Boolean));
+      // Dự án đã apply/làm
+      const appliedJobIds = new Set(jobsApplied.map(e => e.data.job_id.toString()));
+      jobsWorked.forEach(e => appliedJobIds.add(e.data.job_id.toString()));
+      const jobsAppliedOrWorked = rawPostedEvents.filter(e => appliedJobIds.has(e.data.job_id.toString()));
+      const jobsAppliedInfo = await Promise.all(jobsAppliedOrWorked.map(getJobInfo));
+      setMyJobsApplied(jobsAppliedInfo.filter(Boolean));
+    } catch (err: any) {
+      setMyJobsError(`Lỗi không xác định: ${err.message || String(err)}`);
+    } finally {
+      setMyJobsLoading(false);
+    }
+  };
+
+  // --- Hàm copy địa chỉ ---
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => {/* toast có thể thêm nếu muốn */})
+      .catch(() => {/* toast có thể thêm nếu muốn */});
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex justify-center items-center">
@@ -347,6 +529,16 @@ export default function MyProfile() {
               } transition-colors duration-200`}
             >
               Lịch sử cập nhật
+            </button>
+            <button
+              onClick={() => setActiveTab("myjobs")}
+              className={`px-6 py-3 text-lg font-semibold ${
+                activeTab === "myjobs"
+                  ? "text-blue-400 border-b-2 border-blue-400"
+                  : "text-gray-400 hover:text-white"
+              } transition-colors duration-200`}
+            >
+              Dự án của tôi
             </button>
           </div>
 
@@ -611,6 +803,104 @@ export default function MyProfile() {
                 <div className="text-gray-400 mt-2 text-center py-10">Không có lịch sử cập nhật cho địa chỉ này.</div>
               )}
             </motion.div>
+          )}
+
+          {activeTab === "myjobs" && (
+            <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full shadow-xl">
+              <h2 className="text-2xl font-bold mb-6 font-heading text-white text-center">Dự án của tôi</h2>
+              {myJobsLoading && (
+                <div className="flex justify-center items-center py-10">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-400"></div>
+                  <span className="ml-4 text-blue-400">Đang truy vấn dự án...</span>
+                </div>
+              )}
+              {myJobsError && (
+                <div className="text-red-400 mb-2 text-center py-10">{myJobsError}</div>
+              )}
+              {!myJobsLoading && !myJobsError && (
+                <>
+                  {myJobsCreated.length > 0 && (
+                    <div className="mb-8">
+                      <h3 className="font-bold text-white mb-2">Dự án đã tạo</h3>
+                      <ul className="space-y-4">
+                        {myJobsCreated.map(job => (
+                          <li key={job.id} className="bg-gray-800/50 rounded-lg p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="text-white font-medium">{job.title}</span>
+                              <span className="text-xs px-2 py-1 rounded bg-blue-700/30 text-blue-300">{job.status}</span>
+                            </div>
+                            <div className="text-sm text-gray-400 space-y-1">
+                              <div><b>Thời gian tạo:</b> {job.createdAt ? new Date(job.createdAt * 1000).toLocaleString() : '-'}</div>
+                              <div><b>Thời gian hoàn thành:</b> {job.completedAt ? new Date(job.completedAt * 1000).toLocaleString() : '-'}</div>
+                              <div><b>Người đăng:</b> {typeof job.poster === 'string' && job.poster ? (
+                                <span className="inline-flex items-center gap-1">
+                                  {job.poster.slice(0, 6)}...{job.poster.slice(-4)}
+                                  <button onClick={() => handleCopy(job.poster)} className="text-gray-400 hover:text-blue-400" title="Copy"><CheckCircle2 size={12} /></button>
+                                </span>
+                              ) : '-'}</div>
+                              <div><b>Người đã được duyệt:</b> {job.approvedWorkers && job.approvedWorkers.length > 0 ? job.approvedWorkers.map((addr, idx) => (
+                                <span key={addr} className="inline-flex items-center gap-1 mr-2">
+                                  {addr.slice(0, 6)}...{addr.slice(-4)}
+                                  <button onClick={() => handleCopy(addr)} className="text-gray-400 hover:text-blue-400" title="Copy"><CheckCircle2 size={12} /></button>
+                                  {idx < job.approvedWorkers.length - 1 ? ',' : null}
+                                </span>
+                              )) : '-'}</div>
+                              <div><b>Người hoàn thành cột mốc cuối:</b> {typeof job.completedBy === 'string' && job.completedBy ? (
+                                <span className="inline-flex items-center gap-1">
+                                  {job.completedBy.slice(0, 6)}...{job.completedBy.slice(-4)}
+                                  <button onClick={() => handleCopy(job.completedBy)} className="text-gray-400 hover:text-blue-400" title="Copy"><CheckCircle2 size={12} /></button>
+                                </span>
+                              ) : '-'}</div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {myJobsApplied.length > 0 && (
+                    <div className="mb-8">
+                      <h3 className="font-bold text-white mb-2">Dự án đã ứng tuyển/đã làm</h3>
+                      <ul className="space-y-4">
+                        {myJobsApplied.map(job => (
+                          <li key={job.id} className="bg-gray-800/50 rounded-lg p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="text-white font-medium">{job.title}</span>
+                              <span className="text-xs px-2 py-1 rounded bg-green-700/30 text-green-300">{job.status}</span>
+                            </div>
+                            <div className="text-sm text-gray-400 space-y-1">
+                              <div><b>Thời gian tạo:</b> {job.createdAt ? new Date(job.createdAt * 1000).toLocaleString() : '-'}</div>
+                              <div><b>Thời gian hoàn thành:</b> {job.completedAt ? new Date(job.completedAt * 1000).toLocaleString() : '-'}</div>
+                              <div><b>Người đăng:</b> {typeof job.poster === 'string' && job.poster ? (
+                                <span className="inline-flex items-center gap-1">
+                                  {job.poster.slice(0, 6)}...{job.poster.slice(-4)}
+                                  <button onClick={() => handleCopy(job.poster)} className="text-gray-400 hover:text-blue-400" title="Copy"><CheckCircle2 size={12} /></button>
+                                </span>
+                              ) : '-'}</div>
+                              <div><b>Người đã được duyệt:</b> {job.approvedWorkers && job.approvedWorkers.length > 0 ? job.approvedWorkers.map((addr, idx) => (
+                                <span key={addr} className="inline-flex items-center gap-1 mr-2">
+                                  {addr.slice(0, 6)}...{addr.slice(-4)}
+                                  <button onClick={() => handleCopy(addr)} className="text-gray-400 hover:text-blue-400" title="Copy"><CheckCircle2 size={12} /></button>
+                                  {idx < job.approvedWorkers.length - 1 ? ',' : null}
+                                </span>
+                              )) : '-'}</div>
+                              <div><b>Người hoàn thành cột mốc cuối:</b> {typeof job.completedBy === 'string' && job.completedBy ? (
+                                <span className="inline-flex items-center gap-1">
+                                  {job.completedBy.slice(0, 6)}...{job.completedBy.slice(-4)}
+                                  <button onClick={() => handleCopy(job.completedBy)} className="text-gray-400 hover:text-blue-400" title="Copy"><CheckCircle2 size={12} /></button>
+                                </span>
+                              ) : '-'}</div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {myJobsCreated.length === 0 && myJobsApplied.length === 0 && (
+                    <div className="text-gray-400 mt-2 text-center py-10">Bạn chưa có dự án nào liên quan.</div>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       </section>
