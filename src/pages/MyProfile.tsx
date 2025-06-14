@@ -9,14 +9,14 @@ import { motion } from "framer-motion";
 import { useProfile } from "../contexts/ProfileContext";
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
-const MODULE_NAME = "web3_profiles_v11";
-const RESOURCE_NAME = "ProfileRegistryV11";
+const MODULE_NAME = "web3_profiles_v14";
+const RESOURCE_NAME = "ProfileRegistryV14";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
 
-const JOBS_CONTRACT_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v14";
+const JOBS_CONTRACT_ADDRESS = "0x97bd417572de0bda9b8657459d4863e5d0da70d81000619ddfc8c316408fc853";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v17";
 
 interface ProfileDataFromChain {
   cid: string;

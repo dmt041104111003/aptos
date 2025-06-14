@@ -42,7 +42,7 @@ interface ProfileData {
   };
   portfolio: Array<{ name: string; link: string; rating: number }>;
   reviews: Array<{ client: string; comment: string; date: string }>;
-  lastCID?: string; // Track the latest IPFS CID
+  profile_cid?: string; // Track the latest IPFS CID
   cccd: number;
   createdAt: number;
 }
@@ -85,6 +85,7 @@ const emptyProfile: ProfileData = {
   },
   portfolio: [],
   reviews: [],
+  profile_cid: "",
   cccd: 0,
   createdAt: 0,
 };
@@ -127,10 +128,10 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
 
       try {
         const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS; // Ensure this is correctly configured
-        const PROFILE_MODULE_NAME = "web3_profiles_v11";
-        const PROFILE_RESOURCE_NAME = "ProfileRegistryV11";
-        const JOBS_CONTRACT_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe"; // Your jobs contract address
-        const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v14"; // Your jobs module name
+        const PROFILE_MODULE_NAME = "web3_profiles_v14";
+        const PROFILE_RESOURCE_NAME = "ProfileRegistryV14";
+        const JOBS_CONTRACT_ADDRESS = "0x97bd417572de0bda9b8657459d4863e5d0da70d81000619ddfc8c316408fc853"; // Your jobs contract address
+        const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v17"; // Your jobs module name
 
         const userReputationResource = await aptos.getAccountResource({
           accountAddress: account,
@@ -172,6 +173,7 @@ export const ProfileProvider = ({ children }: { children: React.ReactNode }) => 
         // Ensure cccd and createdAt from chain are preferred if fetchProfileDetails doesn't return them directly
         cccd: (fetchedProfile as any).cccd || 0,
         createdAt: (fetchedProfile as any).created_at || 0, // Assuming created_at is available in fetchedProfileDetails if from chain
+        profile_cid: (fetchedProfile as any).profile_cid || "", // Add profile_cid from fetchedProfile
       };
 
       setProfile(updatedProfile);

@@ -46,8 +46,8 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 
-const JOBS_MODULE_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
-const JOBS_MODULE_NAME = "job_marketplace_v13";
+const JOBS_MODULE_ADDRESS = "0x97bd417572de0bda9b8657459d4863e5d0da70d81000619ddfc8c316408fc853";
+const JOBS_MODULE_NAME = "job_marketplace_v17";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
@@ -78,6 +78,7 @@ const PostJob = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newMilestoneAmount, setNewMilestoneAmount] = useState<string>('');
   const [newMilestoneDuration, setNewMilestoneDuration] = useState<string>('');
+  const [marketplaceEscrowAddress, setMarketplaceEscrowAddress] = useState<string | null>(null);
   
   const [form, setForm] = useState<FormState>({
     title: '',
@@ -96,6 +97,26 @@ const PostJob = () => {
     milestones: [],
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  useEffect(() => {
+    const fetchEscrowAddress = async () => {
+      try {
+        const marketplaceCap = await aptos.getAccountResource({
+          accountAddress: JOBS_MODULE_ADDRESS,
+          resourceType: `${JOBS_MODULE_ADDRESS}::${JOBS_MODULE_NAME}::MarketplaceCapability`,
+        });
+        if (marketplaceCap && (marketplaceCap as any).escrow_address) {
+          setMarketplaceEscrowAddress((marketplaceCap as any).escrow_address);
+        } else {
+          toast.error("Không thể tải địa chỉ ký quỹ của Marketplace. Vui lòng thử lại sau.");
+        }
+      } catch (error) {
+        console.error("Lỗi khi tìm nạp địa chỉ ký quỹ Marketplace:", error);
+        toast.error("Lỗi khi tải địa chỉ ký quỹ của Marketplace.");
+      }
+    };
+    fetchEscrowAddress();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -190,30 +211,20 @@ const PostJob = () => {
       return;
     }
 
-    if (!profile || !profile.did || !profile.lastCID) {
-      toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi đăng dự án.');
+    // if (!profile || !profile.did || !profile.lastCID) {
+    //   toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi đăng dự án.');
+    //   return;
+    // }
+
+    if (!marketplaceEscrowAddress) {
+      toast.error('Địa chỉ ký quỹ của Marketplace chưa được tải. Vui lòng thử lại.');
+      setIsSubmitting(false);
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // First, transfer the initial fund amount to the contract address
-      const transferPayload = {
-        type: "entry_function_payload",
-        function: "0x1::coin::transfer",
-        type_arguments: ["0x1::aptos_coin::AptosCoin"],
-        arguments: [
-          JOBS_MODULE_ADDRESS,
-          form.initialFundAmount * 100_000_000 // Amount in micro-APT
-        ]
-      };
-
-      console.log("Transfer Payload:", transferPayload);
-      const transferTxnHash = await window.aptos.signAndSubmitTransaction(transferPayload);
-      await aptos.waitForTransaction({ transactionHash: transferTxnHash.hash });
-      toast.success(`Chuyển ${form.initialFundAmount} APT thành công. Đang đăng dự án...`);
-
       // Upload attachments to IPFS
       const attachmentCIDs = await Promise.all(
         attachments.map(file => uploadFileToIPFS(file))
@@ -222,7 +233,7 @@ const PostJob = () => {
       const jobData = {
         ...form,
         poster: account,
-        posterProfile: profile.lastCID,
+        posterProfile: profile.profile_cid,
         postedAt: new Date().toISOString(),
         attachments: attachmentCIDs,
         status: 'open'
@@ -239,7 +250,7 @@ const PostJob = () => {
           Math.floor(Date.now() / 1000) + form.applicationDeadlineDays * 24 * 60 * 60, // application_deadline (seconds from now)
           form.initialFundAmount * 100_000_000, // initial_fund_amount (convert APT to micro-APT)
           profile.did || "", // poster_did (from user profile)
-          profile.lastCID || "", // poster_profile_cid (from user profile)
+          profile.profile_cid || "", // poster_profile_cid (from user profile)
           form.milestones.map(m => m.amount * 100_000_000), // milestone_amounts
           form.milestones.map(m => m.duration * 24 * 60 * 60) // milestone_durations (convert days to seconds)
         ]

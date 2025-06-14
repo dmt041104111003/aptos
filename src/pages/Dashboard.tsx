@@ -46,7 +46,7 @@ interface JobPost {
   client: {
     id: string;
     name: string;
-    avatar: string;
+    profilePic: string;
   };
   start_time: number;
   end_time: number;
@@ -59,7 +59,7 @@ interface JobPost {
   milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } };
   submit_time: number | null;
   escrowed_amount: number;
-  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfileAvatar: string }[];
+  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfilePic: string }[];
   approve_time: number | null;
   poster_did: string;
   poster_profile_cid: string;
@@ -73,11 +73,11 @@ interface JobPost {
   last_reject_time: number | null;
 }
 
-const CONTRACT_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
-const MODULE_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v14";
-const PROFILE_MODULE_NAME = "web3_profiles_v11";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV11";
+const CONTRACT_ADDRESS = "0x97bd417572de0bda9b8657459d4863e5d0da70d81000619ddfc8c316408fc853";
+const MODULE_ADDRESS = "0x97bd417572de0bda9b8657459d4863e5d0da70d81000619ddfc8c316408fc853";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v17";
+const PROFILE_MODULE_NAME = "web3_profiles_v14";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV14";
 const AUTO_CONFIRM_DELAY = 5 * 60; // 5 minutes in seconds
 
 const Dashboard = () => {
@@ -284,7 +284,7 @@ const Dashboard = () => {
               did: appEvent.data.did,
               profile_cid: appEvent.data.profile_cid,
               workerProfileName: workerProfile.name,
-              workerProfileAvatar: workerProfile.avatar,
+              workerProfilePic: workerProfile.profilePic,
             };
           }));
 
@@ -317,7 +317,7 @@ const Dashboard = () => {
             client: {
               id: jobOnChain.poster,
               name: posterProfile.name,
-              avatar: posterProfile.avatar,
+              profilePic: posterProfile.profilePic,
             },
             start_time: Number(jobOnChain.start_time),
             end_time: Number(jobOnChain.end_time || 0),
@@ -815,7 +815,7 @@ const Dashboard = () => {
                   {(isPoster || isWorker || isApplicant) && ( // Show poster info to all relevant parties
                   <div className="flex items-center gap-3">
                     <Avatar className="w-10 h-10 border-2 border-blue-500">
-                      <AvatarImage src={job.client.avatar} alt={job.client.name} />
+                      <AvatarImage src={job.client.profilePic} alt={job.client.name} />
                       <AvatarFallback>{job.client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div>
@@ -839,7 +839,7 @@ const Dashboard = () => {
                   {job.worker && (
                   <div className="flex items-center gap-3">
                       <Avatar className={`w-10 h-10 border-2 ${isWorker ? 'border-green-500' : 'border-gray-500'}`}>
-                      <AvatarImage src={job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfileAvatar} alt="Worker Avatar" />
+                      <AvatarImage src={job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfilePic} alt="Worker Avatar" />
                       <AvatarFallback>WK</AvatarFallback>
                     </Avatar>
                     <div>
@@ -946,7 +946,7 @@ const Dashboard = () => {
                         <li key={index} className="flex items-center justify-between bg-blue-800/30 p-3 rounded-md">
                           <div className="flex items-center gap-3">
                             <Avatar className="w-9 h-9">
-                              <AvatarImage src={app.workerProfileAvatar} alt={app.workerProfileName} />
+                              <AvatarImage src={app.workerProfilePic} alt={app.workerProfileName} />
                               <AvatarFallback>{app.workerProfileName.slice(0, 2).toUpperCase()}</AvatarFallback>
                             </Avatar>
                             <div>
