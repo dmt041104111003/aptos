@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { mockClients } from '@/data/mockData';
 import { MessageCircle } from 'lucide-react';
 
 interface Message {
@@ -53,16 +52,16 @@ const Messages = () => {
 
   const [messages, setMessages] = useState<{ [key: string]: Message[] }>(
     {
-      '1': [
-        {
-          id: '1-1',
+    '1': [
+      {
+        id: '1-1',
           senderId: 'client1',
-          receiverId: 'me',
+        receiverId: 'me',
           content: 'Chào bạn! Công ty chúng tôi đang tìm kiếm một nhà phát triển hợp đồng thông minh cho dự án DeFi mới. Hồ sơ của bạn trông rất ấn tượng.',
           timestamp: '2023-05-24T10:30:00Z',
-        },
-        {
-          id: '1-2',
+      },
+      {
+        id: '1-2',
           senderId: 'me',
           receiverId: 'client1',
           content: 'Cảm ơn! Tôi rất quan tâm đến các dự án DeFi. Yêu cầu cụ thể của dự án là gì?',
@@ -71,37 +70,37 @@ const Messages = () => {
         {
           id: '1-3',
           senderId: 'client1',
-          receiverId: 'me',
+        receiverId: 'me',
           content: 'Chúng tôi cần xây dựng một giao thức cho vay phi tập trung trên Aptos. Bạn có kinh nghiệm với các tiêu chuẩn Move và các giao thức như Lending/Borrowing không?',
           timestamp: '2023-05-24T10:35:00Z',
-        }
-      ],
-      '2': [
-        {
-          id: '2-1',
+      }
+    ],
+    '2': [
+      {
+        id: '2-1',
           senderId: 'client2',
-          receiverId: 'me',
+        receiverId: 'me',
           content: 'Chào bạn, chúng tôi đã xem xét ứng tuyển của bạn cho vị trí phát triển frontend.',
           timestamp: '2023-05-23T09:15:00Z',
-        },
-        {
-          id: '2-2',
-          senderId: 'me',
+      },
+      {
+        id: '2-2',
+        senderId: 'me',
           receiverId: 'client2',
           content: "Chào bạn! Tôi có 3 năm kinh nghiệm với React và đã làm việc với Aptos SDK trong nhiều dự án. Tôi có thể chia sẻ các demo nếu cần.",
           timestamp: '2023-05-23T09:20:00Z',
-        },
-        {
-          id: '2-3',
+      },
+      {
+        id: '2-3',
           senderId: 'client2',
-          receiverId: 'me',
+        receiverId: 'me',
           content: 'Tuyệt vời! Chúng ta có thể sắp xếp một cuộc gọi trong tuần này để thảo luận sâu hơn không?',
           timestamp: '2023-05-23T09:25:00Z',
-        }
-      ],
-      '3': [
-        {
-          id: '3-1',
+      }
+    ],
+    '3': [
+      {
+        id: '3-1',
           senderId: 'me',
           receiverId: 'client3',
           content: 'Tôi đã gửi đề xuất dự án cho vị trí quản lý cộng đồng. Bạn có thể xem xét và cho tôi phản hồi không?',
@@ -110,11 +109,11 @@ const Messages = () => {
         {
           id: '3-2',
           senderId: 'client3',
-          receiverId: 'me',
+        receiverId: 'me',
           content: 'Đã nhận được đề xuất của bạn. Về ngân sách, chúng tôi có thể thảo luận thêm không?',
           timestamp: '2023-05-21T14:15:00Z',
-        }
-      ]
+      }
+    ]
     }
   );
 
@@ -156,7 +155,7 @@ const Messages = () => {
     // Custom format to show just time if today, otherwise date
     const today = new Date();
     if (date.toDateString() === today.toDateString()) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else {
       return date.toLocaleDateString('vi-VN'); // Vietnamese date format
     }
@@ -281,24 +280,24 @@ const Messages = () => {
                     </div>
                     {/* Message Input */}
                     <div className="p-4 border-t border-white/10 bg-gray-900/50 flex items-center gap-3">
-                      <Input
+                        <Input
                         type="text"
-                        placeholder="Nhập tin nhắn..." 
-                        value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
+                          placeholder="Nhập tin nhắn..."
+                          value={messageInput}
+                          onChange={(e) => setMessageInput(e.target.value)}
                         onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            handleSendMessage();
-                          }
-                        }}
+                            if (e.key === 'Enter') {
+                              handleSendMessage();
+                            }
+                          }}
                         className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-blue-500/20"
-                      />
-                      <Button
-                        onClick={handleSendMessage}
+                        />
+                        <Button 
+                          onClick={handleSendMessage}
                         className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white"
-                      >
-                        Gửi
-                      </Button>
+                        >
+                          Gửi
+                        </Button>
                     </div>
                   </>
                 ) : (

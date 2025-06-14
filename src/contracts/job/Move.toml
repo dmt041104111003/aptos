@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-work_board = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242"
+work_board = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242" 
 work_profiles_addr = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242"
 
 [dependencies]

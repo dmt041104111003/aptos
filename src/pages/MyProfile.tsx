@@ -151,13 +151,13 @@ export default function MyProfile() {
           try {
             console.log("MyProfile: Fetching profile data from IPFS using CID:", profileCID);
             const url = convertIPFSURL(profileCID);
-            const response = await fetch(url);
-            const text = await response.text();
-            if (!response.ok || text.startsWith("<!DOCTYPE")) {
+        const response = await fetch(url);
+        const text = await response.text();
+        if (!response.ok || text.startsWith("<!DOCTYPE")) {
               console.error(`MyProfile: IPFS fetch failed: ${response.status} - ${text.slice(0, 50)}...`);
               throw new Error(`IPFS fetch failed: ${response.status} - ${text.slice(0, 50)}...`);
-            }
-            const profileData = JSON.parse(text);
+        }
+        const profileData = JSON.parse(text);
             console.log("MyProfile: Profile data from IPFS:", profileData);
             setProfile(prev => ({
               ...prev,
@@ -341,177 +341,177 @@ export default function MyProfile() {
           </div>
 
           {activeTab === "profile" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="col-span-1">
-                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full mb-8 flex flex-col items-center shadow-xl">
-                  <div className="w-36 h-36 rounded-full bg-gradient-to-br from-blue-600 to-violet-700 p-1 mb-4">
-                    <img
-                      src={profile.profilePic}
-                      alt={profile.name}
-                      className="w-full h-full rounded-full object-cover border-4 border-black"
-                    />
-                  </div>
-                  <h1 className="text-2xl font-bold text-white mb-1 text-center font-heading">{profile.name}</h1>
-                  <p className="text-gray-400 mb-3 text-center font-primary">{profile.bio}</p>
-                  <div className="flex flex-wrap gap-2 justify-center mb-3">
-                    {profile.skills.slice(0, 4).map(skill => (
-                      <span
-                        key={skill}
-                        className="bg-blue-600/20 text-blue-300 rounded-full px-4 py-1 text-sm font-medium mb-1 font-primary"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                    {profile.skills.length > 4 && (
-                      <span className="bg-white/10 text-gray-300 rounded-full px-4 py-1 text-sm font-medium mb-1 font-primary">+{profile.skills.length - 4} kỹ năng khác</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2 w-full mt-2">
-                    <span className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
-                      Ví: {profile.wallet.slice(0, 6)}...{profile.wallet.slice(-4)}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="col-span-1">
+              <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full mb-8 flex flex-col items-center shadow-xl">
+                <div className="w-36 h-36 rounded-full bg-gradient-to-br from-blue-600 to-violet-700 p-1 mb-4">
+                  <img
+                    src={profile.profilePic}
+                    alt={profile.name}
+                    className="w-full h-full rounded-full object-cover border-4 border-black"
+                  />
+                </div>
+                <h1 className="text-2xl font-bold text-white mb-1 text-center font-heading">{profile.name}</h1>
+                <p className="text-gray-400 mb-3 text-center font-primary">{profile.bio}</p>
+                <div className="flex flex-wrap gap-2 justify-center mb-3">
+                  {profile.skills.slice(0, 4).map(skill => (
+                    <span
+                      key={skill}
+                      className="bg-blue-600/20 text-blue-300 rounded-full px-4 py-1 text-sm font-medium mb-1 font-primary"
+                    >
+                      {skill}
                     </span>
+                  ))}
+                  {profile.skills.length > 4 && (
+                    <span className="bg-white/10 text-gray-300 rounded-full px-4 py-1 text-sm font-medium mb-1 font-primary">+{profile.skills.length - 4} kỹ năng khác</span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 w-full mt-2">
+                  <span className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
+                      Ví: {profile.wallet.slice(0, 6)}...{profile.wallet.slice(-4)}
+                  </span>
                     {ipfsError && (
                       <div className="flex items-center gap-2 px-3 py-2 bg-red-500/20 text-red-400 rounded-lg text-xs w-full justify-center font-primary break-words break-all">
                         <AlertCircle size={16} />
                         <span>{ipfsError}</span>
                       </div>
                     )}
-                  </div>
-                  <div className="flex gap-3 mt-4 justify-center">
-                    {profile.social.github && (
-                      <a href={profile.social.github} className="text-gray-400 hover:text-blue-400" target="_blank" rel="noopener noreferrer">
-                        <i className="bi bi-github text-2xl"></i>
-                      </a>
-                    )}
-                    {profile.social.linkedin && (
-                      <a href={profile.social.linkedin} className="text-gray-400 hover:text-blue-400" target="_blank" rel="noopener noreferrer">
-                        <i className="bi bi-linkedin text-2xl"></i>
-                      </a>
-                    )}
-                    {profile.social.twitter && (
-                      <a href={profile.social.twitter} className="text-gray-400 hover:text-blue-400" target="_blank" rel="noopener noreferrer">
-                        <i className="bi bi-twitter text-2xl"></i>
-                      </a>
-                    )}
-                  </div>
+                </div>
+                <div className="flex gap-3 mt-4 justify-center">
+                  {profile.social.github && (
+                    <a href={profile.social.github} className="text-gray-400 hover:text-blue-400" target="_blank" rel="noopener noreferrer">
+                      <i className="bi bi-github text-2xl"></i>
+                    </a>
+                  )}
+                  {profile.social.linkedin && (
+                    <a href={profile.social.linkedin} className="text-gray-400 hover:text-blue-400" target="_blank" rel="noopener noreferrer">
+                      <i className="bi bi-linkedin text-2xl"></i>
+                    </a>
+                  )}
+                  {profile.social.twitter && (
+                    <a href={profile.social.twitter} className="text-gray-400 hover:text-blue-400" target="_blank" rel="noopener noreferrer">
+                      <i className="bi bi-twitter text-2xl"></i>
+                    </a>
+                  )}
                 </div>
               </div>
-              <div className="col-span-1 md:col-span-2 flex flex-col gap-8">
-                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
-                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Kỹ năng / Dịch vụ cung cấp</h2>
-                  <div className="flex flex-wrap gap-2">
-                    {profile.skills.map(skill => (
-                      <span
-                        key={skill}
-                        className="bg-blue-600/20 text-blue-300 rounded-full px-4 py-1 text-sm font-medium mb-1 font-primary"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
+            </div>
+            <div className="col-span-1 md:col-span-2 flex flex-col gap-8">
+              <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
+                <h2 className="text-lg font-semibold mb-4 font-heading text-white">Kỹ năng / Dịch vụ cung cấp</h2>
+                <div className="flex flex-wrap gap-2">
+                  {profile.skills.map(skill => (
+                    <span
+                      key={skill}
+                      className="bg-blue-600/20 text-blue-300 rounded-full px-4 py-1 text-sm font-medium mb-1 font-primary"
+                    >
+                      {skill}
+                    </span>
+                  ))}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
-                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
-                    <h2 className="text-lg font-semibold mb-4 font-heading text-white">Điểm uy tín</h2>
-                    <div className="flex items-center gap-4 mb-2">
-                      <div className="flex flex-col items-center">
-                        <span className="text-4xl font-bold text-blue-400 font-heading">{profile.reputation.score}</span>
-                        <div className="flex items-center mt-1">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              size={18}
-                              className={i < Math.round(profile.reputation.score) ? "text-blue-400" : "text-gray-700"}
-                            />
-                          ))}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
+                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Điểm uy tín</h2>
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="flex flex-col items-center">
+                      <span className="text-4xl font-bold text-blue-400 font-heading">{profile.reputation.score}</span>
+                      <div className="flex items-center mt-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            size={18}
+                            className={i < Math.round(profile.reputation.score) ? "text-blue-400" : "text-gray-700"}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <span className="text-gray-400 text-sm font-primary">
+                      Dựa trên {profile.reputation.jobs} dự án đã hoàn thành
+                    </span>
+                  </div>
+                  <div className="space-y-2 mt-4">
+                    {profile.reputation.breakdown.map((item) => (
+                      <div key={item.label}>
+                        <div className="flex justify-between text-sm">
+                          <span className="font-primary text-white/80">{item.label}</span>
+                          <span className="font-semibold font-primary text-blue-400">{item.value}</span>
+                        </div>
+                        <div className="w-full h-2 bg-blue-600/10 rounded">
+                          <div
+                            className="h-2 bg-gradient-to-r from-blue-600 to-violet-600 rounded"
+                            style={{ width: `${(item.value / 5) * 100}%` }}
+                          />
                         </div>
                       </div>
-                      <span className="text-gray-400 text-sm font-primary">
-                        Dựa trên {profile.reputation.jobs} dự án đã hoàn thành
-                      </span>
-                    </div>
-                    <div className="space-y-2 mt-4">
-                      {profile.reputation.breakdown.map((item) => (
-                        <div key={item.label}>
-                          <div className="flex justify-between text-sm">
-                            <span className="font-primary text-white/80">{item.label}</span>
-                            <span className="font-semibold font-primary text-blue-400">{item.value}</span>
-                          </div>
-                          <div className="w-full h-2 bg-blue-600/10 rounded">
-                            <div
-                              className="h-2 bg-gradient-to-r from-blue-600 to-violet-600 rounded"
-                              style={{ width: `${(item.value / 5) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-                  <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
-                    <h2 className="text-lg font-semibold mb-4 font-heading text-white">Chứng chỉ Web3</h2>
-                    <ul className="space-y-3">
-                      <li className="flex items-center gap-3">
-                        <Shield className="text-blue-400" />
-                        <span>
-                          <span className="font-medium font-primary text-white">DID đã xác thực</span>
-                          <br />
+                </div>
+                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
+                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Chứng chỉ Web3</h2>
+                  <ul className="space-y-3">
+                    <li className="flex items-center gap-3">
+                      <Shield className="text-blue-400" />
+                      <span>
+                        <span className="font-medium font-primary text-white">DID đã xác thực</span>
+                        <br />
                           <span className="text-xs text-gray-400 font-primary break-all">{profile.did}</span>
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <Tag className="text-blue-400" />
+                      <span>
+                        <span className="font-medium font-primary text-white">Xác thực Lens Protocol</span>
+                        <br />
+                        <span className="text-xs text-gray-400 font-primary">{profile.lens}</span>
+                      </span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <Star className="text-blue-400" />
+                      <span>
+                        <span className="font-medium font-primary text-white">Skill NFTs</span>
+                        <br />
+                        <span className="text-xs text-gray-400 font-primary">
+                          {profile.skillNFTs.length} kỹ năng đã xác thực
                         </span>
-                      </li>
-                      <li className="flex items-center gap-3">
-                        <Tag className="text-blue-400" />
-                        <span>
-                          <span className="font-medium font-primary text-white">Xác thực Lens Protocol</span>
-                          <br />
-                          <span className="text-xs text-gray-400 font-primary">{profile.lens}</span>
-                        </span>
-                      </li>
-                      <li className="flex items-center gap-3">
-                        <Star className="text-blue-400" />
-                        <span>
-                          <span className="font-medium font-primary text-white">Skill NFTs</span>
-                          <br />
-                          <span className="text-xs text-gray-400 font-primary">
-                            {profile.skillNFTs.length} kỹ năng đã xác thực
-                          </span>
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
-                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Dự án nổi bật</h2>
-                  <ul className="space-y-2">
-                    {profile.portfolio.map((proj) => (
-                      <li key={proj.name} className="flex items-center gap-3">
-                        <a
-                          href={proj.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 font-medium hover:underline font-primary"
-                        >
-                          {proj.name}
-                        </a>
-                        <Star className="text-blue-400" size={16} />
-                        <span className="font-semibold text-gray-300 font-primary">{proj.rating}</span>
-                      </li>
-                    ))}
+                      </span>
+                    </li>
                   </ul>
                 </div>
-                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
-                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Đánh giá</h2>
-                  <ul className="divide-y divide-white/10">
-                    {profile.reviews.map((review, idx) => (
-                      <li key={idx} className="py-3">
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold font-primary text-white/90">{review.client}</span>
-                          <span className="text-xs text-gray-400 font-primary">{review.date}</span>
-                        </div>
-                        <p className="text-gray-300 mt-1 font-primary">"{review.comment}"</p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              </div>
+              <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
+                <h2 className="text-lg font-semibold mb-4 font-heading text-white">Dự án nổi bật</h2>
+                <ul className="space-y-2">
+                  {profile.portfolio.map((proj) => (
+                    <li key={proj.name} className="flex items-center gap-3">
+                      <a
+                        href={proj.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 font-medium hover:underline font-primary"
+                      >
+                        {proj.name}
+                      </a>
+                      <Star className="text-blue-400" size={16} />
+                      <span className="font-semibold text-gray-300 font-primary">{proj.rating}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full">
+                <h2 className="text-lg font-semibold mb-4 font-heading text-white">Đánh giá</h2>
+                <ul className="divide-y divide-white/10">
+                  {profile.reviews.map((review, idx) => (
+                    <li key={idx} className="py-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold font-primary text-white/90">{review.client}</span>
+                        <span className="text-xs text-gray-400 font-primary">{review.date}</span>
+                      </div>
+                      <p className="text-gray-300 mt-1 font-primary">"{review.comment}"</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
               </div>
             </div>
           )}
@@ -579,9 +579,9 @@ export default function MyProfile() {
                       >
                         Trang sau
                       </button>
-                    </div>
+            </div>
                   )}
-                </div>
+          </div>
               )}
               {!historyLoading && !historyError && historyResult.length === 0 && (
                 <div className="text-gray-400 mt-2 text-center py-10">Không có lịch sử cập nhật cho địa chỉ này.</div>
