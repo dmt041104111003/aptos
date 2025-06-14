@@ -209,7 +209,7 @@ export default function Settings() {
       // Upload profile image if changed
       let profilePicUrl = profile.profilePic;
       if (imageFile) {
-        const imageCID = await uploadFileToIPFS(imageFile);
+          const imageCID = await uploadFileToIPFS(imageFile);
         profilePicUrl = `ipfs://${imageCID}`;
       }
 
@@ -289,11 +289,11 @@ export default function Settings() {
               <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full mb-8 flex flex-col items-center shadow-xl">
                 <div className="relative w-36 h-36 mb-4">
                   <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-600 to-violet-700 p-1">
-                    <img 
-                      src={imagePreview} 
+                  <img 
+                    src={imagePreview} 
                       alt="Ảnh đại diện" 
-                      className="w-full h-full rounded-full object-cover border-4 border-black"
-                    />
+                    className="w-full h-full rounded-full object-cover border-4 border-black"
+                  />
                   </div>
                   {uploading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
@@ -332,12 +332,12 @@ export default function Settings() {
                 <label className="w-full mt-4 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-center group relative z-10 cursor-pointer overflow-hidden font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10 rounded-lg">
                   <span className="relative inline-flex items-center justify-center gap-2 overflow-hidden font-primary text-base">
                     <Upload size={20} />
-                    <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
-                      Đổi ảnh đại diện
-                    </div>
-                    <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
-                      Đổi ảnh đại diện
-                    </div>
+                      <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
+                        Đổi ảnh đại diện
+                      </div>
+                      <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
+                        Đổi ảnh đại diện
+                      </div>
                   </span>
                   <input
                     type="file"
@@ -436,18 +436,18 @@ export default function Settings() {
                 <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8">
                   <h2 className="text-lg font-semibold mb-4 font-heading text-white">Kỹ năng</h2>
                   <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newSkill}
-                        onChange={(e) => setNewSkill(e.target.value)}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSkill}
+                      onChange={(e) => setNewSkill(e.target.value)}
                         className="flex-1 px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 font-primary"
-                        placeholder="Thêm kỹ năng mới"
+                      placeholder="Thêm kỹ năng mới"
                         disabled={uploading}
-                      />
-                      <button
-                        type="button"
-                        onClick={addSkill}
+                    />
+                    <button
+                      type="button"
+                      onClick={addSkill}
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         disabled={uploading || !newSkill.trim()}
                       >
@@ -466,9 +466,9 @@ export default function Settings() {
                             onClick={() => removeSkill(skill)}
                             className="text-gray-400 hover:text-red-400 transition-colors"
                             disabled={uploading}
-                          >
+                    >
                             <Delete size={16} />
-                          </button>
+                    </button>
                         </div>
                       ))}
                     </div>
