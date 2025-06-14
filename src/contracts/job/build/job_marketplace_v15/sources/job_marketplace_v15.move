@@ -1,4 +1,4 @@
-module work_board::job_marketplace_v14 {
+module work_board::job_marketplace_v15 {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
@@ -6,10 +6,10 @@ module work_board::job_marketplace_v14 {
     use aptos_framework::aptos_coin::AptosCoin;
     use std::table;
     use std::event;
-    use aptos_framework::account;
+    use aptos_framework::account::{Self, SignerCapability};
     use std::vector;
     use aptos_framework::timestamp;
-    use work_profiles_addr::web3_profiles_v11;
+    use work_profiles_addr::web3_profiles_v12;
 
     const EJOB_NOT_FOUND: u64 = 0;
     const EALREADY_HAS_WORKER: u64 = 1;
@@ -40,6 +40,8 @@ module work_board::job_marketplace_v14 {
     const EINVALID_SIGNER_FOR_INIT: u64 = 26;
     const ENOT_READY_TO_REOPEN: u64 = 27;
     const EAPPLICATION_DEADLINE_PASSED: u64 = 28;
+    const ENOT_AUTHORIZED: u64 = 29;
+    const ETOO_EARLY_AUTO_CONFIRM: u64 = 30;
 
     const APPLY_FEE: u64 = 100_000_000;
     const MAX_REJECTIONS: u8 = 3;
@@ -218,9 +220,10 @@ module work_board::job_marketplace_v14 {
         timestamp: u64
     }
 
-    // Add capability for module signer
-    struct ModuleCapability has key {
-        signer_capability: account::SignerCapability
+    // NEW STRUCT for Marketplace's ResourceAccountCapability
+    struct MarketplaceCapability has key {
+        cap: SignerCapability,
+        escrow_address: address, // Store the derived address of the escrow account
     }
 
     public entry fun init_events(account: &signer) {
@@ -245,9 +248,6 @@ module work_board::job_marketplace_v14 {
         assert!(owner_addr == @work_board, EINVALID_SIGNER_FOR_INIT);
 
         if (!exists<Jobs>(owner_addr)) {
-            // Initialize CoinStore for the module's address if it doesn't exist
-            coin::register<AptosCoin>(account); // Ensure module's CoinStore is registered
-
             move_to(account, Jobs {
                 jobs: table::new<u64, Job>(),
                 job_counter: 0,
@@ -257,12 +257,17 @@ module work_board::job_marketplace_v14 {
         if (!exists<Events>(owner_addr)) {
             init_events(account);
         };
-    }
 
-    // Helper function to transfer funds from the module's CoinStore
-    fun transfer_from_module(module_signer: &signer, recipient: address, amount: u64) {
-        assert!(coin::balance<AptosCoin>(signer::address_of(module_signer)) >= amount, EINSUFFICIENT_FUNDS);
-        coin::transfer<AptosCoin>(module_signer, recipient, amount);
+        // NEW: Create and store ResourceAccountCapability for marketplace's escrow
+        if (!exists<MarketplaceCapability>(owner_addr)) {
+            // Create a dedicated resource account for marketplace funds
+            let (escrow_signer, escrow_cap) = account::create_resource_account(account, x"6d61726b6574706c6163655f657363726f77");
+            let escrow_address = signer::address_of(&escrow_signer);
+            // Store the capability and its address under the module's address
+            move_to(account, MarketplaceCapability { cap: escrow_cap, escrow_address: escrow_address });
+            // Register CoinStore for the newly created escrow account
+            coin::register<AptosCoin>(&escrow_signer);
+        }
     }
 
     public entry fun post_job(
@@ -274,7 +279,7 @@ module work_board::job_marketplace_v14 {
         poster_profile_cid: String,
         milestone_amounts: vector<u64>,
         milestone_durations: vector<u64>
-    ) acquires Jobs, Events, UserReputation {
+    ) acquires Jobs, Events, UserReputation, MarketplaceCapability {
         let sender = signer::address_of(account);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs_res = borrow_global_mut<Jobs>(@work_board);
@@ -282,9 +287,17 @@ module work_board::job_marketplace_v14 {
         let job_id = jobs_res.job_counter;
         jobs_res.job_counter = jobs_res.job_counter + 1;
 
+        // Get the marketplace escrow address
+        assert!(exists<MarketplaceCapability>(@work_board), EMODULE_NOT_INITIALIZED);
+        let marketplace_cap_res = borrow_global<MarketplaceCapability>(@work_board);
+        let escrow_address = marketplace_cap_res.escrow_address;
+
         // Initial fund must be positive
         assert!(initial_fund_amount > 0, EINVALID_AMOUNT);
-        assert!(coin::balance<AptosCoin>(@work_board) >= initial_fund_amount, EINSUFFICIENT_FUNDS);
+        // Funds are transferred by the poster to the escrow account
+        coin::transfer<AptosCoin>(account, escrow_address, initial_fund_amount);
+        // Assert that escrow account has enough funds (redundant if transfer above passes)
+        assert!(coin::balance<AptosCoin>(escrow_address) >= initial_fund_amount, EINSUFFICIENT_FUNDS);
 
         // Calculate total milestone amount
         let i = 0;
@@ -316,7 +329,7 @@ module work_board::job_marketplace_v14 {
                 accepted: false,
                 submit_time: 0,
                 reject_count: 0,
-                auto_confirm_timestamp: 0
+                auto_confirm_timestamp: 0 // Keep this field for now, will remove if no longer needed by other logic
             });
 
             // Calculate milestone deadline
@@ -388,8 +401,8 @@ module work_board::job_marketplace_v14 {
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
 
         // Verify worker's profile and DID
-        assert!(web3_profiles_v11::has_profile(worker_addr), EINVALID_PROFILE);
-        let profile_did = web3_profiles_v11::get_profile_did(worker_addr);
+        assert!(web3_profiles_v12::has_profile(worker_addr), EINVALID_PROFILE);
+        let profile_did = web3_profiles_v12::get_profile_did(worker_addr);
         assert!(profile_did == worker_did, EINVALID_DID);
 
         // Check if job is active and within application deadline
@@ -519,7 +532,7 @@ module work_board::job_marketplace_v14 {
         poster: &signer,
         job_id: u64,
         milestone_index: u64
-    ) acquires Jobs, Events, UserReputation, ModuleCapability {
+    ) acquires Jobs, Events, UserReputation, MarketplaceCapability {
         let poster_addr = signer::address_of(poster);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -543,10 +556,11 @@ module work_board::job_marketplace_v14 {
         assert!(milestone_amount > 0, EINVALID_AMOUNT);
         let worker_addr = *option::borrow(&job.worker);
 
-        // Acquire module signer and transfer funds
-        let module_cap = borrow_global<ModuleCapability>(@work_board);
-        let module_signer = account::create_signer_with_capability(&module_cap.signer_capability);
-        transfer_from_module(&module_signer, worker_addr, milestone_amount);
+        // Get the signer for the marketplace's escrow account
+        let marketplace_cap = borrow_global<MarketplaceCapability>(@work_board);
+        let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+
+        coin::transfer<AptosCoin>(&module_signer, worker_addr, milestone_amount);
 
         job.escrowed_amount = job.escrowed_amount - milestone_amount;
 
@@ -646,16 +660,18 @@ module work_board::job_marketplace_v14 {
         account: &signer,
         job_id: u64,
         milestone_index: u64
-    ) acquires Jobs, Events, UserReputation, ModuleCapability {
+    ) acquires Jobs, Events, UserReputation, MarketplaceCapability {
         let _account_addr = signer::address_of(account);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@work_board);
         assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
 
-        // Verify job state
-        assert!(job.active, ENOT_ACTIVE);
+        // Verify job state and worker
         assert!(option::is_some(&job.worker), ENOT_WORKER);
+        let worker_addr = *option::borrow(&job.worker);
+        // Either the poster or the worker can trigger auto-confirmation after delay
+        assert!(job.poster == _account_addr || worker_addr == _account_addr, ENOT_AUTHORIZED);
 
         // Verify milestone state
         let milestone_states = &mut job.milestone_states;
@@ -663,32 +679,30 @@ module work_board::job_marketplace_v14 {
         let milestone_data = table::borrow_mut(milestone_states, milestone_index);
         assert!(milestone_data.submitted, ENOT_SUBMITTED);
         assert!(!milestone_data.accepted, EALREADY_SUBMITTED);
-
-        // Check if enough time has passed for auto-confirmation
-        let submit_time = milestone_data.submit_time;
-        assert!(timestamp::now_seconds() >= submit_time + AUTO_CONFIRM_DELAY, ENOT_READY_TO_AUTO_CONFIRM);
+        
+        // Ensure auto-confirmation delay has passed
+        let auto_confirm_delay = *vector::borrow(&job.duration_per_milestone, milestone_index) / 2;
+        assert!(timestamp::now_seconds() >= (milestone_data.submit_time + auto_confirm_delay), ETOO_EARLY_AUTO_CONFIRM);
 
         // Calculate milestone payment
         let milestone_amount = *vector::borrow(&job.milestones, milestone_index);
         assert!(milestone_amount > 0, EINVALID_AMOUNT);
-        let worker_addr = *option::borrow(&job.worker);
-        let poster_addr = job.poster; // Get poster's address
 
-        // Acquire module signer and transfer funds
-        let module_cap = borrow_global<ModuleCapability>(@work_board);
-        let module_signer = account::create_signer_with_capability(&module_cap.signer_capability);
-        transfer_from_module(&module_signer, worker_addr, milestone_amount);
+        // Get the signer for the marketplace's escrow account
+        let marketplace_cap = borrow_global<MarketplaceCapability>(@work_board);
+        let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+
+        coin::transfer<AptosCoin>(&module_signer, worker_addr, milestone_amount);
 
         job.escrowed_amount = job.escrowed_amount - milestone_amount;
 
         // Update milestone state
         milestone_data.accepted = true;
-        milestone_data.auto_confirm_timestamp = timestamp::now_seconds();
+        // Update auto_confirmed flag
+        vector::insert(&mut job.auto_confirmed, milestone_index, true);
 
         // Update job state
         job.current_milestone = milestone_index + 1;
-        let auto_confirmed = vector::borrow_mut(&mut job.auto_confirmed, milestone_index);
-        *auto_confirmed = true;
 
         // Check if all milestones are completed
         if (job.current_milestone == vector::length(&job.milestones)) {
@@ -700,11 +714,11 @@ module work_board::job_marketplace_v14 {
         assert!(exists<Events>(@work_board), EMODULE_NOT_INITIALIZED);
         let events = borrow_global_mut<Events>(@work_board);
         event::emit_event(
-            &mut events.auto_confirm_event,
-            MilestoneAutoConfirmedEvent {
+            &mut events.accept_event,
+            MilestoneAcceptedEvent {
                 job_id,
                 milestone: milestone_index,
-                auto_confirm_time: timestamp::now_seconds()
+                accept_time: timestamp::now_seconds()
             }
         );
 
@@ -719,15 +733,14 @@ module work_board::job_marketplace_v14 {
         );
 
         // Update worker's reputation
-        update_user_reputation(worker_addr, job_id, milestone_amount, false, true, EVENT_MILESTONE_AUTO_CONFIRMED);
-        // Update poster's reputation
-        update_user_reputation(poster_addr, job_id, 0, true, false, EVENT_MILESTONE_AUTO_CONFIRMED);
+        update_user_reputation(worker_addr, job_id, milestone_amount, false, true, EVENT_MILESTONE_ACCEPTED);
+        // Poster's reputation not directly impacted by auto-confirm, but worker gets positive
     }
 
     public entry fun cancel_job(
         account: &signer,
         job_id: u64
-    ) acquires Jobs, Events, UserReputation, ModuleCapability {
+    ) acquires Jobs, Events, UserReputation, MarketplaceCapability {
         let account_addr = signer::address_of(account);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -744,9 +757,9 @@ module work_board::job_marketplace_v14 {
         // Return remaining funds to poster
         let remaining_funds = job.escrowed_amount;
         if (remaining_funds > 0) {
-            let module_cap = borrow_global<ModuleCapability>(@work_board);
-            let module_signer = account::create_signer_with_capability(&module_cap.signer_capability);
-            transfer_from_module(&module_signer, account_addr, remaining_funds);
+            let marketplace_cap = borrow_global<MarketplaceCapability>(@work_board);
+            let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+            coin::transfer<AptosCoin>(&module_signer, account_addr, remaining_funds);
             job.escrowed_amount = 0; // All escrowed funds returned
         };
 
@@ -822,7 +835,7 @@ module work_board::job_marketplace_v14 {
     public entry fun expire_job(
         account: &signer,
         job_id: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, MarketplaceCapability {
         let _account_addr = signer::address_of(account);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@work_board);
@@ -837,7 +850,9 @@ module work_board::job_marketplace_v14 {
         if (option::is_none(&job.worker)) {
             let remaining_funds = job.escrowed_amount;
             if (remaining_funds > 0) {
-                transfer_from_module(account, job.poster, remaining_funds);
+                let marketplace_cap = borrow_global<MarketplaceCapability>(@work_board);
+                let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+                coin::transfer<AptosCoin>(&module_signer, job.poster, remaining_funds);
                 job.escrowed_amount = 0; // All escrowed funds returned
             };
         };
@@ -856,13 +871,6 @@ module work_board::job_marketplace_v14 {
                 expire_time: timestamp::now_seconds()
             }
         );
-
-        if (option::is_none(&job.worker)) {
-            let remaining_funds = job.escrowed_amount;
-            if (remaining_funds > 0) {
-                transfer_from_module(account, job.poster, remaining_funds);
-            };
-        };
     }
 
     public entry fun reopen_applications(

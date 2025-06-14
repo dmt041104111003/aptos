@@ -46,8 +46,8 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 
-const JOBS_MODULE_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
-const JOBS_MODULE_NAME = "job_marketplace_v13";
+const JOBS_MODULE_ADDRESS = "0x107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a";
+const JOBS_MODULE_NAME = "job_marketplace_v15";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
@@ -190,10 +190,10 @@ const PostJob = () => {
       return;
     }
 
-    if (!profile || !profile.did || !profile.lastCID) {
-      toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi đăng dự án.');
-      return;
-    }
+    // if (!profile || !profile.did || !profile.lastCID) {
+    //   toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi đăng dự án.');
+    //   return;
+    // }
 
     setIsSubmitting(true);
 
@@ -222,7 +222,7 @@ const PostJob = () => {
       const jobData = {
         ...form,
         poster: account,
-        posterProfile: profile.lastCID,
+        posterProfile: profile.profile_cid,
         postedAt: new Date().toISOString(),
         attachments: attachmentCIDs,
         status: 'open'
@@ -239,7 +239,7 @@ const PostJob = () => {
           Math.floor(Date.now() / 1000) + form.applicationDeadlineDays * 24 * 60 * 60, // application_deadline (seconds from now)
           form.initialFundAmount * 100_000_000, // initial_fund_amount (convert APT to micro-APT)
           profile.did || "", // poster_did (from user profile)
-          profile.lastCID || "", // poster_profile_cid (from user profile)
+          profile.profile_cid || "", // poster_profile_cid (from user profile)
           form.milestones.map(m => m.amount * 100_000_000), // milestone_amounts
           form.milestones.map(m => m.duration * 24 * 60 * 60) // milestone_durations (convert days to seconds)
         ]

@@ -35,3 +35,10 @@ profiles:
     account: 268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe
     rest_url: "https://fullnode.testnet.aptoslabs.com"
     faucet_url: "https://faucet.testnet.aptoslabs.com"
+  testnet_new_v5:
+    network: Testnet
+    private_key: ed25519-priv-0xe089df2dc51f87dcd0366b8500621c183ffc24c0eb70962623ca598cb9126056
+    public_key: ed25519-pub-0x2ebe81204527d208ea9c999f766ce7fc42d3bb2fa5e2b48a9036bb942112a79c
+    account: 107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+    faucet_url: "https://faucet.testnet.aptoslabs.com"

@@ -1,6 +1,6 @@
 ---
 compiled_package_info:
-  package_name: job_marketplace_v14
+  package_name: job_marketplace_v15
   address_alias_instantiation:
     Extensions: "0000000000000000000000000000000000000000000000000000000000000001"
     aptos_framework: "0000000000000000000000000000000000000000000000000000000000000001"
@@ -11,9 +11,9 @@ compiled_package_info:
     std: "0000000000000000000000000000000000000000000000000000000000000001"
     vm: "0000000000000000000000000000000000000000000000000000000000000000"
     vm_reserved: "0000000000000000000000000000000000000000000000000000000000000000"
-    work_board: 268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe
-    work_profiles_addr: 268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe
-  source_digest: E9E5480CE65AD2032D6B867B6BC0A30ED90024B9AB2858650E0F249F527952F8
+    work_board: 107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a
+    work_profiles_addr: 107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a
+  source_digest: E14A78BD20A87FBAE3C0926415C8E45D049DA4F1415575CCC7B6CCE69E2B1B6B
   build_flags:
     dev_mode: false
     test_mode: false
@@ -25,7 +25,7 @@ compiled_package_info:
     install_dir: ~
     force_recompilation: false
     additional_named_addresses:
-      work_board: 268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe
+      work_board: 107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a
     fetch_deps_only: false
     skip_fetch_latest_git_deps: false
     compiler_config:

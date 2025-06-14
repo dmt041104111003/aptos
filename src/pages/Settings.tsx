@@ -29,7 +29,7 @@ interface Profile {
   skills: string[];
   portfolio: { name: string; link: string; rating: number }[];
   reviews: { client: string; date: string; comment: string }[];
-  lastCID?: string;
+  profile_cid?: string;
   cccd: number;
   createdAt: number;
   lastUpdated: string;
@@ -43,8 +43,12 @@ interface ProfileDataFromChain {
   created_at: number;
 }
 
-const MODULE_NAME = "web3_profiles_v11";
-const RESOURCE_NAME = "ProfileRegistryV11";
+const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
+const MODULE_NAME = "web3_profiles_v12";
+const RESOURCE_NAME = "ProfileRegistryV12";
+
+const JOBS_CONTRACT_ADDRESS = "0x107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v15";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
@@ -240,14 +244,14 @@ export default function Settings() {
       // Update local state
       setProfile(prev => ({
         ...prev,
-        lastCID: cid,
+        profile_cid: cid,
         profilePic: profilePicUrl,
       }));
 
       // Update context
       updateProfile({
         ...profileData,
-        lastCID: cid,
+        profile_cid: cid,
       });
 
       setStatus({ 

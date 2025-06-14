@@ -45,11 +45,11 @@ import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 
 declare global { interface Window { ethereum?: any } }
 
-const CONTRACT_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
-const MODULE_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v14";
-const PROFILE_MODULE_NAME = "web3_profiles_v11";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV11";
+const CONTRACT_ADDRESS = "0x107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a";
+const MODULE_ADDRESS = "0x107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v15";
+const PROFILE_MODULE_NAME = "web3_profiles_v12";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV12";
 
 export interface JobPost {
   id: string;
@@ -70,7 +70,7 @@ export interface JobPost {
   client: {
     id: string;
     name: string;
-    avatar: string;
+    profilePic: string;
   };
   // Fields directly from the Move contract's Job struct
   start_time: number; // u64
@@ -84,7 +84,7 @@ export interface JobPost {
   milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } }; // table<u64, MilestoneData>
   submit_time: number | null; // Option<u64>
   escrowed_amount: number; // u64
-  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfileAvatar: string }[]; // vector<Application>
+  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfilePic: string }[]; // vector<Application>
   approve_time: number | null; // Option<u64>
   poster_did: string; // DID of the job poster
   poster_profile_cid: string; // CID of the job poster's profile (from contract)
@@ -132,7 +132,7 @@ const Jobs = () => {
   // Thêm state lưu thông tin hồ sơ tra cứu
   const [queriedProfile, setQueriedProfile] = useState<{
     name: string;
-    avatar: string;
+    profilePic: string;
     did: string;
     profile_cid: string;
     reputation_score?: number;
@@ -252,10 +252,10 @@ const Jobs = () => {
         uniquePosterAddresses.add(event.data.poster);
       }
 
-      const profileDetailsMap = new Map<string, { name: string; avatar: string }>();
+      const profileDetailsMap = new Map<string, { name: string; profilePic: string }>();
       const fetchProfilePromises = Array.from(uniquePosterAddresses).map(async (address) => {
         const profile = await fetchProfileDetails(address);
-        profileDetailsMap.set(address, profile);
+        profileDetailsMap.set(address, { name: profile.name, profilePic: profile.profilePic });
       });
       await Promise.all(fetchProfilePromises);
 
@@ -292,7 +292,7 @@ const Jobs = () => {
             }
 
             // Use pre-fetched poster profile data
-            const posterProfile = profileDetailsMap.get(eventData.poster) || { name: "Client", avatar: "" };
+            const posterProfile = profileDetailsMap.get(eventData.poster) || { name: "Client", profilePic: "" };
 
             // Construct jobPost object, ensuring all fields from JobPost interface are populated
             const jobPost: JobPost = {
@@ -319,7 +319,7 @@ const Jobs = () => {
               client: {
                 id: eventData.poster,
                 name: posterProfile.name,
-                avatar: posterProfile.avatar
+                profilePic: posterProfile.profilePic
               },
               start_time: Number(eventData.start_time),
               end_time: Number(eventData.end_time || 0),
@@ -349,7 +349,7 @@ const Jobs = () => {
                 did: app.did,
                 profile_cid: app.profile_cid,
                 workerProfileName: app.workerProfileName || "",
-                workerProfileAvatar: app.workerProfileAvatar || "",
+                workerProfilePic: app.workerProfilePic || "",
               })) : [],
               approve_time: eventData.approve_time ? Number(eventData.approve_time) : null,
               poster_profile_cid: eventData.poster_profile_cid || "",
@@ -401,7 +401,7 @@ const Jobs = () => {
       return;
     }
 
-    if (!profile || !profile.did || !profile.lastCID) {
+    if (!profile || !profile.did || !profile.profile_cid) {
       toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi ứng tuyển.');
       return;
     }
@@ -414,7 +414,7 @@ const Jobs = () => {
         arguments: [
           selectedJob.id, // job_id: u64
           profile.did, // worker_did: String
-          profile.lastCID // worker_profile_cid: String
+          profile.profile_cid // worker_profile_cid: String
         ]
       });
 
@@ -861,7 +861,7 @@ const Jobs = () => {
                   {queriedProfile && (
                     <div className="mt-4 p-4 bg-gray-900/60 rounded-xl border border-white/10">
                       <div className="flex items-center gap-4 mb-4">
-                        <img src={queriedProfile.avatar} alt="avatar" className="w-12 h-12 rounded-full border border-blue-400" />
+                        <img src={queriedProfile.profilePic} alt="avatar" className="w-12 h-12 rounded-full border border-blue-400" />
                         <div>
                           <div className="font-bold text-lg text-white">{queriedProfile.name}</div>
                           <div className="text-xs text-gray-400 break-all">{profileAddress}</div>

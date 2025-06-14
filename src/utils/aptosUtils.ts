@@ -1,10 +1,10 @@
 import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 import { convertIPFSURL } from "@/utils/ipfs";
 
-const MODULE_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
-const PROFILE_MODULE_NAME = "web3_profiles_v11";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV11";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v14";
+const MODULE_ADDRESS = "0x107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a";
+const PROFILE_MODULE_NAME = "web3_profiles_v12";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV12";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v15";
 
 export const aptosConfig = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 export const aptos = new Aptos(aptosConfig);
@@ -17,15 +17,15 @@ export interface ProfileDataFromChain {
 }
 
 // Cache for profile details
-const profileCache = new Map<string, { name: string; avatar: string; did: string; profile_cid: string }>();
+const profileCache = new Map<string, { name: string; profilePic: string; did: string; profile_cid: string }>();
 
-export const fetchProfileDetails = async (address: string): Promise<{ name: string; avatar: string; did: string; profile_cid: string }> => {
+export const fetchProfileDetails = async (address: string): Promise<{ name: string; profilePic: string; did: string; profile_cid: string }> => {
   if (profileCache.has(address)) {
     return profileCache.get(address)!;
   }
 
   let name = "Ẩn danh";
-  let avatar = "";
+  let profilePic = "";
   let did = "";
   let profile_cid = "";
 
@@ -58,7 +58,7 @@ export const fetchProfileDetails = async (address: string): Promise<{ name: stri
           const errorText = await response.text();
           console.error(`IPFS fetch failed for CID ${profile_cid}. Status: ${response.status}. Response text: ${errorText.slice(0, 500)}`);
           // If IPFS fetch fails, still use blockchain DID if available
-          const cachedResult: { name: string; avatar: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, avatar: "", did, profile_cid };
+          const cachedResult: { name: string; profilePic: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, profilePic: "", did, profile_cid };
           profileCache.set(address, cachedResult);
           return cachedResult;
         }
@@ -67,25 +67,25 @@ export const fetchProfileDetails = async (address: string): Promise<{ name: stri
         if (!contentType || !contentType.includes('application/json')) {
           const errorText = await response.text();
           console.warn(`IPFS response for CID ${profile_cid} is not JSON. Content-Type: ${contentType}. Response text: ${errorText.slice(0, 500)}`);
-          const cachedResult: { name: string; avatar: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, avatar: "", did, profile_cid };
+          const cachedResult: { name: string; profilePic: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, profilePic: "", did, profile_cid };
           profileCache.set(address, cachedResult);
           return cachedResult;
         }
 
         const profileJson = await response.json();
         name = profileJson.name || `Người dùng ${address.slice(0, 6)}...`;
-        avatar = profileJson.profilePic || "";
+        profilePic = profileJson.profilePic || "";
       }
     }
   } catch (profileError: any) {
     console.warn(`Could not fetch profile for ${address}:`, profileError);
     // If fetching from chain fails, return a default anonymous profile
-    const cachedResult: { name: string; avatar: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, avatar: "", did: "", profile_cid: "" };
+    const cachedResult: { name: string; profilePic: string; did: string; profile_cid: string } = { name: `Người dùng ${address.slice(0, 6)}...`, profilePic: "", did: "", profile_cid: "" };
     profileCache.set(address, cachedResult);
     return cachedResult;
   }
 
-  const result = { name, avatar, did, profile_cid };
+  const result = { name, profilePic, did, profile_cid };
   profileCache.set(address, result);
   return result;
 }; 
