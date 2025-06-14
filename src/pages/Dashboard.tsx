@@ -16,7 +16,8 @@ import {
   Briefcase,
   Users,
   Hourglass,
-  CalendarCheck
+  CalendarCheck,
+  Copy
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { useWallet } from '../context/WalletContext';
@@ -747,6 +748,12 @@ const Dashboard = () => {
     }
   };
 
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => toast.success("Đã sao chép địa chỉ ví!"))
+      .catch(() => toast.error("Không thể sao chép."));
+  };
+
   const renderJobCard = (job: JobPost, type: 'in-progress' | 'completed' | 'applications') => {
     const userAddress = account?.toLowerCase();
     const isPoster = job.poster.toLowerCase() === userAddress;
@@ -794,15 +801,25 @@ const Dashboard = () => {
                 <h3 className="font-semibold text-white mb-3 flex items-center gap-2"><Users size={18} className="text-violet-400" />Thông tin liên quan</h3>
                 <div className="space-y-3">
                   {/* Poster Info */}
-                  {isPoster && (
+                  {(isPoster || isWorker || isApplicant) && ( // Show poster info to all relevant parties
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10 border-2 border-blue-500">
                         <AvatarImage src={job.client.avatar} alt={job.client.name} />
                         <AvatarFallback>{job.client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium text-white">Bạn là người đăng</p>
+                        <p className="font-medium text-white">Người đăng: {isPoster ? 'Bạn' : job.client.name}</p>
                         <p className="text-xs text-gray-400">Đăng lúc: {formatPostedTime(job.start_time)}</p>
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                          <span>Địa chỉ ví: {job.poster.slice(0, 6)}...{job.poster.slice(-4)}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCopy(job.poster); }}
+                            className="text-gray-500 hover:text-blue-400 p-1 rounded-sm transition-colors"
+                            title="Sao chép địa chỉ ví"
+                          >
+                            <Copy size={12} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -817,6 +834,16 @@ const Dashboard = () => {
                       <div>
                         <p className="font-medium text-white">Người thực hiện: {isWorker ? 'Bạn' : (job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfileName || 'Ẩn danh')}</p>
                         <p className="text-xs text-gray-400">Được chấp nhận lúc: {formatPostedTime(job.approve_time || 0)}</p>
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                          <span>Địa chỉ ví: {job.worker.slice(0, 6)}...{job.worker.slice(-4)}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCopy(job.worker); }}
+                            className="text-gray-500 hover:text-blue-400 p-1 rounded-sm transition-colors"
+                            title="Sao chép địa chỉ ví"
+                          >
+                            <Copy size={12} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -914,6 +941,16 @@ const Dashboard = () => {
                               <div>
                                 <p className="font-medium text-white">{app.workerProfileName}</p>
                                 <p className="text-xs text-gray-400">Ứng tuyển lúc: {formatPostedTime(app.apply_time)}</p>
+                                <div className="flex items-center gap-1 text-xs text-gray-400">
+                                  <span>Địa chỉ ví: {app.worker.slice(0, 6)}...{app.worker.slice(-4)}</span>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleCopy(app.worker); }}
+                                    className="text-gray-500 hover:text-blue-400 p-1 rounded-sm transition-colors"
+                                    title="Sao chép địa chỉ ví"
+                                  >
+                                    <Copy size={12} />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                             <Button

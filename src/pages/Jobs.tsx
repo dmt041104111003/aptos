@@ -36,7 +36,8 @@ import {
   Building,
   RefreshCw,
   Info,
-  AlertCircle
+  AlertCircle,
+  Copy
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { aptos, aptosConfig, fetchProfileDetails, ProfileDataFromChain } from '@/utils/aptosUtils';
@@ -536,6 +537,12 @@ const Jobs = () => {
     }
   };
 
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => toast.success("Đã sao chép địa chỉ ví!"))
+      .catch(() => toast.error("Không thể sao chép."));
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
@@ -777,8 +784,18 @@ const Jobs = () => {
                               </span>
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-gray-300">{job.client.name}</div>
-                              <div className="text-xs text-gray-500">{formatPostedTime(job.postedAt)}</div>
+                              <div className="text-sm font-medium text-gray-300">Người đăng: {job.client.name}</div>
+                              <div className="text-xs text-gray-500">Đăng lúc: {formatPostedTime(job.postedAt)}</div>
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <span>Địa chỉ ví: {job.poster.slice(0, 6)}...{job.poster.slice(-4)}</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleCopy(job.poster); }}
+                                  className="text-gray-500 hover:text-blue-400 p-1 rounded-sm transition-colors"
+                                  title="Sao chép địa chỉ ví"
+                                >
+                                  <Copy size={12} />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
