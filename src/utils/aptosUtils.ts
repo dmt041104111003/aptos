@@ -1,10 +1,10 @@
 import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 import { convertIPFSURL } from "@/utils/ipfs";
 
-const MODULE_ADDRESS = "0x20c226e275090c4f0854f05b2a6a08a638ecdad2a1c4cfa2014ed6d6e1dc0a66";
-const PROFILE_MODULE_NAME = "web3_profiles_v10";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV10";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v13";
+const MODULE_ADDRESS = "0x268e7d82b84c6bf39663bf4a924a914981390c8ee6238f8c30fd9d237fa39bfe";
+const PROFILE_MODULE_NAME = "web3_profiles_v11";
+const PROFILE_RESOURCE_NAME = "ProfileRegistryV11";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v14";
 
 export const aptosConfig = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 export const aptos = new Aptos(aptosConfig);

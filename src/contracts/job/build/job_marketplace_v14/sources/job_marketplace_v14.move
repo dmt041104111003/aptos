@@ -1,4 +1,4 @@
-module work_board::job_marketplace_v13 {
+module work_board::job_marketplace_v14 {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
@@ -9,7 +9,7 @@ module work_board::job_marketplace_v13 {
     use aptos_framework::account;
     use std::vector;
     use aptos_framework::timestamp;
-    use work_profiles_addr::web3_profiles_v10;
+    use work_profiles_addr::web3_profiles_v11;
 
     const EJOB_NOT_FOUND: u64 = 0;
     const EALREADY_HAS_WORKER: u64 = 1;
@@ -388,8 +388,8 @@ module work_board::job_marketplace_v13 {
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
 
         // Verify worker's profile and DID
-        assert!(web3_profiles_v10::has_profile(worker_addr), EINVALID_PROFILE);
-        let profile_did = web3_profiles_v10::get_profile_did(worker_addr);
+        assert!(web3_profiles_v11::has_profile(worker_addr), EINVALID_PROFILE);
+        let profile_did = web3_profiles_v11::get_profile_did(worker_addr);
         assert!(profile_did == worker_did, EINVALID_DID);
 
         // Check if job is active and within application deadline
