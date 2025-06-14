@@ -130,6 +130,46 @@ const Jobs = () => {
   const { account, accountType } = useWallet();
   const { profile } = useProfile();
 
+  // Thêm state lưu thông tin hồ sơ tra cứu
+  const [queriedProfile, setQueriedProfile] = useState<{ name: string; avatar: string; did: string; profile_cid: string } | null>(null);
+
+  // State cho dự án đã tạo và đã apply/làm khi tra cứu hồ sơ
+  const [profileJobsCreated, setProfileJobsCreated] = useState<{
+    id: string;
+    title: string;
+    status: string;
+    poster: string;
+    worker: string | null;
+    milestones: {
+      index: number;
+      amount: number;
+      status: string;
+      completedAt?: number;
+    }[];
+    completedBy?: string | null;
+    approvedWorkers?: string[];
+    createdAt?: number;
+    completedAt?: number | null;
+  }[]>([]);
+
+  const [profileJobsApplied, setProfileJobsApplied] = useState<{
+    id: string;
+    title: string;
+    status: string;
+    poster: string;
+    worker: string | null;
+    milestones: {
+      index: number;
+      amount: number;
+      status: string;
+      completedAt?: number;
+    }[];
+    completedBy?: string | null;
+    approvedWorkers?: string[];
+    createdAt?: number;
+    completedAt?: number | null;
+  }[]>([]);
+
   useEffect(() => {
     let filtered = jobs;
     
@@ -416,6 +456,9 @@ const Jobs = () => {
     setHistoryResult([]);
     setHistoryError(null);
     setCurrentPage(1);
+    setProfileJobsCreated([]);
+    setProfileJobsApplied([]);
+    setQueriedProfile(null);
 
     if (!profileAddress.trim()) {
       setProfileError("Vui lòng nhập địa chỉ ví Aptos để tra cứu.");
@@ -424,114 +467,202 @@ const Jobs = () => {
     }
 
     try {
+      // Lấy thông tin hồ sơ (nếu có)
+      const profileInfo = await fetchProfileDetails(profileAddress);
+      setQueriedProfile(profileInfo);
+
+      // Kiểm tra có hồ sơ không bằng cách check did/profile_cid
+      const hasProfile = !!profileInfo.did && !!profileInfo.profile_cid;
+      setProfileResult(hasProfile ? "Đã đăng ký hồ sơ" : "Chưa có hồ sơ");
+
+      // Lấy lịch sử cập nhật/chuyển quyền
       const moduleAddress = MODULE_ADDRESS;
-      const resourceType = `${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}` as `${string}::${string}::${string}`;
-      const profileDataType = `${moduleAddress}::${PROFILE_MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`;
-
-      let profileExists = false;
-      let registryResourceHandle: string | null = null;
-
-      try {
-        const registryResource = await aptos.getAccountResource({
-          accountAddress: moduleAddress,
-          resourceType: resourceType,
-        });
-
-        if (!registryResource) {
-          setProfileError("Hệ thống đăng ký hồ sơ không tìm thấy. Vui lòng kiểm tra lại cấu hình hoặc module.");
-          setProfileLoading(false);
-          return;
-        }
-
-        const profiles = (registryResource as any)?.profiles;
-        if (!profiles?.handle) {
-          setProfileError("Không tìm thấy Event Handle của bảng hồ sơ. Vui lòng kiểm tra lại cấu hình hoặc module.");
-          setProfileLoading(false);
-          return;
-        }
-        registryResourceHandle = profiles.handle;
-      } catch (err: any) {
-        setProfileError(`Lỗi khi truy xuất thông tin Registry: ${err.message || String(err)}`);
-        setProfileLoading(false);
-        return;
-      }
-
-      if (registryResourceHandle) {
-        try {
-          // Check if profile exists by attempting to get the table item
-          await aptos.getTableItem({
-            handle: registryResourceHandle,
-            data: {
-              key_type: "address",
-              value_type: profileDataType,
-              key: profileAddress,
-            },
-          });
-          profileExists = true;
-          setProfileResult("Đã đăng ký hồ sơ");
-          setProfileError(null); 
-          
-        } catch (e: any) {
-          if (e.message.includes("TableItemNotFound")) {
-            setProfileResult("Chưa có hồ sơ");
-            profileExists = false;
-            setProfileError(null); 
-            
+      const updateEventsRes = await fetch(
+        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/update_events`
+      );
+      const updateEvents = await updateEventsRes.json();
+      const transferEventsRes = await fetch(
+        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/transfer_events`
+      );
+      const transferEvents = await transferEventsRes.json();
+      let allEvents: any[] = [];
+      if (Array.isArray(updateEvents)) {
+        updateEvents.sort((a: any, b: any) => Number(a.data.timestamp_seconds) - Number(b.data.timestamp_seconds));
+        const filteredUpdates = updateEvents.filter((e: any) => e.data.user?.toLowerCase() === profileAddress.toLowerCase());
+        filteredUpdates.forEach((e: any, index: number) => {
+          if (index === 0) {
+            allEvents.push({ ...e, type: 'ProfileRegistered' });
           } else {
-            setProfileError(`Lỗi khi kiểm tra hồ sơ: ${e.message || String(e)}`);
-            
+            allEvents.push({ ...e, type: 'ProfileUpdated' });
           }
-        }
+        });
       }
-
-      if (profileExists) {
-        const updateEventsRes = await fetch(
-          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/update_events`
+      if (Array.isArray(transferEvents)) {
+        const filteredTransfers = transferEvents.filter((e: any) => 
+          e.data.from?.toLowerCase() === profileAddress.toLowerCase() || 
+          e.data.to?.toLowerCase() === profileAddress.toLowerCase()
         );
-        const updateEvents = await updateEventsRes.json();
+        allEvents = allEvents.concat(filteredTransfers.map((e: any) => ({ ...e, type: 'ProfileOwnershipTransferred' })));
+      }
+      allEvents.sort((a, b) => Number(b.data.timestamp_seconds) - Number(a.data.timestamp_seconds));
+      setHistoryResult(allEvents);
+      setCurrentPage(1);
 
-        const transferEventsRes = await fetch(
-          `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${PROFILE_MODULE_NAME}::${PROFILE_RESOURCE_NAME}/transfer_events`
-        );
-        const transferEvents = await transferEventsRes.json();
+      // --- Truy vấn các job liên quan đến address ---
+      // 1. Lấy tất cả JobPostedEvent
+      const rawPostedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+        options: { limit: 100 }
+      });
+      // 2. Lấy tất cả WorkerAppliedEvent
+      const rawAppliedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerAppliedEvent`,
+        options: { limit: 100 }
+      });
+      // 3. Lấy tất cả WorkerApprovedEvent
+      const rawApprovedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
+        options: { limit: 100 }
+      });
+      // 4. Lấy tất cả JobCompletedEvent
+      const rawCompletedEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
+        options: { limit: 100 }
+      });
+      // 5. Lấy tất cả JobCanceledEvent
+      const rawCanceledEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCanceledEvent`,
+        options: { limit: 100 }
+      });
+      // 6. Lấy tất cả JobExpiredEvent
+      const rawExpiredEvents = await aptos.event.getModuleEventsByEventType({
+        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobExpiredEvent`,
+        options: { limit: 100 }
+      });
+      // Map trạng thái job
+      const jobStatusMap = {};
+      rawCompletedEvents.forEach(e => { jobStatusMap[e.data.job_id.toString()] = 'Đã hoàn thành'; });
+      rawCanceledEvents.forEach(e => { jobStatusMap[e.data.job_id.toString()] = 'Đã hủy'; });
+      rawExpiredEvents.forEach(e => { jobStatusMap[e.data.job_id.toString()] = 'Đã hết hạn'; });
+      rawApprovedEvents.forEach(e => {
+        const id = e.data.job_id.toString();
+        if (!jobStatusMap[id]) jobStatusMap[id] = 'Đang thực hiện';
+      });
+      rawPostedEvents.forEach(e => {
+        const id = e.data.job_id.toString();
+        if (!jobStatusMap[id]) jobStatusMap[id] = 'Đang tuyển';
+      });
+      // Lọc job đã tạo
+      const jobsCreated = rawPostedEvents.filter(e => e.data.poster.toLowerCase() === profileAddress.toLowerCase());
+      // Lọc job đã apply
+      const jobsApplied = rawAppliedEvents.filter(e => e.data.worker.toLowerCase() === profileAddress.toLowerCase());
+      // Lọc job đã được nhận (worker)
+      const jobsWorked = rawApprovedEvents.filter(e => e.data.worker.toLowerCase() === profileAddress.toLowerCase());
+      // Lấy thông tin chi tiết job (từ IPFS)
+      const getJobInfo = async (event) => {
+        try {
+          const jobIdStr = event.data.job_id.toString();
+          const jobDetailsUrl = convertIPFSURL(event.data.cid);
+          const response = await fetch(jobDetailsUrl);
+          if (!response.ok) return null;
+          const jobData = await response.json();
 
-        let allEvents: any[] = [];
+          // 1. Lấy tất cả event liên quan
+          let postedEvents = [];
+          let approvedEvents = [];
+          let milestoneAcceptedEvents = [];
+          let completedEvents = [];
+          try {
+            postedEvents = await aptos.event.getModuleEventsByEventType({
+              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+              options: { limit: 1000 }
+            });
+            approvedEvents = await aptos.event.getModuleEventsByEventType({
+              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
+              options: { limit: 1000 }
+            });
+            milestoneAcceptedEvents = await aptos.event.getModuleEventsByEventType({
+              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneAcceptedEvent`,
+              options: { limit: 1000 }
+            });
+            completedEvents = await aptos.event.getModuleEventsByEventType({
+              eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobCompletedEvent`,
+              options: { limit: 1000 }
+            });
+          } catch {}
 
-        if (Array.isArray(updateEvents)) {
-          // Sort updates by timestamp to identify the first one as registration
-          updateEvents.sort((a: any, b: any) => Number(a.data.timestamp_seconds) - Number(b.data.timestamp_seconds));
+          // 2. Thời gian tạo job
+          const postedEvent = postedEvents.find(e => e.data.job_id.toString() === jobIdStr);
+          const createdAt = postedEvent ? Number(postedEvent.data.start_time) : null;
+          const poster = postedEvent ? postedEvent.data.poster : event.data.poster;
 
-          const filteredUpdates = updateEvents.filter((e: any) => e.data.user?.toLowerCase() === profileAddress.toLowerCase());
-          
-          filteredUpdates.forEach((e: any, index: number) => {
-            if (index === 0) {
-              allEvents.push({ ...e, type: 'ProfileRegistered' }); // Mark the first as Registered
-            } else {
-              allEvents.push({ ...e, type: 'ProfileUpdated' });    // Mark subsequent as Updated
+          // 3. Người đã được duyệt (có thể nhiều lần)
+          const approvedWorkers = approvedEvents
+            .filter(e => e.data.job_id.toString() === jobIdStr)
+            .map(e => e.data.worker)
+            .filter((v, i, arr) => typeof v === 'string' && arr.indexOf(v) === i);
+
+          // 4. Milestone accepted cuối cùng
+          const jobMilestoneAccepted = milestoneAcceptedEvents
+            .filter(e => e.data.job_id.toString() === jobIdStr);
+          let completedAt: number | null = null;
+          let completedBy: string | null = null;
+          if (jobMilestoneAccepted.length > 0) {
+            // milestone cuối là milestone có index lớn nhất
+            const lastAccepted = jobMilestoneAccepted.reduce((a, b) => a.data.milestone > b.data.milestone ? a : b);
+            completedAt = Number(lastAccepted.data.accept_time);
+            // completedBy là worker đã được duyệt gần nhất trước thời điểm accept_time
+            const approvedBefore = approvedEvents
+              .filter(e => e.data.job_id.toString() === jobIdStr && Number(e.data.approve_time) <= completedAt)
+              .sort((a, b) => Number(b.data.approve_time) - Number(a.data.approve_time));
+            completedBy = approvedBefore.length > 0 ? approvedBefore[0].data.worker : null;
+          }
+          // Nếu không có milestone accepted, lấy từ JobCompletedEvent
+          if (!completedAt) {
+            const jobCompleted = completedEvents.find(e => e.data.job_id.toString() === jobIdStr);
+            if (jobCompleted) {
+              completedAt = Number(jobCompleted.data.complete_time);
+              // completedBy là worker đã được duyệt gần nhất trước thời điểm complete_time
+              const approvedBefore = approvedEvents
+                .filter(e => e.data.job_id.toString() === jobIdStr && Number(e.data.approve_time) <= completedAt)
+                .sort((a, b) => Number(b.data.approve_time) - Number(a.data.approve_time));
+              completedBy = approvedBefore.length > 0 ? approvedBefore[0].data.worker : null;
             }
-          });
+          }
+
+          // 5. Trạng thái
+          let status = 'Đang tuyển';
+          if (completedAt && completedBy) status = 'Đã hoàn thành';
+          else if (approvedWorkers.length > 0) status = 'Đang thực hiện';
+
+          return {
+            id: jobIdStr,
+            title: jobData.title || 'Untitled Job',
+            status,
+            poster,
+            worker: completedBy,
+            milestones: [],
+            completedBy,
+            approvedWorkers,
+            createdAt,
+            completedAt
+          };
+        } catch (e) {
+          console.error('Lỗi khi lấy thông tin job:', e);
+          return null;
         }
-
-        if (Array.isArray(transferEvents)) {
-          const filteredTransfers = transferEvents.filter((e: any) => 
-            e.data.from?.toLowerCase() === profileAddress.toLowerCase() || 
-            e.data.to?.toLowerCase() === profileAddress.toLowerCase()
-          );
-          allEvents = allEvents.concat(filteredTransfers.map((e: any) => ({ ...e, type: 'ProfileOwnershipTransferred' })));
-        }
-
-        allEvents.sort((a, b) => Number(b.data.timestamp_seconds) - Number(a.data.timestamp_seconds));
-
-        setHistoryResult(allEvents);
-        setCurrentPage(1); 
-      } else {
-        setHistoryResult([]);
-        setHistoryError(null);
-      }
+      };
+      // Dự án đã tạo
+      const jobsCreatedInfo = await Promise.all(jobsCreated.map(getJobInfo));
+      setProfileJobsCreated(jobsCreatedInfo.filter(Boolean));
+      // Dự án đã apply/làm
+      const appliedJobIds = new Set(jobsApplied.map(e => e.data.job_id.toString()));
+      jobsWorked.forEach(e => appliedJobIds.add(e.data.job_id.toString()));
+      const jobsAppliedOrWorked = rawPostedEvents.filter(e => appliedJobIds.has(e.data.job_id.toString()));
+      const jobsAppliedInfo = await Promise.all(jobsAppliedOrWorked.map(getJobInfo));
+      setProfileJobsApplied(jobsAppliedInfo.filter(Boolean));
     } catch (err: any) {
-      console.error("Lỗi chung khi truy vấn hồ sơ hoặc lịch sử:", err);
       setProfileError(`Lỗi không xác định: ${err.message || String(err)}`);
-      
     } finally {
       setProfileLoading(false);
     }
@@ -647,74 +778,167 @@ const Jobs = () => {
                   </div>
                   {profileLoading && <div className="text-blue-400 text-xs mb-2 flex items-center gap-2 justify-center py-4"><Info className="w-4 h-4 animate-spin" /> Đang truy vấn...</div>}
                   {profileError && <div className="text-red-400 text-xs mb-2 flex items-center gap-2 justify-center py-4"><AlertCircle className="w-4 h-4" /> <span>Đã xảy ra lỗi khi tra cứu hồ sơ. Vui lòng thử lại.</span></div>}
-                  {profileResult && (
-                    <div className="space-y-2 mb-2 text-center">
-                      <div className="flex items-center gap-2 justify-center text-green-400 text-sm font-semibold">{profileResult}</div>
-                    </div>
-                  )}
-
-  
-                  {!profileLoading && !profileError && historyResult.length > 0 && (
-                    <div className="mt-6 bg-white/5 rounded p-3">
-                      <h4 className="font-semibold mb-2 text-white">Lịch sử cập nhật và chuyển quyền:</h4>
-                      <ul className="divide-y divide-gray-700">
-                        {historyResult.slice(
-                          (currentPage - 1) * itemsPerPage,
-                          currentPage * itemsPerPage
-                        ).map((item, idx) => (
-                          <li key={item.guid?.creation_number + '-' + item.sequence_number || idx} className="py-4 px-3 hover:bg-white/10 transition-colors duration-200 rounded-md">
-                            {item.type === 'ProfileRegistered' ? (
-                              <>
-                                <div className="flex items-center gap-2 mb-1"><b>Loại sự kiện:</b> <span className="text-blue-400 font-semibold">Đăng ký hồ sơ</span></div>
-                                <div className="text-sm text-gray-300"><b>Thời gian:</b> {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>
-                                <div className="text-sm text-gray-300"><b>Người dùng:</b> <span className="break-all text-gray-400">{item.data.user}</span></div>
-                                <div className="text-sm text-gray-300"><b>CID mới:</b> <span className="break-all text-gray-400">{item.data.cid}</span></div>
-                                <div className="text-sm text-gray-300"><b>CCCD mới:</b> <span className="break-all text-gray-400">{item.data.cccd}</span></div>
-                                <div className="text-sm text-gray-300"><b>DID mới:</b> <span className="break-all text-gray-400">{item.data.did}</span></div>
-                              </>
-                            ) : item.type === 'ProfileUpdated' ? (
-                              <>
-                                <div className="flex items-center gap-2 mb-1"><b>Loại sự kiện:</b> <span className="text-blue-400 font-semibold">Cập nhật hồ sơ</span></div>
-                                <div className="text-sm text-gray-300"><b>Thời gian:</b> {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>
-                                <div className="text-sm text-gray-300"><b>Người dùng:</b> <span className="break-all text-gray-400">{item.data.user}</span></div>
-                                <div className="text-sm text-gray-300"><b>CID mới:</b> <span className="break-all text-gray-400">{item.data.cid}</span></div>
-                                <div className="text-sm text-gray-300"><b>CCCD mới:</b> <span className="break-all text-gray-400">{item.data.cccd}</span></div>
-                                <div className="text-sm text-gray-300"><b>DID mới:</b> <span className="break-all text-gray-400">{item.data.did}</span></div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2 mb-1"><b>Loại sự kiện:</b> <span className="text-yellow-400 font-semibold">Chuyển quyền sở hữu</span></div>
-                                <div className="text-sm text-gray-300"><b>Thời gian:</b> {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>
-                                <div className="text-sm text-gray-300"><b>Từ:</b> <span className="break-all text-gray-400">{item.data.from}</span></div>
-                                <div className="text-sm text-gray-300"><b>Đến:</b> <span className="break-all text-gray-400">{item.data.to}</span></div>
-                              </>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      {historyResult.length > itemsPerPage && (
-                        <div className="flex justify-center items-center mt-6 gap-4">
-                          <button
-                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                            disabled={currentPage === 1}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            Trang trước
-                          </button>
-                          <span className="text-gray-300">Trang {currentPage} / {Math.ceil(historyResult.length / itemsPerPage)}</span>
-                          <button
-                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(historyResult.length / itemsPerPage), prev + 1))}
-                            disabled={currentPage === Math.ceil(historyResult.length / itemsPerPage)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            Trang sau
-                          </button>
+                  {queriedProfile && (
+                    <div className="mt-4 p-4 bg-gray-900/60 rounded-xl border border-white/10">
+                      <div className="flex items-center gap-4 mb-4">
+                        <img src={queriedProfile.avatar} alt="avatar" className="w-12 h-12 rounded-full border border-blue-400" />
+                        <div>
+                          <div className="font-bold text-lg text-white">{queriedProfile.name}</div>
+                          <div className="text-xs text-gray-400 break-all">{profileAddress}</div>
+                          <div className="text-xs text-gray-400 break-all">DID: {queriedProfile.did}</div>
+                        </div>
+                      </div>
+                      <div className="text-green-400 font-semibold mb-2">{profileResult}</div>
+                      {historyResult.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="font-bold text-white mb-2">Lịch sử cập nhật và chuyển quyền:</h4>
+                          <ul className="space-y-3">
+                            {historyResult.map((item, idx) => (
+                              <li key={idx} className="bg-gray-800/50 rounded p-3">
+                                <div className="font-semibold text-blue-300">Loại sự kiện: {item.type === 'ProfileRegistered' ? 'Đăng ký hồ sơ' : item.type === 'ProfileUpdated' ? 'Cập nhật hồ sơ' : 'Chuyển quyền sở hữu'}</div>
+                                <div className="text-xs text-gray-400">Thời gian: {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>
+                                {item.data.user && <div className="text-xs text-gray-400">Người dùng: {item.data.user}</div>}
+                                {item.data.cid && <div className="text-xs text-gray-400">CID mới: {item.data.cid}</div>}
+                                {item.data.cccd && <div className="text-xs text-gray-400">CCCD mới: {item.data.cccd}</div>}
+                                {item.data.did && <div className="text-xs text-gray-400">DID mới: {item.data.did}</div>}
+                                {item.data.from && <div className="text-xs text-gray-400">Từ: {item.data.from}</div>}
+                                {item.data.to && <div className="text-xs text-gray-400">Đến: {item.data.to}</div>}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {profileJobsCreated.length > 0 && (
+                        <div className="mt-6">
+                          <h3 className="font-bold text-white mb-2">Dự án đã tạo</h3>
+                          <ul className="space-y-4">
+                            {profileJobsCreated.map(job => (
+                              <li key={job.id} className="bg-gray-800/50 rounded-lg p-4">
+                                <div className="flex justify-between items-start mb-2">
+                                  <span className="text-white font-medium">{job.title}</span>
+                                  <span className="text-xs px-2 py-1 rounded bg-blue-700/30 text-blue-300">{job.status}</span>
+                                </div>
+                                <div className="text-sm text-gray-400 space-y-1">
+                                  <div><b>Thời gian tạo:</b> {job.createdAt ? new Date(job.createdAt * 1000).toLocaleString() : '-'}</div>
+                                  <div><b>Thời gian hoàn thành:</b> {job.completedAt ? new Date(job.completedAt * 1000).toLocaleString() : '-'}</div>
+                                  <div><b>Người đăng:</b> {typeof job.poster === 'string' && job.poster ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      {job.poster.slice(0, 6)}...{job.poster.slice(-4)}
+                                      <button onClick={() => handleCopy(job.poster)} className="text-gray-400 hover:text-blue-400" title="Copy"><Copy size={12} /></button>
+                                    </span>
+                                  ) : '-'}</div>
+                                  <div><b>Người đã được duyệt:</b> {job.approvedWorkers && job.approvedWorkers.length > 0 ? job.approvedWorkers.map((addr, idx) => (
+                                    <span key={addr} className="inline-flex items-center gap-1 mr-2">
+                                      {addr.slice(0, 6)}...{addr.slice(-4)}
+                                      <button onClick={() => handleCopy(addr)} className="text-gray-400 hover:text-blue-400" title="Copy"><Copy size={12} /></button>
+                                      {idx < job.approvedWorkers.length - 1 && ','}
+                                    </span>
+                                  )) : '-'}</div>
+                                  <div><b>Người hoàn thành cột mốc cuối:</b> {typeof job.completedBy === 'string' && job.completedBy ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      {job.completedBy.slice(0, 6)}...{job.completedBy.slice(-4)}
+                                      <button onClick={() => handleCopy(job.completedBy!)} className="text-gray-400 hover:text-blue-400" title="Copy"><Copy size={12} /></button>
+                                    </span>
+                                  ) : '-'}</div>
+                                </div>
+                                {job.milestones.length > 0 && (
+                                  <div className="mt-3">
+                                    <h4 className="text-sm font-medium text-gray-300 mb-2">Các cột mốc:</h4>
+                                    <ul className="space-y-2">
+                                      {job.milestones.map(milestone => (
+                                        <li key={milestone.index} className="flex justify-between items-center text-sm">
+                                          <span className="text-gray-400">Cột mốc {milestone.index + 1}: {milestone.amount / 1_000_000} APT</span>
+                                          <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-1 rounded text-xs ${
+                                              milestone.status === 'Đã hoàn thành' ? 'bg-green-700/30 text-green-300' :
+                                              milestone.status === 'Đã nộp' ? 'bg-blue-700/30 text-blue-300' :
+                                              milestone.status.includes('từ chối') ? 'bg-red-700/30 text-red-300' :
+                                              'bg-gray-700/30 text-gray-300'
+                                            }`}>
+                                              {milestone.status}
+                                            </span>
+                                            {milestone.completedAt && (
+                                              <span className="text-xs text-gray-500">
+                                                {new Date(milestone.completedAt * 1000).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {profileJobsApplied.length > 0 && (
+                        <div className="mt-6">
+                          <h3 className="font-bold text-white mb-2">Dự án đã ứng tuyển/đã làm</h3>
+                          <ul className="space-y-4">
+                            {profileJobsApplied.map(job => (
+                              <li key={job.id} className="bg-gray-800/50 rounded-lg p-4">
+                                <div className="flex justify-between items-start mb-2">
+                                  <span className="text-white font-medium">{job.title}</span>
+                                  <span className="text-xs px-2 py-1 rounded bg-green-700/30 text-green-300">{job.status}</span>
+                                </div>
+                                <div className="text-sm text-gray-400 space-y-1">
+                                  <div><b>Thời gian tạo:</b> {job.createdAt ? new Date(job.createdAt * 1000).toLocaleString() : '-'}</div>
+                                  <div><b>Thời gian hoàn thành:</b> {job.completedAt ? new Date(job.completedAt * 1000).toLocaleString() : '-'}</div>
+                                  <div><b>Người đăng:</b> {typeof job.poster === 'string' && job.poster ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      {job.poster.slice(0, 6)}...{job.poster.slice(-4)}
+                                      <button onClick={() => handleCopy(job.poster)} className="text-gray-400 hover:text-blue-400" title="Copy"><Copy size={12} /></button>
+                                    </span>
+                                  ) : '-'}</div>
+                                  <div><b>Người đã được duyệt:</b> {job.approvedWorkers && job.approvedWorkers.length > 0 ? job.approvedWorkers.map((addr, idx) => (
+                                    <span key={addr} className="inline-flex items-center gap-1 mr-2">
+                                      {addr.slice(0, 6)}...{addr.slice(-4)}
+                                      <button onClick={() => handleCopy(addr)} className="text-gray-400 hover:text-blue-400" title="Copy"><Copy size={12} /></button>
+                                      {idx < job.approvedWorkers.length - 1 && ','}
+                                    </span>
+                                  )) : '-'}</div>
+                                  <div><b>Người hoàn thành cột mốc cuối:</b> {typeof job.completedBy === 'string' && job.completedBy ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      {job.completedBy.slice(0, 6)}...{job.completedBy.slice(-4)}
+                                      <button onClick={() => handleCopy(job.completedBy!)} className="text-gray-400 hover:text-blue-400" title="Copy"><Copy size={12} /></button>
+                                    </span>
+                                  ) : '-'}</div>
+                                </div>
+                                {job.milestones.length > 0 && (
+                                  <div className="mt-3">
+                                    <h4 className="text-sm font-medium text-gray-300 mb-2">Các cột mốc:</h4>
+                                    <ul className="space-y-2">
+                                      {job.milestones.map(milestone => (
+                                        <li key={milestone.index} className="flex justify-between items-center text-sm">
+                                          <span className="text-gray-400">Cột mốc {milestone.index + 1}: {milestone.amount / 1_000_000} APT</span>
+                                          <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-1 rounded text-xs ${
+                                              milestone.status === 'Đã hoàn thành' ? 'bg-green-700/30 text-green-300' :
+                                              milestone.status === 'Đã nộp' ? 'bg-blue-700/30 text-blue-300' :
+                                              milestone.status.includes('từ chối') ? 'bg-red-700/30 text-red-300' :
+                                              'bg-gray-700/30 text-gray-300'
+                                            }`}>
+                                              {milestone.status}
+                                            </span>
+                                            {milestone.completedAt && (
+                                              <span className="text-xs text-gray-500">
+                                                {new Date(milestone.completedAt * 1000).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
                     </div>
-                  )}
-                  {!profileLoading && !profileError && historyResult.length === 0 && profileAddress && (
-                    <div className="text-gray-400 mt-2 text-center py-10">Không có lịch sử cập nhật cho địa chỉ này.</div>
                   )}
                 </div>
               )}
