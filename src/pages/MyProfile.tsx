@@ -8,8 +8,8 @@ import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 import { motion } from "framer-motion";
 
 const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
-const MODULE_NAME = "web3_profiles_v7";
-const RESOURCE_NAME = "ProfileRegistryV7";
+const MODULE_NAME = "web3_profiles_v8";
+const RESOURCE_NAME = "ProfileRegistryV8";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
@@ -216,7 +216,7 @@ export default function MyProfile() {
       // Fetch ProfileUpdated events
       console.log(`Fetching ProfileUpdated events for module: ${moduleAddress}`);
       const updateEventsRes = await fetch(
-        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v4::ProfileRegistryV4/update_events`
+        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${MODULE_NAME}::ProfileRegistryV8/update_events`
       );
       const updateEvents = await updateEventsRes.json();
       console.log("Raw ProfileUpdated events:", updateEvents);
@@ -224,7 +224,7 @@ export default function MyProfile() {
       // Fetch ProfileOwnershipTransferred events
       console.log(`Fetching ProfileOwnershipTransferred events for module: ${moduleAddress}`);
       const transferEventsRes = await fetch(
-        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::web3_profiles_v4::ProfileRegistryV4/transfer_events`
+        `https://fullnode.testnet.aptoslabs.com/v1/accounts/${moduleAddress}/events/${moduleAddress}::${MODULE_NAME}::ProfileRegistryV8/transfer_events`
       );
       const transferEvents = await transferEventsRes.json();
       console.log("Raw ProfileOwnershipTransferred events:", transferEvents);
@@ -232,9 +232,19 @@ export default function MyProfile() {
       let allEvents: any[] = [];
 
       if (Array.isArray(updateEvents)) {
+        // Sort updates by timestamp to identify the first one as registration
+        updateEvents.sort((a: any, b: any) => Number(a.data.timestamp_seconds) - Number(b.data.timestamp_seconds));
+
         const filteredUpdates = updateEvents.filter((e: any) => e.data.user?.toLowerCase() === address.toLowerCase());
-        console.log("Filtered ProfileUpdated events for address:", address, filteredUpdates);
-        allEvents = allEvents.concat(filteredUpdates.map((e: any) => ({ ...e, type: 'ProfileUpdated' })));
+        
+        filteredUpdates.forEach((e: any, index: number) => {
+          if (index === 0) {
+            allEvents.push({ ...e, type: 'ProfileRegistered' }); // Mark the first as Registered
+          } else {
+            allEvents.push({ ...e, type: 'ProfileUpdated' });    // Mark subsequent as Updated
+          }
+        });
+        console.log("Filtered and categorized ProfileUpdated/Registered events for address:", address, allEvents.filter(e => e.type !== 'ProfileOwnershipTransferred'));
       }
 
       if (Array.isArray(transferEvents)) {
@@ -346,7 +356,7 @@ export default function MyProfile() {
               <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full mb-8 flex flex-col items-center shadow-xl">
                 <div className="w-36 h-36 rounded-full bg-gradient-to-br from-blue-600 to-violet-700 p-1 mb-4">
                   <img
-                    src={profile.profilePic}
+                    src={convertIPFSURL(profile.profilePic)}
                     alt={profile.name}
                     className="w-full h-full rounded-full object-cover border-4 border-black"
                   />
@@ -370,6 +380,11 @@ export default function MyProfile() {
                   <span className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
                       Ví: {profile.wallet.slice(0, 6)}...{profile.wallet.slice(-4)}
                   </span>
+                  {profile.cccd !== 0 && (
+                    <span className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
+                      CCCD: {profile.cccd}
+                    </span>
+                  )}
                     {ipfsError && (
                       <div className="flex items-center gap-2 px-3 py-2 bg-red-500/20 text-red-400 rounded-lg text-xs w-full justify-center font-primary break-words break-all">
                         <AlertCircle size={16} />
@@ -542,7 +557,16 @@ export default function MyProfile() {
                       currentPage * itemsPerPage
                     ).map((item, idx) => (
                       <li key={item.guid?.creation_number + '-' + item.sequence_number || idx} className="py-4 px-3 hover:bg-white/10 transition-colors duration-200 rounded-md">
-                        {item.type === 'ProfileUpdated' ? (
+                        {item.type === 'ProfileRegistered' ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-1"><b>Loại sự kiện:</b> <span className="text-blue-400 font-semibold">Đăng ký hồ sơ</span></div>
+                            <div className="text-sm text-gray-300"><b>Thời gian:</b> {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>
+                            <div className="text-sm text-gray-300"><b>Người dùng:</b> <span className="break-all text-gray-400">{item.data.user}</span></div>
+                            <div className="text-sm text-gray-300"><b>CID mới:</b> <span className="break-all text-gray-400">{item.data.cid}</span></div>
+                            <div className="text-sm text-gray-300"><b>CCCD mới:</b> <span className="break-all text-gray-400">{item.data.cccd}</span></div>
+                            <div className="text-sm text-gray-300"><b>DID mới:</b> <span className="break-all text-gray-400">{item.data.did}</span></div>
+                          </>
+                        ) : item.type === 'ProfileUpdated' ? (
                           <>
                             <div className="flex items-center gap-2 mb-1"><b>Loại sự kiện:</b> <span className="text-blue-400 font-semibold">Cập nhật hồ sơ</span></div>
                             <div className="text-sm text-gray-300"><b>Thời gian:</b> {new Date(Number(item.data.timestamp_seconds) * 1000).toLocaleString()}</div>

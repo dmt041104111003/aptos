@@ -1,4 +1,4 @@
-module work_board::job_marketplace_v5 {
+module work_board::job_marketplace_v6 {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
@@ -9,7 +9,7 @@ module work_board::job_marketplace_v5 {
     use aptos_framework::account;
     use std::vector;
     use aptos_framework::timestamp;
-    use work_profiles_addr::web3_profiles_v7;
+    use work_profiles_addr::web3_profiles_v8;
 
     const EJOB_NOT_FOUND: u64 = 0;
     const EALREADY_HAS_WORKER: u64 = 1;
@@ -38,6 +38,8 @@ module work_board::job_marketplace_v5 {
     const EINSUFFICIENT_FUNDS: u64 = 24;
     const EINVALID_AMOUNT: u64 = 25;
     const EINVALID_SIGNER_FOR_INIT: u64 = 26;
+    const ENOT_READY_TO_REOPEN: u64 = 27;
+    const EAPPLICATION_DEADLINE_PASSED: u64 = 28;
 
     const APPLY_FEE: u64 = 1000000; // 0.01 APT
     const MAX_REJECTIONS: u8 = 3;
@@ -220,7 +222,9 @@ module work_board::job_marketplace_v5 {
         application_deadline: u64,
         initial_fund_amount: u64,
         poster_did: String,
-        poster_profile_cid: String
+        poster_profile_cid: String,
+        milestone_amounts: vector<u64>,
+        milestone_durations: vector<u64>
     ) acquires Jobs, Events {
         let sender = signer::address_of(account);
         assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED); // Access Jobs resource from module address
@@ -237,21 +241,39 @@ module work_board::job_marketplace_v5 {
 
         let start_time = timestamp::now_seconds();
         let end_time = 0u64;
-        let milestones_vec = vector::empty<u64>();
-        let duration_per_milestone_vec = vector::empty<u64>();
 
         let milestone_states_table = table::new<u64, MilestoneData>();
         let auto_confirmed_vec = vector::empty<bool>();
         let milestone_deadlines_vec = vector::empty<u64>();
 
+        let i = 0;
+        let total_milestones = vector::length(&milestone_amounts);
+        let cumulative_duration = 0u64;
+
+        while (i < total_milestones) {
+            table::add(&mut milestone_states_table, i, MilestoneData {
+                submitted: false,
+                accepted: false,
+                submit_time: 0,
+                reject_count: 0
+            });
+
+            // Calculate milestone deadline
+            let milestone_duration = *vector::borrow(&milestone_durations, i);
+            cumulative_duration = cumulative_duration + milestone_duration;
+            vector::push_back(&mut milestone_deadlines_vec, start_time + cumulative_duration);
+            vector::push_back(&mut auto_confirmed_vec, false);
+
+            i = i + 1;
+        };
 
         let new_job = Job {
             poster: sender,
             cid: job_details_cid,
             start_time: start_time,
             end_time: end_time,
-            milestones: milestones_vec,
-            duration_per_milestone: duration_per_milestone_vec,
+            milestones: milestone_amounts,
+            duration_per_milestone: milestone_durations,
             worker: option::none(),
             approved: false,
             active: true,
@@ -302,8 +324,8 @@ module work_board::job_marketplace_v5 {
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
 
         // Verify worker's profile and DID
-        assert!(web3_profiles_v7::has_profile(worker_addr), EINVALID_PROFILE);
-        let profile_did = web3_profiles_v7::get_profile_did(worker_addr);
+        assert!(web3_profiles_v8::has_profile(worker_addr), EINVALID_PROFILE);
+        let profile_did = web3_profiles_v8::get_profile_did(worker_addr);
         assert!(profile_did == worker_did, EINVALID_DID);
 
         // Check if job is active and within application deadline
@@ -743,5 +765,36 @@ module work_board::job_marketplace_v5 {
                 );
             };
         };
+    }
+
+    public entry fun reopen_applications(
+        poster: &signer,
+        job_id: u64
+    ) acquires Jobs {
+        let poster_addr = signer::address_of(poster);
+        assert!(exists<Jobs>(@work_board), EMODULE_NOT_INITIALIZED);
+        let jobs = borrow_global_mut<Jobs>(@work_board);
+        assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
+        let job = table::borrow_mut(&mut jobs.jobs, job_id);
+
+        // Verify poster
+        assert!(job.poster == poster_addr, ENOT_POSTER);
+        // Job must be active and have a worker assigned
+        assert!(job.active, ENOT_ACTIVE);
+        assert!(option::is_some(&job.worker), ENOT_READY_TO_REOPEN); // Only reopen if there's a worker
+
+        // Cannot reopen if application deadline has passed
+        assert!(timestamp::now_seconds() <= job.application_deadline, EAPPLICATION_DEADLINE_PASSED);
+        
+        // Reset worker and approved status
+        job.worker = option::none();
+        job.approved = false;
+        job.approve_time = option::none(); // Clear approval time
+        job.selected_application_index = option::none(); // Clear selected application
+        job.rejected_count = 0; // Reset rejection count for new applications
+        job.last_reject_time = option::none(); // Clear last reject time
+
+        // No event needed specifically for reopening applications, as applications can just flow in again.
+        // Or we could emit a JobReopenedEvent if needed for off-chain indexing. For now, skipping.
     }
 }

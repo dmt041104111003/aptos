@@ -47,7 +47,7 @@ import {
 import Navbar from '@/components/ui2/Navbar';
 
 const JOBS_MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
-const JOBS_MODULE_NAME = "job_marketplace_v5";
+const JOBS_MODULE_NAME = "job_marketplace_v6";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
@@ -66,6 +66,7 @@ interface FormState {
   attachments: File[];
   applicationDeadlineDays: number;
   initialFundAmount: number;
+  milestones: { amount: number; duration: number }[];
 }
 
 const PostJob = () => {
@@ -75,6 +76,8 @@ const PostJob = () => {
   const [skill, setSkill] = useState<string>('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newMilestoneAmount, setNewMilestoneAmount] = useState<string>('');
+  const [newMilestoneDuration, setNewMilestoneDuration] = useState<string>('');
   
   const [form, setForm] = useState<FormState>({
     title: '',
@@ -88,8 +91,9 @@ const PostJob = () => {
     immediate: false,
     experience: '',
     attachments: [],
-    applicationDeadlineDays: 7, // Default to 7 days
-    initialFundAmount: 1000000, // Default to 1 APT (1_000_000 micro-APT)
+    applicationDeadlineDays: 7,
+    initialFundAmount: 1_000_000,
+    milestones: [],
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -127,6 +131,28 @@ const PostJob = () => {
 
   const handleFileRemove = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddMilestone = () => {
+    const amount = Number(newMilestoneAmount);
+    const duration = Number(newMilestoneDuration);
+    if (amount > 0 && duration > 0) {
+      setForm(prev => ({
+        ...prev,
+        milestones: [...prev.milestones, { amount, duration }]
+      }));
+      setNewMilestoneAmount('');
+      setNewMilestoneDuration('');
+    } else {
+      toast.error('Vui lòng nhập số tiền và thời gian hợp lệ cho cột mốc.');
+    }
+  };
+
+  const handleRemoveMilestone = (indexToRemove: number) => {
+    setForm(prev => ({
+      ...prev,
+      milestones: prev.milestones.filter((_, index) => index !== indexToRemove)
+    }));
   };
 
   const validateForm = () => {
@@ -208,7 +234,9 @@ const PostJob = () => {
           Math.floor(Date.now() / 1000) + form.applicationDeadlineDays * 24 * 60 * 60, // application_deadline (seconds from now)
           form.initialFundAmount * 1_000_000, // initial_fund_amount (convert APT to micro-APT)
           profile.did || "", // poster_did (from user profile)
-          profile.lastCID || "" // poster_profile_cid (from user profile)
+          profile.lastCID || "", // poster_profile_cid (from user profile)
+          form.milestones.map(m => m.amount * 1_000_000), // milestone_amounts
+          form.milestones.map(m => m.duration * 24 * 60 * 60) // milestone_durations (convert days to seconds)
         ]
       };
 
@@ -437,8 +465,57 @@ const PostJob = () => {
                     onChange={handleInputChange}
                     placeholder="Ví dụ: 1 (để escrow 1 APT)"
                     className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.initialFundAmount ? 'border-red-500/50' : ''}`}
+                    readOnly={false}
+                    disabled={false}
                   />
                   {errors.initialFundAmount && <p className="text-red-400 text-sm">{errors.initialFundAmount}</p>}
+                </div>
+
+                {/* Milestones Section */}
+                <div className="space-y-2">
+                  <Label className="text-white">Cột mốc dự án <span className="text-gray-400 text-sm">(Số tiền và thời gian ước tính cho mỗi giai đoạn)</span></Label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                    <Input
+                      type="number"
+                      value={newMilestoneAmount}
+                      onChange={(e) => setNewMilestoneAmount(e.target.value)}
+                      placeholder="Số tiền (APT)"
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50"
+                      min="0"
+                      step="0.01"
+                    />
+                    <Input
+                      type="number"
+                      value={newMilestoneDuration}
+                      onChange={(e) => setNewMilestoneDuration(e.target.value)}
+                      placeholder="Thời gian (ngày)"
+                      className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50"
+                      min="1"
+                    />
+                    <Button type="button" onClick={handleAddMilestone} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Plus className="w-4 h-4 mr-2" />Thêm cột mốc
+                    </Button>
+                  </div>
+                  {errors.milestones && <p className="text-red-400 text-sm">{errors.milestones}</p>}
+                  {form.milestones.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <h3 className="text-sm font-semibold text-gray-300">Các cột mốc đã thêm:</h3>
+                      {form.milestones.map((milestone, index) => (
+                        <div key={index} className="flex items-center justify-between bg-white/10 p-2 rounded">
+                          <span className="text-sm text-white">Cột mốc {index + 1}: {milestone.amount} APT, {milestone.duration} ngày</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveMilestone(index)}
+                            className="text-gray-400 hover:text-red-400"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Duration & Location */}
