@@ -129,6 +129,43 @@ export default function MyProfile() {
   const [myJobsCreated, setMyJobsCreated] = useState<any[]>([]);
   const [myJobsApplied, setMyJobsApplied] = useState<any[]>([]);
 
+  // Add new function to fetch reputation data
+  const fetchReputationData = async (address: string) => {
+    try {
+      const userReputationResource = await aptos.getAccountResource({
+        accountAddress: address,
+        resourceType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::UserReputation`,
+      });
+
+      if (userReputationResource) {
+        const reputationData = {
+          score: Number((userReputationResource as any).reputation_score),
+          level: Number((userReputationResource as any).reputation_level),
+          metrics: {
+            total_jobs_completed: Number((userReputationResource as any).metrics?.total_jobs_completed || 0),
+            total_jobs_cancelled: Number((userReputationResource as any).metrics?.total_jobs_cancelled || 0),
+            total_amount_transacted: Number((userReputationResource as any).metrics?.total_amount_transacted || 0),
+            last_activity_time: Number((userReputationResource as any).metrics?.last_activity_time || 0),
+            total_milestones_completed: Number((userReputationResource as any).metrics?.total_milestones_completed || 0),
+            total_milestones_rejected: Number((userReputationResource as any).metrics?.total_milestones_rejected || 0),
+            on_time_delivery_count: Number((userReputationResource as any).metrics?.on_time_delivery_count || 0),
+            total_milestones: Number((userReputationResource as any).metrics?.total_milestones || 0),
+            total_jobs_posted: Number((userReputationResource as any).metrics?.total_jobs_posted || 0),
+            total_milestones_accepted: Number((userReputationResource as any).metrics?.total_milestones_accepted || 0),
+            total_milestones_rejected_by_client: Number((userReputationResource as any).metrics?.total_milestones_rejected_by_client || 0),
+            total_response_time: Number((userReputationResource as any).metrics?.total_response_time || 0),
+            response_count: Number((userReputationResource as any).metrics?.response_count || 0),
+          }
+        };
+        return reputationData;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching reputation data:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const fetchProfile = async () => {
       if (!account || accountType !== 'aptos') {
@@ -136,12 +173,13 @@ export default function MyProfile() {
         console.log("MyProfile: No Aptos account connected.");
         return;
       }
-      setLoading(true); // Bắt đầu tải cục bộ
+      setLoading(true);
 
       try {
-        // Kích hoạt refetch từ ProfileContext để đảm bảo context có dữ liệu mới nhất, bao gồm danh tiếng
-        await refetchProfile();
-
+        // Fetch reputation data independently
+        const reputationData = await fetchReputationData(account);
+        
+        // Fetch profile data from chain
         console.log("MyProfile: Attempting to fetch registry resource from:", MODULE_ADDRESS);
         const registryResource = await aptos.getAccountResource({
           accountAddress: MODULE_ADDRESS,
@@ -149,21 +187,15 @@ export default function MyProfile() {
         });
 
         if (!registryResource) {
-          console.log("MyProfile: Profile registry resource not found for module.");
           throw new Error("Profile not registered: Resource data missing.");
         }
 
-        console.log("MyProfile: Registry resource found.", registryResource);
         const profiles = (registryResource as any)?.profiles;
         if (!profiles?.handle) {
-          console.log("MyProfile: Profiles table handle missing from registry resource.");
           throw new Error("Profile not registered: Profiles table handle missing.");
         }
 
         const profilesTableHandle = profiles.handle;
-        console.log("MyProfile: Profiles table handle:", profilesTableHandle);
-
-        console.log("MyProfile: Attempting to get table item for account:", account);
         const profileDataFromChain = await aptos.getTableItem({
           handle: profilesTableHandle,
           data: {
@@ -173,14 +205,13 @@ export default function MyProfile() {
           },
         }) as ProfileDataFromChain;
 
-        console.log("MyProfile: Profile data from chain:", profileDataFromChain);
         const profileCID = profileDataFromChain.cid;
         const cccdData = profileDataFromChain.cccd;
         const didData = profileDataFromChain.did;
         const createdAt = profileDataFromChain.created_at;
 
-        // Sử dụng dữ liệu danh tiếng từ contextProfile
-        const reputationToUse = contextProfile?.reputation || {
+        // Use reputation data from independent fetch
+        const reputationToUse = reputationData || {
           score: 0,
           level: 0,
           metrics: {
@@ -200,70 +231,26 @@ export default function MyProfile() {
           },
         };
 
-        // Populate basic profile data from chain first
-        setProfile(prev => ({
-          ...prev,
-          cccd: cccdData,
-          did: didData,
+        // Update profile state with fetched data
+        setProfile(prevProfile => ({
+          ...prevProfile,
           wallet: account,
+          did: didData,
+          cccd: cccdData,
           createdAt: createdAt,
-          reputation: reputationToUse, // Sử dụng danh tiếng từ context
+          reputation: reputationToUse,
         }));
 
-        if (!profileCID) {
-          console.log("MyProfile: Profile CID is empty. Cannot fetch from IPFS.");
-          setIpfsError("Không có CID. Dữ liệu chi tiết hồ sơ không khả dụng từ IPFS."); // Set a specific IPFS error
-        } else {
-          try {
-            console.log("MyProfile: Fetching profile data from IPFS using CID:", profileCID);
-            const url = convertIPFSURL(profileCID);
-        const response = await fetch(url);
-        const text = await response.text();
-        if (!response.ok || text.startsWith("<!DOCTYPE")) {
-              console.error(`MyProfile: IPFS fetch failed: ${response.status} - ${text.slice(0, 50)}...`);
-              throw new Error(`IPFS fetch failed: ${response.status} - ${text.slice(0, 50)}...`);
-        }
-        const profileData = JSON.parse(text);
-            console.log("MyProfile: Profile data from IPFS:", profileData);
-            setProfile(prev => ({
-              ...prev,
-              ...profileData, // Merge with existing blockchain data
-              // Ensure these are from chain, not overwritten by IPFS data if IPFS is outdated
-              cccd: cccdData,
-              did: didData,
-              wallet: account,
-              reputation: reputationToUse, // Đảm bảo danh tiếng vẫn từ context sau khi merge IPFS
-            }));
-            setIpfsError(null); // Clear any previous IPFS errors
-            console.log("MyProfile: Profile set successfully (with IPFS data).");
-          } catch (ipfsErr: any) {
-            console.error("MyProfile: Lỗi khi tải dữ liệu từ IPFS:", ipfsErr);
-            setIpfsError(`Đã xảy ra lỗi khi tải dữ liệu chi tiết hồ sơ từ IPFS: ${ipfsErr.message || String(ipfsErr)}. Có thể do lỗi mạng hoặc dữ liệu không còn khả dụng.`);
-            console.log("MyProfile: Continuing with blockchain-only profile data due to IPFS error.");
-          }
-        }
-      } catch (err: any) {
-        console.error("MyProfile: Lỗi khi tải hồ sơ tổng thể từ blockchain (Resource/TableItem not found):", err);
-        if (
-          err.toString().includes("Profile not registered") ||
-          err.toString().includes("TableItemNotFound") ||
-          err.toString().includes("Resource not found") ||
-          err.toString().includes("Cannot read properties of undefined") ||
-          err.message.includes("CID is empty") // Thêm lỗi CID rỗng
-        ) {
-          setError("PROFILE_NOT_FOUND");
-          console.log("MyProfile: Setting error to PROFILE_NOT_FOUND (blockchain level).");
-          return;
-        }
-        setError("Đã xảy ra lỗi khi tải hồ sơ. Vui lòng thử lại.");
-        console.log("MyProfile: Setting generic error.");
+      } catch (error) {
+        console.error("Error in fetchProfile:", error);
+        setError(error instanceof Error ? error.message : "Failed to load profile");
       } finally {
         setLoading(false);
-        console.log("MyProfile: Loading finished.");
       }
     };
+
     fetchProfile();
-  }, [account, accountType, refetchProfile, contextProfile]);
+  }, [account, accountType]);
 
   // Trigger fetch history when tab changes or account changes
   useEffect(() => {
