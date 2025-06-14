@@ -1232,16 +1232,34 @@ const Jobs = () => {
                       </div>
 
          
-                      <Button onClick={() => handleApplyToJob(job)} className="group relative z-10 w-full cursor-pointer overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white font-semibold py-3 px-8 transition-all duration-300 shadow">
+                      <Button 
+                        onClick={() => handleApplyToJob(job)} 
+                        disabled={account && job.poster.toLowerCase() === account.toLowerCase()}
+                        className={`group relative z-10 w-full cursor-pointer overflow-hidden rounded-full ${
+                          account && job.poster.toLowerCase() === account.toLowerCase()
+                            ? 'bg-gray-600 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700'
+                        } text-white font-semibold py-3 px-8 transition-all duration-300 shadow`}
+                      >
                         <span className="relative inline-flex overflow-hidden font-primary text-base">
-                          <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
-                            Ứng tuyển ngay
-                          </div>
-                          <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
-                            Ứng tuyển ngay
-                          </div>
+                          {account && job.poster.toLowerCase() === account.toLowerCase() ? (
+                            <div className="flex items-center justify-center gap-2">
+                              Không thể ứng tuyển job của chính mình
+                            </div>
+                          ) : (
+                            <>
+                              <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
+                                Ứng tuyển ngay
+                              </div>
+                              <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
+                                Ứng tuyển ngay
+                              </div>
+                            </>
+                          )}
                         </span>
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform inline-block" />
+                        {!(account && job.poster.toLowerCase() === account.toLowerCase()) && (
+                          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform inline-block" />
+                        )}
                       </Button>
                     </CardContent>
                   </Card>
