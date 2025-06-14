@@ -9,22 +9,27 @@ Tính năng chính
 ---------------
 - Kết nối ví Aptos để xác thực định danh phi tập trung (on-chain DID).
 - Xây dựng và cập nhật hồ sơ cá nhân, lưu trữ trên IPFS.
-- Lịch sử cập nhật hồ sơ (on-chain event history).
+- Lịch sử cập nhật hồ sơ (on-chain event history) với phân trang.
 - Chuyển quyền sở hữu hồ sơ sang ví khác.
 - AI ngăn đăng job ảo.
+- Hệ thống tin nhắn phi tập trung với tính năng kiểm tra nội dung độc hại (toxicity check).
 - Đánh giá, điểm uy tín, xác thực kỹ năng on-chain.
+- Hiển thị chi tiết cách tính điểm danh tiếng.
 - Đăng dự án, tìm kiếm freelancer, xác thực hồ sơ trực tiếp từ blockchain.
 - Thanh toán minh bạch, bảo mật qua smart contract Move.
-- Quản lý dự án, đánh giá freelancer, lưu trữ lịch sử giao dịch.
+- Quản lý dự án với phân trang và trạng thái chi tiết.
+- Lưu trữ lịch sử giao dịch.
+- Nút làm mới trang thống nhất trên Dashboard, MyProfile và Messages.
 
 Công nghệ sử dụng
 -----------------
-- Frontend: Nextjs, Tailwind CSS, Context API
+- Frontend: React, Tailwind CSS, Context API
 - Wallet/Auth: Aptos Wallet Adapter (Petra)
 - State Management: React Context, Custom Hooks
 - Blockchain: Aptos Move, Aptos SDK, Aptos REST API
 - Lưu trữ: IPFS (Pinata)
 - Triển khai: Vercel
+- AI: Hugging Face Inference API (để kiểm tra toxicity trong tin nhắn).
 
 Hướng dẫn cài đặt và chạy local
 -------------------------------
