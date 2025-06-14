@@ -1,4 +1,4 @@
-module work_board::job_marketplace_v6 {
+module work_board::job_marketplace_v11 {
     use std::option::{Self, Option};
     use std::string::String;
     use std::signer;
@@ -41,9 +41,9 @@ module work_board::job_marketplace_v6 {
     const ENOT_READY_TO_REOPEN: u64 = 27;
     const EAPPLICATION_DEADLINE_PASSED: u64 = 28;
 
-    const APPLY_FEE: u64 = 1000000; // 0.01 APT
+    const APPLY_FEE: u64 = 100_000_000;
     const MAX_REJECTIONS: u8 = 3;
-    const AUTO_CONFIRM_DELAY: u64 = 7 * 24 * 60 * 60; // 7 days in seconds
+    const AUTO_CONFIRM_DELAY: u64 = 5 * 60;
 
     struct MilestoneData has copy, drop, store {
         submitted: bool,
@@ -110,7 +110,8 @@ module work_board::job_marketplace_v6 {
         cancel_event: event::EventHandle<JobCanceledEvent>,
         complete_event: event::EventHandle<JobCompletedEvent>,
         expire_event: event::EventHandle<JobExpiredEvent>,
-        fund_flow_event: event::EventHandle<FundFlowEvent>
+        fund_flow_event: event::EventHandle<FundFlowEvent>,
+        reputation_event: event::EventHandle<ReputationUpdatedEvent>
     }
 
     struct JobPostedEvent has copy, drop, store {
@@ -175,6 +176,36 @@ module work_board::job_marketplace_v6 {
         expire_time: u64
     }
 
+    struct ReputationMetrics has copy, drop, store {
+        total_jobs_completed: u64,
+        total_jobs_cancelled: u64,
+        total_amount_transacted: u64,
+        last_activity_time: u64,
+        total_milestones_completed: u64,
+        total_milestones_rejected: u64,
+        on_time_delivery_count: u64,
+        total_milestones: u64,
+        total_jobs_posted: u64,
+        total_milestones_accepted: u64,
+        total_milestones_rejected_by_client: u64,
+        total_response_time: u64,
+        response_count: u64
+    }
+
+    struct UserReputation has key {
+        metrics: ReputationMetrics,
+        reputation_score: u64,
+        reputation_level: u8, // 1-5
+        last_updated: u64
+    }
+
+    struct ReputationUpdatedEvent has copy, drop, store {
+        user: address,
+        new_score: u64,
+        new_level: u8,
+        timestamp: u64
+    }
+
     public entry fun init_events(account: &signer) {
         move_to(account, Events {
             post_event: account::new_event_handle<JobPostedEvent>(account),
@@ -187,7 +218,8 @@ module work_board::job_marketplace_v6 {
             cancel_event: account::new_event_handle<JobCanceledEvent>(account),
             complete_event: account::new_event_handle<JobCompletedEvent>(account),
             expire_event: account::new_event_handle<JobExpiredEvent>(account),
-            fund_flow_event: account::new_event_handle<FundFlowEvent>(account)
+            fund_flow_event: account::new_event_handle<FundFlowEvent>(account),
+            reputation_event: account::new_event_handle<ReputationUpdatedEvent>(account)
         });
     }
 
@@ -796,5 +828,76 @@ module work_board::job_marketplace_v6 {
 
         // No event needed specifically for reopening applications, as applications can just flow in again.
         // Or we could emit a JobReopenedEvent if needed for off-chain indexing. For now, skipping.
+    }
+
+    // Reputation calculation helpers
+    fun calculate_reputation_score(metrics: &ReputationMetrics): u64 {
+        let score = 0u64;
+        score = score + (metrics.total_jobs_completed * 200);
+        score = score - (metrics.total_jobs_cancelled * 100);
+        score = score + (metrics.total_milestones_completed * 50);
+        score = score - (metrics.total_milestones_rejected * 30);
+        score = score + (metrics.on_time_delivery_count * 100);
+        score = score + (metrics.total_amount_transacted / 1_000_000);
+        score = score + (metrics.total_jobs_posted * 50);
+        score = score + (metrics.total_milestones_accepted * 20);
+        score = score - (metrics.total_milestones_rejected_by_client * 20);
+        let avg_response = if (metrics.response_count > 0) { metrics.total_response_time / metrics.response_count } else { 0 };
+        if (avg_response > 0 && avg_response < 24 * 60 * 60) { score = score + 100; };
+        score
+    }
+
+    fun calculate_reputation_level(score: u64): u8 {
+        let result = if (score >= 2000) {
+            5
+        } else if (score >= 1500) {
+            4
+        } else if (score >= 1000) {
+            3
+        } else if (score >= 500) {
+            2
+        } else {
+            1
+        };
+        result
+    }
+
+    public fun get_reputation_score(addr: address): u64 acquires UserReputation {
+        let rep = borrow_global<UserReputation>(addr);
+        rep.reputation_score
+    }
+    public fun get_reputation_level(addr: address): u8 acquires UserReputation {
+        let rep = borrow_global<UserReputation>(addr);
+        rep.reputation_level
+    }
+    public fun get_reputation_metrics(addr: address): ReputationMetrics acquires UserReputation {
+        let rep = borrow_global<UserReputation>(addr);
+        rep.metrics
+    }
+
+    public entry fun initialize_reputation(account: &signer) {
+        let addr = signer::address_of(account);
+        if (!exists<UserReputation>(addr)) {
+            move_to(account, UserReputation {
+                metrics: ReputationMetrics {
+                    total_jobs_completed: 0,
+                    total_jobs_cancelled: 0,
+                    total_amount_transacted: 0,
+                    last_activity_time: 0,
+                    total_milestones_completed: 0,
+                    total_milestones_rejected: 0,
+                    on_time_delivery_count: 0,
+                    total_milestones: 0,
+                    total_jobs_posted: 0,
+                    total_milestones_accepted: 0,
+                    total_milestones_rejected_by_client: 0,
+                    total_response_time: 0,
+                    response_count: 0
+                },
+                reputation_score: 0,
+                reputation_level: 1,
+                last_updated: 0
+            });
+        }
     }
 }

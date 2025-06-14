@@ -4,6 +4,7 @@ import { convertIPFSURL } from "@/utils/ipfs";
 const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
 const PROFILE_MODULE_NAME = "web3_profiles_v8";
 const PROFILE_RESOURCE_NAME = "ProfileRegistryV8";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
 
 export const aptosConfig = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 export const aptos = new Aptos(aptosConfig);

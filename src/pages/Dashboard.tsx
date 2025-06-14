@@ -72,9 +72,9 @@ interface JobPost {
   last_reject_time: number | null;
 }
 
-const CONTRACT_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
-const MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242"; // Same as contract address for now
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v6";
+const CONTRACT_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
+const MODULE_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3"; // Same as contract address for now
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v11";
 const PROFILE_MODULE_NAME = "web3_profiles_v8";
 const PROFILE_RESOURCE_NAME = "ProfileRegistryV8";
 
@@ -868,7 +868,7 @@ const Dashboard = () => {
                           return (
                             <li key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-700/30 px-3 py-2 rounded-md">
                               <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 sm:mb-0">
-                                <span className="text-sm text-gray-300">Giai đoạn {index + 1}: ${amount / 1_000_000} APT</span>
+                                <span className="text-sm text-gray-300">Giai đoạn {index + 1}: ${amount / 100_000_000} APT</span>
                           <Badge variant={getMilestoneBadgeVariant(job, index)}>{getMilestoneStatus(job, index)}</Badge>
                               </div>
                               <div className="flex flex-wrap gap-2 justify-end">

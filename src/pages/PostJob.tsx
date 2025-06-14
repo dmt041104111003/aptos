@@ -46,8 +46,8 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 
-const JOBS_MODULE_ADDRESS = "0xf9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242";
-const JOBS_MODULE_NAME = "job_marketplace_v6";
+const JOBS_MODULE_ADDRESS = "0xc2b8787a42a99d10acef3a16a3941ec1e25b6b17231b683691cc48b92f3639c3";
+const JOBS_MODULE_NAME = "job_marketplace_v11";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
@@ -200,7 +200,7 @@ const PostJob = () => {
         type_arguments: ["0x1::aptos_coin::AptosCoin"],
         arguments: [
           JOBS_MODULE_ADDRESS,
-          form.initialFundAmount * 1_000_000 // Amount in micro-APT
+          form.initialFundAmount * 100_000_000 // Amount in micro-APT
         ]
       };
 
@@ -232,10 +232,10 @@ const PostJob = () => {
         arguments: [
           cid, // job_details_cid
           Math.floor(Date.now() / 1000) + form.applicationDeadlineDays * 24 * 60 * 60, // application_deadline (seconds from now)
-          form.initialFundAmount * 1_000_000, // initial_fund_amount (convert APT to micro-APT)
+          form.initialFundAmount * 100_000_000, // initial_fund_amount (convert APT to micro-APT)
           profile.did || "", // poster_did (from user profile)
           profile.lastCID || "", // poster_profile_cid (from user profile)
-          form.milestones.map(m => m.amount * 1_000_000), // milestone_amounts
+          form.milestones.map(m => m.amount * 100_000_000), // milestone_amounts
           form.milestones.map(m => m.duration * 24 * 60 * 60) // milestone_durations (convert days to seconds)
         ]
       };
