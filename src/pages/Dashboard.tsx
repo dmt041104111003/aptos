@@ -24,7 +24,7 @@ import { useWallet } from '../context/WalletContext';
 import { useProfile } from '../contexts/ProfileContext';
 import { convertIPFSURL } from '@/utils/ipfs';
 import { toast } from '@/components/ui/sonner';
-import { aptos, fetchProfileDetails } from '@/utils/aptosUtils';
+import { aptos, fetchProfileDetails, UserReputationData } from '@/utils/aptosUtils';
 
 // Define JobPost interface locally to ensure consistency
 interface JobPost {
@@ -47,6 +47,7 @@ interface JobPost {
     id: string;
     name: string;
     profilePic: string;
+    reputation: UserReputationData;
   };
   start_time: number;
   end_time: number;
@@ -59,7 +60,7 @@ interface JobPost {
   milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } };
   submit_time: number | null;
   escrowed_amount: number;
-  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfilePic: string }[];
+  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfilePic: string; workerReputation: UserReputationData }[];
   approve_time: number | null;
   poster_did: string;
   poster_profile_cid: string;
@@ -285,6 +286,7 @@ const Dashboard = () => {
               profile_cid: appEvent.data.profile_cid,
               workerProfileName: workerProfile.name,
               workerProfilePic: workerProfile.profilePic,
+              workerReputation: workerProfile.reputation,
             };
           }));
 
@@ -318,6 +320,7 @@ const Dashboard = () => {
               id: jobOnChain.poster,
               name: posterProfile.name,
               profilePic: posterProfile.profilePic,
+              reputation: posterProfile.reputation,
             },
             start_time: Number(jobOnChain.start_time),
             end_time: Number(jobOnChain.end_time || 0),
@@ -819,7 +822,14 @@ const Dashboard = () => {
                       <AvatarFallback>{job.client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <div>
-                        <p className="font-medium text-white">Người đăng: {isPoster ? 'Bạn' : job.client.name}</p>
+                        <p className="font-medium text-white">
+                          Người đăng: {isPoster ? 'Bạn' : job.client.name}
+                          {job.client.reputation && (
+                            <span className="text-sm text-gray-400 ml-2">
+                              (Danh tiếng: {job.client.reputation.score}, Cấp: {job.client.reputation.level})
+                            </span>
+                          )}
+                        </p>
                       <p className="text-xs text-gray-400">Đăng lúc: {formatPostedTime(job.start_time)}</p>
                         <div className="flex items-center gap-1 text-xs text-gray-400">
                           <span>Địa chỉ ví: {job.poster.slice(0, 6)}...{job.poster.slice(-4)}</span>
@@ -843,7 +853,14 @@ const Dashboard = () => {
                       <AvatarFallback>WK</AvatarFallback>
                     </Avatar>
                     <div>
-                        <p className="font-medium text-white">Người thực hiện: {isWorker ? 'Bạn' : (job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfileName || 'Ẩn danh')}</p>
+                        <p className="font-medium text-white">
+                          Người thực hiện: {isWorker ? 'Bạn' : (job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfileName || 'Ẩn danh')}
+                          {job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerReputation && (
+                            <span className="text-sm text-gray-400 ml-2">
+                              (Danh tiếng: {job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerReputation.score}, Cấp: {job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerReputation.level})
+                            </span>
+                          )}
+                        </p>
                       <p className="text-xs text-gray-400">Được chấp nhận lúc: {formatPostedTime(job.approve_time || 0)}</p>
                         <div className="flex items-center gap-1 text-xs text-gray-400">
                           <span>Địa chỉ ví: {job.worker.slice(0, 6)}...{job.worker.slice(-4)}</span>

@@ -210,6 +210,27 @@ export default function Settings() {
     setStatus({ type: null, message: '' });
 
     try {
+      // Ensure reputation resource is initialized for the user
+      // Check if UserReputation resource already exists for the current account
+      const userReputationResourceType = `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::UserReputation`;
+      const reputationExists = await aptos.getAccountResource({ accountAddress: account, resourceType: userReputationResourceType })
+        .then(() => true)
+        .catch(() => false);
+
+      if (!reputationExists) {
+        console.log("Initializing user reputation...");
+        const initRepTxn = await window.aptos.signAndSubmitTransaction({
+          type: "entry_function_payload",
+          function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::initialize_reputation`,
+          type_arguments: [],
+          arguments: []
+        });
+        await aptos.waitForTransaction({ transactionHash: initRepTxn.hash });
+        console.log("User reputation initialized successfully.");
+      } else {
+        console.log("User reputation already exists, skipping initialization.");
+      }
+
       // Upload profile image if changed
       let profilePicUrl = profile.profilePic;
       if (imageFile) {
