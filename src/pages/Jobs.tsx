@@ -130,7 +130,29 @@ const Jobs = () => {
   const { profile } = useProfile();
 
   // Thêm state lưu thông tin hồ sơ tra cứu
-  const [queriedProfile, setQueriedProfile] = useState<{ name: string; avatar: string; did: string; profile_cid: string } | null>(null);
+  const [queriedProfile, setQueriedProfile] = useState<{
+    name: string;
+    avatar: string;
+    did: string;
+    profile_cid: string;
+    reputation_score?: number;
+    reputation_level?: number;
+    reputation_metrics?: {
+      total_jobs_completed: number;
+      total_jobs_cancelled: number;
+      total_amount_transacted: number;
+      last_activity_time: number;
+      total_milestones_completed: number;
+      total_milestones_rejected: number;
+      on_time_delivery_count: number;
+      total_milestones: number;
+      total_jobs_posted: number;
+      total_milestones_accepted: number;
+      total_milestones_rejected_by_client: number;
+      total_response_time: number;
+      response_count: number;
+    };
+  } | null>(null);
 
   // State cho dự án đã tạo và đã apply/làm khi tra cứu hồ sơ
   const [profileJobsCreated, setProfileJobsCreated] = useState<{
@@ -468,7 +490,66 @@ const Jobs = () => {
     try {
       // Lấy thông tin hồ sơ (nếu có)
       const profileInfo = await fetchProfileDetails(profileAddress);
-      setQueriedProfile(profileInfo);
+      
+      // Lấy dữ liệu danh tiếng (reputation)
+      let reputationScore = 0;
+      let reputationLevel = 0;
+      let reputationMetrics = {
+        total_jobs_completed: 0,
+        total_jobs_cancelled: 0,
+        total_amount_transacted: 0,
+        last_activity_time: 0,
+        total_milestones_completed: 0,
+        total_milestones_rejected: 0,
+        on_time_delivery_count: 0,
+        total_milestones: 0,
+        total_jobs_posted: 0,
+        total_milestones_accepted: 0,
+        total_milestones_rejected_by_client: 0,
+        total_response_time: 0,
+        response_count: 0,
+      };
+
+      try {
+        console.log("Jobs: Fetching UserReputation resource for account:", profileAddress);
+        const userReputationResource = await aptos.getAccountResource({
+          accountAddress: profileAddress,
+          resourceType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::UserReputation`,
+        });
+        
+        if (userReputationResource) {
+          console.log("Jobs: UserReputation resource found:", userReputationResource);
+          reputationScore = Number((userReputationResource as any).reputation_score);
+          reputationLevel = Number((userReputationResource as any).reputation_level);
+          reputationMetrics = {
+            total_jobs_completed: Number((userReputationResource as any).metrics.total_jobs_completed),
+            total_jobs_cancelled: Number((userReputationResource as any).metrics.total_jobs_cancelled),
+            total_amount_transacted: Number((userReputationResource as any).metrics.total_amount_transacted),
+            last_activity_time: Number((userReputationResource as any).metrics.last_activity_time),
+            total_milestones_completed: Number((userReputationResource as any).metrics.total_milestones_completed),
+            total_milestones_rejected: Number((userReputationResource as any).metrics.total_milestones_rejected),
+            on_time_delivery_count: Number((userReputationResource as any).metrics.on_time_delivery_count),
+            total_milestones: Number((userReputationResource as any).metrics.total_milestones),
+            total_jobs_posted: Number((userReputationResource as any).metrics.total_jobs_posted),
+            total_milestones_accepted: Number((userReputationResource as any).metrics.total_milestones_accepted),
+            total_milestones_rejected_by_client: Number((userReputationResource as any).metrics.total_milestones_rejected_by_client),
+            total_response_time: Number((userReputationResource as any).metrics.total_response_time),
+            response_count: Number((userReputationResource as any).metrics.response_count),
+          };
+        } else {
+          console.log("Jobs: UserReputation resource not found for this account.");
+        }
+      } catch (repError: any) {
+        console.warn("Jobs: Error fetching UserReputation resource:", repError);
+        // Continue without reputation data if there's an error
+      }
+
+      setQueriedProfile({
+        ...profileInfo,
+        reputation_score: reputationScore,
+        reputation_level: reputationLevel,
+        reputation_metrics: reputationMetrics,
+      });
 
       // Kiểm tra có hồ sơ không bằng cách check did/profile_cid
       const hasProfile = !!profileInfo.did && !!profileInfo.profile_cid;
@@ -788,6 +869,58 @@ const Jobs = () => {
                         </div>
                       </div>
                       <div className="text-green-400 font-semibold mb-2">{profileResult}</div>
+                      {queriedProfile.reputation_score !== undefined && (
+                        <div className="mt-4 p-4 bg-gray-900/60 rounded-xl border border-white/10">
+                          <h4 className="font-bold text-white mb-2">Điểm uy tín:</h4>
+                          <div className="flex items-center gap-4 mb-2">
+                            <div className="flex flex-col items-center">
+                              <span className="text-4xl font-bold text-blue-400 font-heading">{queriedProfile.reputation_score}</span>
+                              <div className="flex items-center mt-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    size={18}
+                                    className={i < Math.round(queriedProfile.reputation_level || 0) ? "text-blue-400" : "text-gray-700"}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <span className="text-gray-400 text-sm font-primary">
+                              Cấp độ: {queriedProfile.reputation_level} ({queriedProfile.reputation_metrics?.total_jobs_completed || 0} dự án đã hoàn thành)
+                            </span>
+                          </div>
+                          {queriedProfile.reputation_metrics && (
+                            <div className="space-y-2 mt-4">
+                              <h3 className="text-sm font-semibold text-gray-300">Chỉ số danh tiếng:</h3>
+                              {queriedProfile.reputation_metrics.total_jobs_completed > 0 && (
+                                <div className="text-sm font-primary text-white/80">
+                                  Tổng dự án hoàn thành: <span className="font-semibold text-blue-400">{queriedProfile.reputation_metrics.total_jobs_completed}</span>
+                                </div>
+                              )}
+                              {queriedProfile.reputation_metrics.total_jobs_posted > 0 && (
+                                <div className="text-sm font-primary text-white/80">
+                                  Tổng dự án đã đăng: <span className="font-semibold text-blue-400">{queriedProfile.reputation_metrics.total_jobs_posted}</span>
+                                </div>
+                              )}
+                              {queriedProfile.reputation_metrics.total_amount_transacted > 0 && (
+                                <div className="text-sm font-primary text-white/80">
+                                  Tổng số tiền giao dịch: <span className="font-semibold text-blue-400">{queriedProfile.reputation_metrics.total_amount_transacted / 100_000_000} APT</span>
+                                </div>
+                              )}
+                              {queriedProfile.reputation_metrics.on_time_delivery_count > 0 && queriedProfile.reputation_metrics.total_milestones > 0 && (
+                                <div className="text-sm font-primary text-white/80">
+                                  Tỷ lệ hoàn thành đúng hạn: <span className="font-semibold text-blue-400">{((queriedProfile.reputation_metrics.on_time_delivery_count / queriedProfile.reputation_metrics.total_milestones) * 100).toFixed(2)}%</span>
+                                </div>
+                              )}
+                              {queriedProfile.reputation_metrics.response_count > 0 && (
+                                <div className="text-sm font-primary text-white/80">
+                                  Thời gian phản hồi trung bình: <span className="font-semibold text-blue-400">{(queriedProfile.reputation_metrics.total_response_time / queriedProfile.reputation_metrics.response_count / 60).toFixed(2)} phút</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {historyResult.length > 0 && (
                         <div className="mb-4">
                           <h4 className="font-bold text-white mb-2">Lịch sử cập nhật và chuyển quyền:</h4>
@@ -1107,8 +1240,6 @@ const Jobs = () => {
                 variant="outline"
                 className="group relative z-10 cursor-pointer overflow-hidden rounded-full  font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10"
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                
                 <span className="relative inline-flex overflow-hidden font-primary text-base">
                   <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
                     Đặt lại bộ lọc
