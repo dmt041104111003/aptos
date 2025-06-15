@@ -309,7 +309,7 @@ const Navbar = () => {
                     className="w-full justify-start flex items-center space-x-3 px-4 py-2 text-blue-200 hover:text-white hover:bg-blue-500/10 rounded-xl"
                   >
                     <Settings className="w-5 h-5" />
-                    <span>Định danh</span>
+                    <span>Định danh DID</span>
                   </Button>
                   <Button 
                     onClick={() => {
