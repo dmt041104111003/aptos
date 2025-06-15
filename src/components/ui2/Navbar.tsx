@@ -188,7 +188,7 @@ const Navbar = () => {
                         className="py-2 px-3 rounded-md hover:bg-blue-500/10 text-blue-200 hover:text-white cursor-pointer"
                       >
                         <Settings className="mr-3 h-4 w-4 text-gray-500" />
-                        <span>Cài đặt</span>
+                        <span>Định danh DID</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
