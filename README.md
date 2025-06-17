@@ -1,57 +1,74 @@
 APT - UTC: Decentralized Talent Marketplace on Aptos
 ====================================================
 
-Giới thiệu
-----------
-APT - UTC là nền tảng marketplace phi tập trung kết nối freelancer và khách hàng trong lĩnh vực Web3, phát triển độc quyền bởi đội ngũ APT - UTC. Sản phẩm được xây dựng trên blockchain Aptos với smart contract Move, giao diện React, định danh on-chain, lưu trữ hồ sơ trên IPFS và tích hợp AI matching. Tất cả ý tưởng, thiết kế, mã nguồn đều do APT - UTC phát triển, không sao chép từ bất kỳ nền tảng nào khác.
+Introduction
+-----------
+APT - UTC is a decentralized marketplace designed to connect Web3 freelancers with clients. It features full transaction event tracking for transparency and includes built-in dispute resolution mechanisms.
 
-Tính năng chính
+Key Features
 ---------------
-- Kết nối ví Aptos để xác thực định danh phi tập trung (on-chain DID).
-- Xây dựng và cập nhật hồ sơ cá nhân, lưu trữ trên IPFS.
-- Lịch sử cập nhật hồ sơ (on-chain event history) với phân trang.
-- Chuyển quyền sở hữu hồ sơ sang ví khác.
-- AI ngăn đăng job ảo.
-- Hệ thống tin nhắn phi tập trung với tính năng kiểm tra nội dung độc hại (toxicity check).
-- Đánh giá, điểm uy tín, xác thực kỹ năng on-chain.
-- Hiển thị chi tiết cách tính điểm danh tiếng.
-- Đăng dự án, tìm kiếm freelancer, xác thực hồ sơ trực tiếp từ blockchain.
-- Thanh toán minh bạch, bảo mật qua smart contract Move.
-- Quản lý dự án với phân trang và trạng thái chi tiết.
-- Lưu trữ lịch sử giao dịch.
-- Nút làm mới trang thống nhất trên Dashboard, MyProfile và Messages.
+- Connect Aptos wallet for decentralized identity verification (on-chain DID)
+- Build and update personal profiles, stored on IPFS
+- Paginated on-chain event history of profile updates
+- Transfer profile ownership to another wallet
+- AI-powered fake job prevention
+- Decentralized messaging system with toxicity detection
+- On-chain reputation system with reviews, scoring, and skill verification
+- Detailed reputation score calculation display
+- Post projects, search for freelancers, and verify profiles directly from the blockchain
+- Transparent and secure payments via Move smart contracts
+- Project management with pagination and detailed status
+- Transaction history storage
+- Unified refresh button on Dashboard, MyProfile, and Messages
 
-Công nghệ sử dụng
+Technologies
 -----------------
-- Frontend: React, Tailwind CSS, Context API
+- Frontend: Nextjs, Tailwind CSS, Context API
 - Wallet/Auth: Aptos Wallet Adapter (Petra)
 - State Management: React Context, Custom Hooks
 - Blockchain: Aptos Move, Aptos SDK, Aptos REST API
-- Lưu trữ: IPFS (Pinata)
-- Triển khai: Vercel
-- AI: Hugging Face Inference API (để kiểm tra toxicity trong tin nhắn).
+- Storage: IPFS (Pinata)
+- AI: Hugging Face Inference API (for detecting toxicity in messages)
+- Source Code Management: Git/GitHub
 
-Hướng dẫn cài đặt và chạy local
+Tasks (major)
+-----------------
+- Connect Petra wallet for decentralized identity verification (on-chain DID)
+- Maintain paginated on-chain event history of profile updates
+- Transfer profile ownership to another wallet
+- Decentralized messaging system with integrated toxicity detection
+- On-chain reputation system with reviews, scoring, and skill verification
+- Post projects, search for freelancers, and verify profiles directly from the blockchain
+- Transparent and secure payments via Move smart contracts
+- Full tracking of all historical data, project activities, and reputation events
+
+In Progress
+-----------------
+- Dispute resolution module is currently under development, aiming to enable fair and transparent conflict handling between parties
+- Freelancers can launch micro-DAOs and issue personal tokens to raise funds, with smart contracts managing capital, milestones, and revenue sharing
+- Users contribute to an insurance pool for protection against scams or unfair job cancellations, governed by a DAO and funded via staking yields
+- Platform fees are automatically distributed to the DAO treasury, stakers, and active contributors through smart vaults, promoting sustainable value sharing
+
+Local Installation and Setup
 -------------------------------
-1. Cài đặt dependencies:
+1. Install dependencies:
    ```bash
    npm install
    ```
-2. Khởi động server phát triển:
+2. Start development server:
    ```bash
    npm run dev
    ```
-3. Phát triển smart contract Move:
+3. Develop Move smart contracts:
    ```bash
    aptos move compile
    aptos move test
    ```
 
-Liên hệ và thông tin thêm
+Contact and Additional Information
 -------------------------
-- Smart contract: thư mục `contracts/` (Move/Aptos)
+- Smart contracts: `contracts/` directory (Move/Aptos)
 
-
-Bản quyền và sở hữu trí tuệ
+Copyright and Intellectual Property
 ---------------------------
-Toàn bộ ý tưởng, thiết kế, mã nguồn và giải pháp kỹ thuật thuộc sở hữu độc quyền của APT - UTC. Nghiêm cấm mọi hành vi sao chép, sử dụng lại hoặc phân phối lại dưới bất kỳ hình thức nào khi chưa có sự đồng ý bằng văn bản của APT - UTC.
+All ideas, designs, source code, and technical solutions are exclusively owned by APT - UTC. Any copying, reuse, or redistribution in any form is strictly prohibited without written consent from APT - UTC.
