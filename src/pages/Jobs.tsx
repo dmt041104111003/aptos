@@ -435,10 +435,10 @@ const Jobs = () => {
       return;
     }
 
-    if (!profile || !profile.did || !profile.profile_cid) {
-      toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi ứng tuyển.');
-      return;
-    }
+    // if (!profile || !profile.did || !profile.profile_cid) {
+    //   toast.error('Vui lòng hoàn tất hồ sơ của bạn trên trang Cài đặt trước khi ứng tuyển.');
+    //   return;
+    // }
 
     try {
       const transaction = await window.aptos.signAndSubmitTransaction({
