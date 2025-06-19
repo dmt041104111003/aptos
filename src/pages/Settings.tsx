@@ -6,49 +6,18 @@ import { uploadJSONToIPFS, uploadFileToIPFS } from "@/utils/pinata";
 import { useProfile } from '../contexts/ProfileContext';
 import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 
-interface Profile {
-  name: string;
-  bio: string;
-  profilePic: string;
-  wallet: string;
-  did: string;
-  verified: boolean;
-  social: {
-    github: string;
-    linkedin: string;
-    twitter: string;
-  };
-  reputation: {
-    score: number;
-    jobs: number;
-    breakdown: { label: string; value: number }[];
-  };
-  lens: string;
-  skillNFTs: string[];
-  gitcoinStamps: number;
-  skills: string[];
-  portfolio: { name: string; link: string; rating: number }[];
-  reviews: { client: string; date: string; comment: string }[];
-  profile_cid?: string;
-  cccd: number;
-  createdAt: number;
-  lastUpdated: string;
-  [key: string]: unknown;
-}
-
 interface ProfileDataFromChain {
   cid: string;
-  cccd: number;
+  cccd: string;
   did: string;
+  name: string;
   created_at: number;
 }
 
-const MODULE_ADDRESS = import.meta.env.VITE_MODULE_ADDRESS;
-const MODULE_NAME = "web3_profiles_v12";
-const RESOURCE_NAME = "ProfileRegistryV12";
+const MODULE_ADDRESS = "0x3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490";
+const MODULE_NAME = "web3_profiles_v29";
+const RESOURCE_NAME = "Profiles";
 
-const JOBS_CONTRACT_ADDRESS = "0x107b835625f8dbb3a185aabff8f754e5a98715c7dc9369544f8920c0873ccf2a";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v15";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
@@ -58,7 +27,6 @@ export default function Settings() {
   const { profile: savedProfile, updateProfile } = useProfile();
   const [profile, setProfile] = useState(savedProfile);
   const [newSkill, setNewSkill] = useState("");
-  const [newPortfolioItem, setNewPortfolioItem] = useState({ name: "", link: "", rating: 5 });
   const [imagePreview, setImagePreview] = useState(savedProfile.profilePic);
   const [uploading, setUploading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -68,10 +36,13 @@ export default function Settings() {
   const [newOwnerAddress, setNewOwnerAddress] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
+  const [skills, setSkills] = useState<string[]>([]);
+  const [cccdInput, setCccdInput] = useState(savedProfile.cccd ? savedProfile.cccd.toString() : "");
 
   useEffect(() => {
     setProfile(savedProfile);
     setImagePreview(savedProfile.profilePic);
+    setCccdInput(savedProfile.cccd ? savedProfile.cccd.toString() : "");
 
     const checkProfileExistence = async () => {
       if (!account || accountType !== 'aptos') {
@@ -79,21 +50,18 @@ export default function Settings() {
         return;
       }
       try {
-        console.log("Attempting to fetch full profile data from blockchain...");
         const registryResource = await aptos.getAccountResource({
-          accountAddress: import.meta.env.VITE_MODULE_ADDRESS,
-          resourceType: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME}`,
+          accountAddress: MODULE_ADDRESS,
+          resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME}`,
         });
 
         if (!registryResource) {
-          console.log("Profile registry resource not found.");
           setIsProfileExistInState(false);
           return;
         }
 
         const profiles = (registryResource as any)?.profiles;
         if (!profiles?.handle) {
-          console.error("Profile registry handle missing.");
           setIsProfileExistInState(false);
           return;
         }
@@ -104,22 +72,22 @@ export default function Settings() {
           handle: profilesTableHandle,
           data: {
             key_type: "address",
-            value_type: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::ProfileData`,
+            value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::ProfileData`,
             key: account,
           },
         }) as ProfileDataFromChain;
 
-        console.log("Profile data from chain:", profileDataFromChain);
-        setCccd(profileDataFromChain.cccd.toString());
-        setProfile(prev => ({ ...prev, did: profileDataFromChain.did }));
-        setIsProfileExistInState(true); // Profile exists if we successfully fetch data
-
+        setIsProfileExistInState(true);
+        setCccdInput(profileDataFromChain.cccd ? profileDataFromChain.cccd.toString() : "");
+        setCccd(profileDataFromChain.cccd ? profileDataFromChain.cccd.toString() : "");
+        setProfile(prev => ({
+          ...prev,
+          did: profileDataFromChain.did,
+          name: profileDataFromChain.name,
+        }));
       } catch (error: any) {
-        console.warn("Lỗi khi lấy ProfileData từ blockchain. Coi là chưa đăng ký:", error);
         setIsProfileExistInState(false);
-        // Optionally, set initial CCCD value to empty string if profile not found
-        setCccd(''); 
-        setProfile(prev => ({ ...prev, did: `did:aptos:${account}` })); // Set default DID
+        setCccd('');
       }
     };
     checkProfileExistence();
@@ -131,59 +99,6 @@ export default function Settings() {
     setProfile(prev => ({
       ...prev,
       [name]: value
-    }));
-  };
-
-  const handleSocialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setProfile(prev => ({
-      ...prev,
-      social: {
-        ...prev.social,
-        [name]: value
-      }
-    }));
-  };
-
-  const handlePortfolioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setNewPortfolioItem(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const addPortfolioItem = () => {
-    if (newPortfolioItem.name && newPortfolioItem.link) {
-      setProfile(prev => ({
-        ...prev,
-        portfolio: [...prev.portfolio, newPortfolioItem]
-      }));
-      setNewPortfolioItem({ name: "", link: "", rating: 5 });
-    }
-  };
-
-  const removePortfolioItem = (name: string) => {
-    setProfile(prev => ({
-      ...prev,
-      portfolio: prev.portfolio.filter(item => item.name !== name)
-    }));
-  };
-
-  const addSkill = () => {
-    if (newSkill.trim()) {
-      setProfile(prev => ({
-        ...prev,
-        skills: [...prev.skills, newSkill.trim()]
-      }));
-      setNewSkill("");
-    }
-  };
-
-  const removeSkill = (skill: string) => {
-    setProfile(prev => ({
-      ...prev,
-      skills: prev.skills.filter(s => s !== skill)
     }));
   };
 
@@ -210,45 +125,37 @@ export default function Settings() {
     setStatus({ type: null, message: '' });
 
     try {
-      // Upload profile image if changed
       let profilePicUrl = profile.profilePic;
       if (imageFile) {
-          const imageCID = await uploadFileToIPFS(imageFile);
+        const imageCID = await uploadFileToIPFS(imageFile);
         profilePicUrl = `ipfs://${imageCID}`;
       }
-
-      // Prepare profile data
       const profileData = {
         ...profile,
+        skills,
         profilePic: profilePicUrl,
         lastUpdated: new Date().toISOString(),
       };
 
-      // Upload to IPFS
       const cid = await uploadJSONToIPFS(profileData);
-
-      // Prepare transaction payload
       const payload = {
         type: "entry_function_payload",
         function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::${isProfileExistInState ? 'update_profile' : 'register_profile'}`,
         type_arguments: [],
         arguments: isProfileExistInState 
-          ? [cid] // For update_profile
-          : [cid, parseInt(cccd), `did:aptos:${account}`], // For register_profile
+          ? [cid, profile.name] 
+          : [`did:aptos:${account}`, cccdInput, cid, profile.name],
       };
 
-      // Sign and submit transaction
       const txnHash = await window.aptos.signAndSubmitTransaction(payload);
       await aptos.waitForTransaction({ transactionHash: txnHash.hash });
 
-      // Update local state
       setProfile(prev => ({
         ...prev,
         profile_cid: cid,
         profilePic: profilePicUrl,
       }));
 
-      // Update context
       updateProfile({
         ...profileData,
         profile_cid: cid,
@@ -293,11 +200,11 @@ export default function Settings() {
               <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8 w-full mb-8 flex flex-col items-center shadow-xl">
                 <div className="relative w-36 h-36 mb-4">
                   <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-600 to-violet-700 p-1">
-                  <img 
-                    src={imagePreview} 
+                    <img 
+                      src={imagePreview} 
                       alt="Ảnh đại diện" 
-                    className="w-full h-full rounded-full object-cover border-4 border-black"
-                  />
+                      className="w-full h-full rounded-full object-cover border-4 border-black"
+                    />
                   </div>
                   {uploading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
@@ -311,46 +218,33 @@ export default function Settings() {
                     <span className="truncate break-all">{account || "Chưa kết nối ví"}</span>
                   </div>
                   <div className="inline-flex items-center px-3 py-2 bg-white/10 rounded-lg text-xs text-white w-full justify-center font-primary">
-                    <span className="truncate break-all">{profile.did}</span>
+                    <input
+                      type="text"
+                      value={profile.did}
+                      readOnly={isProfileExistInState}
+                      disabled={isProfileExistInState}
+                      className={`w-full border-none outline-none text-xs text-center ${isProfileExistInState ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50'}`}
+                    />
                   </div>
                 </div>
 
-                <div className="flex gap-3 mt-4 justify-center">
-                  {profile.social.github && (
-                    <a href={profile.social.github} className="text-gray-400 hover:text-blue-400 transition-colors" target="_blank" rel="noopener noreferrer">
-                      <i className="bi bi-github text-2xl"></i>
-                    </a>
-                  )}
-                  {profile.social.linkedin && (
-                    <a href={profile.social.linkedin} className="text-gray-400 hover:text-blue-400 transition-colors" target="_blank" rel="noopener noreferrer">
-                      <i className="bi bi-linkedin text-2xl"></i>
-                    </a>
-                  )}
-                  {profile.social.twitter && (
-                    <a href={profile.social.twitter} className="text-gray-400 hover:text-blue-400 transition-colors" target="_blank" rel="noopener noreferrer">
-                      <i className="bi bi-twitter text-2xl"></i>
-                    </a>
-                  )}
-                </div>
-
-                <label className="w-full mt-4 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-center group relative z-10 cursor-pointer overflow-hidden font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10 rounded-lg">
-                  <span className="relative inline-flex items-center justify-center gap-2 overflow-hidden font-primary text-base">
-                    <Upload size={20} />
-                      <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
-                        Đổi ảnh đại diện
-                      </div>
-                      <div className="absolute translate-y-[164%] skew-y-12 transition duration-500 group-hover:translate-y-0 group-hover:skew-y-0">
-                        Đổi ảnh đại diện
-                      </div>
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageChange}
-                    disabled={uploading}
-                  />
-                </label>
+                <button
+                  type="button"
+                  className="w-full mt-6 flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => document.getElementById('profilePicInput')?.click()}
+                  disabled={uploading}
+                >
+                  <Upload size={20} />
+                  Đổi ảnh đại diện
+                </button>
+                <input
+                  id="profilePicInput"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageChange}
+                  disabled={uploading}
+                />
               </div>
             </div>
 
@@ -369,9 +263,9 @@ export default function Settings() {
                           name="name"
                           value={profile.name}
                           onChange={handleChange}
-                          className={`w-full px-3 py-2 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 mt-1 font-primary ${uploading ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400'}`}
-                          required
-                          disabled={uploading}
+                          readOnly={isProfileExistInState}
+                          disabled={isProfileExistInState || uploading}
+                          className={`w-full px-3 py-2 border rounded-md mt-1 font-primary ${isProfileExistInState ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50'}`}
                         />
                       </label>
                     </div>
@@ -379,21 +273,17 @@ export default function Settings() {
                       <label className="block text-sm font-medium text-white mb-1 font-primary">
                         Số CCCD
                         <input
-                          type="number"
-                          value={cccd}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Limit to 12 digits
-                            if (value === '' || (/^\d+$/.test(value) && value.length <= 12)) {
-                              setCccd(value);
-                            }
+                          type="text"
+                          value={cccdInput}
+                          maxLength={12}
+                          onChange={e => {
+                            const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
+                            setCccdInput(value);
                           }}
-                          className={`w-full px-3 py-2 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 mt-1 font-primary ${uploading || isProfileExistInState ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400'}`}
+                          readOnly={isProfileExistInState}
+                          disabled={isProfileExistInState}
+                          className={`w-full px-3 py-2 border rounded-md mt-1 font-primary ${isProfileExistInState ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50'}`}
                           placeholder="Nhập số CCCD của bạn"
-                          required={!isProfileExistInState}
-                          disabled={uploading || isProfileExistInState}
-                          min="0"
-                          step="1"
                         />
                       </label>
                     </div>
@@ -410,150 +300,44 @@ export default function Settings() {
                         />
                       </label>
                     </div>
-                  </div>
-                </div>
-
-                {/* Social Links Section */}
-                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8">
-                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Mạng xã hội</h2>
-                  <div className="space-y-4">
-                    {['github', 'linkedin', 'twitter'].map((platform) => (
-                      <div key={platform}>
-                        <label className="block text-sm font-medium text-white mb-1 font-primary capitalize">
-                          {platform === 'github' ? 'GitHub' : platform === 'linkedin' ? 'LinkedIn' : 'Twitter'}
-                          <input
-                            type="url"
-                            name={platform}
-                            value={profile.social[platform as keyof typeof profile.social]}
-                            onChange={handleSocialChange}
-                            className="w-full px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 mt-1 font-primary"
-                            placeholder={`https://${platform}.com/username`}
-                            disabled={uploading}
-                          />
-                        </label>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-white mb-1 font-primary">Kỹ năng</label>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={newSkill}
+                          onChange={e => setNewSkill(e.target.value)}
+                          placeholder="Nhập kỹ năng mới"
+                          className="flex-1 px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 font-primary"
+                          disabled={uploading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newSkill.trim() && !skills.includes(newSkill.trim())) {
+                              setSkills([...skills, newSkill.trim()]);
+                              setNewSkill('');
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={uploading || !newSkill.trim()}
+                        >
+                          Thêm
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Skills Section */}
-                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8">
-                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Kỹ năng</h2>
-                  <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newSkill}
-                      onChange={(e) => setNewSkill(e.target.value)}
-                        className="flex-1 px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 font-primary"
-                      placeholder="Thêm kỹ năng mới"
-                        disabled={uploading}
-                    />
-                    <button
-                      type="button"
-                      onClick={addSkill}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={uploading || !newSkill.trim()}
-                      >
-                        <Plus size={20} />
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.skills.map((skill) => (
-                        <div
-                          key={skill}
-                          className="flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-sm"
-                        >
-                          <span>{skill}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeSkill(skill)}
-                            className="text-gray-400 hover:text-red-400 transition-colors"
-                            disabled={uploading}
-                    >
-                            <Delete size={16} />
-                    </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Portfolio Section */}
-                <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8">
-                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Dự án cá nhân</h2>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input
-                        type="text"
-                        name="name"
-                        value={newPortfolioItem.name}
-                        onChange={handlePortfolioChange}
-                        className="px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 font-primary"
-                        placeholder="Tên dự án"
-                        disabled={uploading}
-                      />
-                      <input
-                        type="url"
-                        name="link"
-                        value={newPortfolioItem.link}
-                        onChange={handlePortfolioChange}
-                        className="px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 font-primary"
-                        placeholder="Đường dẫn dự án"
-                        disabled={uploading}
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        name="rating"
-                        value={newPortfolioItem.rating}
-                        onChange={handlePortfolioChange}
-                        min="1"
-                        max="5"
-                        step="0.1"
-                        className="w-24 px-3 py-2 bg-white/10 border-white/20 text-white placeholder:text-gray-400 border rounded-md focus:border-blue-500/50 focus:ring-blue-500/20 font-primary"
-                        disabled={uploading}
-                      />
-                      <button
-                        type="button"
-                        onClick={addPortfolioItem}
-                        className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={uploading || !newPortfolioItem.name.trim() || !newPortfolioItem.link.trim()}
-                      >
-                        Thêm dự án
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {profile.portfolio.map((item) => (
-                        <div
-                          key={item.name}
-                          className="flex items-center justify-between p-3 bg-white/10 rounded-lg"
-                        >
-                          <div>
-                            <h3 className="font-medium">{item.name}</h3>
-                            <a
-                              href={item.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-blue-400 hover:text-blue-300"
-                            >
-                              {item.link}
-                            </a>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <span className="text-yellow-400">★ {item.rating}</span>
+                      <div className="flex flex-wrap gap-2">
+                        {skills.map(skill => (
+                          <span key={skill} className="bg-white/10 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                            {skill}
                             <button
                               type="button"
-                              onClick={() => removePortfolioItem(item.name)}
+                              onClick={() => setSkills(skills.filter(s => s !== skill))}
                               className="text-gray-400 hover:text-red-400 transition-colors"
                               disabled={uploading}
-                            >
-                              <Delete size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                            >x</button>
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -602,44 +386,9 @@ export default function Settings() {
                     setTransferStatus({ type: null, message: '' });
 
                     try {
-                      // Check if new owner address already has a profile
-                      const moduleAddress = import.meta.env.VITE_MODULE_ADDRESS;
-                      const resourceType = `${moduleAddress}::${MODULE_NAME}::${RESOURCE_NAME}` as `${string}::${string}::${string}`;
-                      const profileDataType = `${moduleAddress}::${MODULE_NAME}::ProfileData` as `${string}::${string}::${string}`;
-
-                      try {
-                        const registryResource = await aptos.getAccountResource({
-                          accountAddress: moduleAddress,
-                          resourceType: resourceType,
-                        });
-
-                        if (registryResource) {
-                          const profiles = (registryResource as any)?.profiles;
-                          if (profiles?.handle) {
-                            await aptos.getTableItem({
-                              handle: profiles.handle,
-                              data: {
-                                key_type: "address",
-                                value_type: profileDataType,
-                                key: newOwnerAddress.trim(),
-                              },
-                            });
-                            // If we reach here, it means a profile exists for newOwnerAddress
-                            setTransferStatus({ type: 'error', message: 'Địa chỉ nhận đã có hồ sơ. Không thể chuyển quyền sở hữu.' });
-                            setTransferring(false);
-                            return; // Stop the transfer process
-                          }
-                        }
-                      } catch (checkError: any) {
-                        // If TableItemNotFound or Resource not found, it's fine, profile doesn't exist for new owner
-                        if (!checkError.message.includes("TableItemNotFound") && !checkError.message.includes("Resource not found")) {
-                            console.warn("Lỗi khi kiểm tra hồ sơ địa chỉ nhận:", checkError);
-                        }
-                      }
-
                       const txnPayload = {
                         type: 'entry_function_payload',
-                        function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::transfer_ownership`,
+                        function: `${MODULE_ADDRESS}::${MODULE_NAME}::transfer_ownership`,
                         type_arguments: [],
                         arguments: [newOwnerAddress.trim()],
                       };

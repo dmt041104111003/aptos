@@ -10,8 +10,6 @@ import Jobs from "./pages/Jobs";
 import PostJob from "./pages/PostJob";
 import Dashboard from "./pages/Dashboard";
 import Messages from "./pages/Messages";
-
-import MyProfile from "./pages/MyProfile";
 import Settings from "./pages/Settings";
 import { ProfileProvider } from './contexts/ProfileContext';
 import ScrollToTop from "./components/ScrollToTop";
@@ -32,7 +30,7 @@ const App = () => (
             <Route path="/post-job" element={<PostJob />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/messages" element={<Messages />} />
-            <Route path="/profile" element={<MyProfile />} />
+    
             <Route path="/settings" element={<Settings />} />
 
 

@@ -1,5 +1,67 @@
 ---
 profiles:
+  did:
+    network: Testnet
+    private_key: ed25519-priv-0x8d2ebe3909c522f30f1b4f9b585ffefe6299d7a4fb3ea86c69eb7d9e8e56b1a6
+    public_key: ed25519-pub-0x3c37bf1f6caadedcf6beb50222a5a4daf5a454ce19071bfb28fc9c4ff8eb6405
+    account: 8cae60d0feab0caf977de2bb045c5b0b5e5f342a93911045a2600697db90afbe
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm:
+    network: Testnet
+    private_key: ed25519-priv-0xb7ce187a393f351e470539998b2be39dc59b835bd92cc1af54980c766203c7ae
+    public_key: ed25519-pub-0xecb9bb7ab6c5551a2db633c880958ca6ef99b49075f98977137f21b6aee0d560
+    account: 6fec994d1fb0569657a99c6999dfe891277ec9b54385b911017197f446ffe4bc
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+    faucet_url: "https://faucet.testnet.aptoslabs.com"
+  farm_v1:
+    network: Testnet
+    private_key: ed25519-priv-0x2d8cfa4b95f16f5e4c75c4efd20d205ae224327eb0c4d187a06cbf52c2ce9bf1
+    public_key: ed25519-pub-0x9ae320f17f4b166862b76ba02c2871b4ed7408b5169e0ffa919ceb3527628ae5
+    account: 9f08893410072976ece933091d470418c45b1a8df44d0fe7c0868bd0c6d23ae8
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v2:
+    network: Testnet
+    private_key: ed25519-priv-0x7924b8169c8b9dd75989be10cac86333a94bea9a223f876dee476796bcdacbb4
+    public_key: ed25519-pub-0x6ba0d457299b3fe9252cbe0459df08d17842af56eb05a9b97eb4ed07b5be6730
+    account: 3a33d41dff67985ae65cec07f37fe6495c39432e862bebf2c536c4e65db51ecd
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v3:
+    network: Testnet
+    private_key: ed25519-priv-0xe759053e638e526c7aa04b910ba20eb9fceb1c948efdaae28e3599316e1a4f2c
+    public_key: ed25519-pub-0x4c89936582c1e0d94817e285ead609d7c05d208d0ba71ec451d65111d78e8d1b
+    account: 39759f27ba015f971ec403efa8697d2c0bee3ca159a78309353fb243739e8cb0
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v4:
+    network: Testnet
+    private_key: ed25519-priv-0x4e195a691496d396dbe79d1db9146b9a22536f7db5e94c30cd6767737de82c1e
+    public_key: ed25519-pub-0x37b02b593ebf434ce26919fbd5a5cf59f56ceb63b3953ad1e7068b91d81ba3ae
+    account: 523ce9eb897886b0dd70858eda52fedf8b5b7911ab883fdc631fd96d622cf01f
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v5:
+    network: Testnet
+    private_key: ed25519-priv-0x764626cf01ffb8cad451efe84798d5258c0b2796498cc6b6deae2dc72e2d70ca
+    public_key: ed25519-pub-0xa15aac86894c5323ac422c394caa85de69964929d428d9f03abaf70b0b97e90c
+    account: 1a86567c43e90fb907b2e74be9dbda27498f986086ac0869696756273326eb55
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v6:
+    network: Testnet
+    private_key: ed25519-priv-0x389d3dc5c64f4dd89e26cf9da9c597fc82a63bbf9e1c9cae283853bdcf92f9eb
+    public_key: ed25519-pub-0xd874b0d7aed4f1ccb05c79269e60cb1e886d7e1f3a3e5d0694eca8e43ee9c684
+    account: 3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  job:
+    network: Testnet
+    private_key: ed25519-priv-0x3f246c158930a15d7365722d80a431ea3653e484b446a32e3d9485693f0185a3
+    public_key: ed25519-pub-0x084f1533833b3e53b5b0b474b02bb3e542b81f18f755d748e7b21741f57b5e8f
+    account: 16de4f1738d187857e6da58310336a2894f53a19f2f99f6383e6a1b0d3e4c32b
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+    faucet_url: "https://faucet.testnet.aptoslabs.com"
+  marketplaces:
+    network: Testnet
+    private_key: ed25519-priv-0xffc59255d22e21c193c48f6824e12e5f076b970dd823bbbfff7866dc4b30c5b6
+    public_key: ed25519-pub-0xc8eb89d657408dad9c4e0e57edd0ee4269a403df3a7dff112dfec13df227efab
+    account: 8866b3298426b1dac5c144f4c5e7a8d725f90b9930bd84ecabf3eb732c214ac3
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
   testnet:
     network: Testnet
     private_key: ed25519-priv-0x263d973a03f22e2a4677c2f48b4c246ddb6539c08218db401d74ac5f92d11496

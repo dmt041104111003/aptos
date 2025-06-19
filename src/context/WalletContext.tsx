@@ -28,12 +28,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [aptosNetwork, setAptosNetwork] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user was previously connected
     const savedAccount = localStorage.getItem('walletAccount');
     if (savedAccount) {
       setAccount(savedAccount);
     }
-    // Load saved wallet type and aptos network
     const savedType = localStorage.getItem('walletType');
     if (savedType === 'aptos') {
       setAccountType('aptos');
@@ -45,13 +43,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   useEffect(() => {
-    // Lắng nghe sự kiện chuyển mạng của Petra
     if (accountType === 'aptos' && window.aptos) {
       const handleNetworkChange = (network: string) => {
         setAptosNetwork(network);
         localStorage.setItem('aptosNetwork', network);
       };
-      // Đăng ký sự kiện mạng (hỗ trợ both on và addEventListener)
       if (window.aptos.on) {
         window.aptos.on('networkChange', handleNetworkChange);
         window.aptos.on('networkChanged', handleNetworkChange);
@@ -65,7 +61,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         localStorage.setItem('aptosNetwork', network);
       });
       return () => {
-        // Remove listeners
         if (window.aptos.removeListener) {
           window.aptos.removeListener('networkChange', handleNetworkChange);
           window.aptos.removeListener('networkChanged', handleNetworkChange);
@@ -138,7 +133,6 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 };
 
-// Type declaration for window.aptos
 declare global {
   interface Window {
     aptos?: {
