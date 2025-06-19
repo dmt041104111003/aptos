@@ -1,6 +1,6 @@
 ---
 compiled_package_info:
-  package_name: did_project
+  package_name: job_marketplace_v29
   address_alias_instantiation:
     Extensions: "0000000000000000000000000000000000000000000000000000000000000001"
     aptos_framework: "0000000000000000000000000000000000000000000000000000000000000001"
@@ -8,11 +8,12 @@ compiled_package_info:
     aptos_std: "0000000000000000000000000000000000000000000000000000000000000001"
     aptos_token: "0000000000000000000000000000000000000000000000000000000000000003"
     core_resources: 000000000000000000000000000000000000000000000000000000000a550c18
+    did_addr_profile: 3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490
+    job_work_board: 3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490
     std: "0000000000000000000000000000000000000000000000000000000000000001"
     vm: "0000000000000000000000000000000000000000000000000000000000000000"
     vm_reserved: "0000000000000000000000000000000000000000000000000000000000000000"
-    work_profiles_addr: f9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242
-  source_digest: B1E1EFEEA204593097B051FC92A9A5A5BFF591074FCD622D86086E3B5D2B9564
+  source_digest: CC19A11FC1CDC7E4EB94D3767F0B4ADD7A1D0708A97BB93876077C10F34D27E3
   build_flags:
     dev_mode: false
     test_mode: false
@@ -24,7 +25,7 @@ compiled_package_info:
     install_dir: ~
     force_recompilation: false
     additional_named_addresses:
-      work_profiles_addr: f9c47e613fee3858fccbaa3aebba1f4dbe227db39288a12bfb1958accd068242
+      job_work_board: 3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490
     fetch_deps_only: false
     skip_fetch_latest_git_deps: false
     compiler_config:

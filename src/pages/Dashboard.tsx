@@ -1,54 +1,28 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, useInView } from 'framer-motion';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  TrendingUp,
-  Star,
+
   DollarSign,
   Clock,
   CheckCircle,
-  Sparkles,
-  Award,
-  Shield,
-  Briefcase,
-  Users,
-  Hourglass,
-  CalendarCheck,
-  Copy
+
+  X,
+  Upload
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { useWallet } from '../context/WalletContext';
 import { useProfile } from '../contexts/ProfileContext';
 import { convertIPFSURL } from '@/utils/ipfs';
 import { toast } from '@/components/ui/sonner';
-import { aptos, fetchProfileDetails, UserReputationData } from '@/utils/aptosUtils';
+import { aptos, fetchProfileDetails } from '@/utils/aptosUtils';
 
-// Define JobPost interface locally to ensure consistency
 interface JobPost {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  skills: string[];
-  budget: { min: number; max: number; currency: string };
-  duration: string;
-  location: "remote" | "onsite" | "hybrid";
-  immediate: boolean;
-  experience: string;
-  attachments: string[];
+  id: string; 
   poster: string;
-  posterProfile: string;
-  postedAt: string;
-  initialFundAmount: number;
-  client: {
-    id: string;
-    name: string;
-    profilePic: string;
-    reputation: UserReputationData;
-  };
+  cid: string;
   start_time: number;
   end_time: number;
   milestones: number[];
@@ -60,26 +34,48 @@ interface JobPost {
   milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } };
   submit_time: number | null;
   escrowed_amount: number;
-  applications: { worker: string; apply_time: number; did: string; profile_cid: string; workerProfileName: string; workerProfilePic: string; workerReputation: UserReputationData }[];
   approve_time: number | null;
   poster_did: string;
   poster_profile_cid: string;
   completed: boolean;
   rejected_count: number;
   job_expired: boolean;
-  auto_confirmed: boolean[];
   milestone_deadlines: number[];
   application_deadline: number;
-  selected_application_index: number | null;
   last_reject_time: number | null;
+  locked: boolean;
+  title?: string;
+  description?: string;
 }
 
-const CONTRACT_ADDRESS = "0x97bd417572de0bda9b8657459d4863e5d0da70d81000619ddfc8c316408fc853";
-const MODULE_ADDRESS = "0x97bd417572de0bda9b8657459d4863e5d0da70d81000619ddfc8c316408fc853";
-const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v17";
-const PROFILE_MODULE_NAME = "web3_profiles_v14";
-const PROFILE_RESOURCE_NAME = "ProfileRegistryV14";
-const AUTO_CONFIRM_DELAY = 5 * 60; // 5 minutes in seconds
+
+type MilestoneData = {
+  submitted: boolean;
+  accepted: boolean;
+  submit_time: number | string;
+  reject_count: number;
+};
+
+const JOBS_CONTRACT_ADDRESS = "0x3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490";
+const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
+
+const TABS = [
+  { key: 'in-progress', label: 'Đang thực hiện' },
+  { key: 'completed', label: 'Đã hoàn thành' },
+  { key: 'canceled', label: 'Đã hủy' },
+  { key: 'locked', label: 'Đã khóa' },
+  { key: 'closed', label: 'Đã đóng' },
+];
+
+const getJobStatus = (job: JobPost) => {
+  if (job.completed) return { label: 'Đã hoàn thành', color: 'bg-blue-700/30 text-blue-300', key: 'completed' };
+  if (job.job_expired) return { label: 'Đã hủy', color: 'bg-red-700/30 text-red-300', key: 'canceled' };
+  if (job.locked) return { label: 'Đã khóa', color: 'bg-gray-700/30 text-gray-300', key: 'locked' };
+  if (job.active && job.worker) return { label: 'Đang thực hiện', color: 'bg-green-700/30 text-green-300', key: 'in-progress' };
+  if (job.active && !job.worker) return { label: 'Đang tuyển', color: 'bg-yellow-700/30 text-yellow-300', key: 'in-progress' };
+  return { label: 'Đã đóng', color: 'bg-gray-400/20 text-gray-400', key: 'closed' };
+};
+
 
 const Dashboard = () => {
   const { account, accountType } = useWallet();
@@ -87,23 +83,10 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<string>('in-progress');
   const [inProgressJobs, setInProgressJobs] = useState<JobPost[]>([]);
   const [completedJobs, setCompletedJobs] = useState<JobPost[]>([]);
-  const [jobsWithApplications, setJobsWithApplications] = useState<JobPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Pagination states
-  const itemsPerPage = 2; // Set a constant for items per page
-  const [inProgressCurrentPage, setInProgressCurrentPage] = useState(1);
-  const [applicationsCurrentPage, setApplicationsCurrentPage] = useState(1);
-  const [completedCurrentPage, setCompletedCurrentPage] = useState(1);
-
-  // Pagination handlers
-  const handleInProgressPageChange = (page: number) => setInProgressCurrentPage(page);
-  const handleApplicationsPageChange = (page: number) => setApplicationsCurrentPage(page);
-  const handleCompletedPageChange = (page: number) => setCompletedCurrentPage(page);
-
-  // Animation refs
+ 
   const heroRef = useRef(null);
   const statsRef = useRef(null);
   const heroInView = useInView(heroRef, { once: true });
@@ -122,426 +105,175 @@ const Dashboard = () => {
 
     setLoading(true);
     setError(null);
-    console.log("Dashboard: Loading user jobs...");
     try {
-      const fetchedInProgressJobs: JobPost[] = [];
-      const fetchedCompletedJobs: JobPost[] = [];
-      const fetchedJobsWithApplications: JobPost[] = [];
+      const fetchedInProgressJobs: (JobPost & { title?: string; description?: string })[] = [];
+      const fetchedCompletedJobs: (JobPost & { title?: string; description?: string })[] = [];
 
-      console.log("Dashboard: Fetching Events resource...");
       const eventsResource = await aptos.getAccountResource({
-        accountAddress: CONTRACT_ADDRESS,
-        resourceType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Events`,
+        accountAddress: JOBS_CONTRACT_ADDRESS,
+        resourceType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Events`,
       });
 
       if (!eventsResource || !(eventsResource as any).post_event?.guid?.id) {
-        console.warn("Dashboard: JobPostedEvent handle not found or marketplace not initialized.");
         setLoading(false);
         return;
       }
-      console.log("Dashboard: Events resource found.", eventsResource);
 
-      console.log("Dashboard: Fetching all JobPostedEvent...");
       const rawPostedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
-        options: {
-          limit: 100,
-        }
+        eventType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::JobPostedEvent`,
+        options: { limit: 100 },
       });
-      console.log("Dashboard: Fetched raw JobPostedEvents:", rawPostedEvents);
 
-      // Fetch all application and approval events directly
-      console.log("Dashboard: Fetching all WorkerAppliedEvent...");
-      const rawAppliedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerAppliedEvent`,
-        options: {
-          limit: 100,
-        }
-      });
-      console.log("Dashboard: Fetched raw WorkerAppliedEvents:", rawAppliedEvents);
-
-      console.log("Dashboard: Fetching all WorkerApprovedEvent...");
-      const rawApprovedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::WorkerApprovedEvent`,
-        options: {
-          limit: 100,
-        }
-      });
-      console.log("Dashboard: Fetched raw WorkerApprovedEvents:", rawApprovedEvents);
-
-      // Add fetching MilestoneSubmittedEvent
-      console.log("Dashboard: Fetching all MilestoneSubmittedEvent...");
-      const rawSubmittedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneSubmittedEvent`,
-        options: {
-          limit: 100,
-        }
-      });
-      console.log("Dashboard: Fetched raw MilestoneSubmittedEvents:", rawSubmittedEvents);
-
-      // Add fetching MilestoneAcceptedEvent
-      console.log("Dashboard: Fetching all MilestoneAcceptedEvent...");
-      const rawAcceptedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneAcceptedEvent`,
-        options: {
-          limit: 100,
-        }
-      });
-      console.log("Dashboard: Fetched raw MilestoneAcceptedEvents:", rawAcceptedEvents);
-
-      // Add fetching MilestoneRejectedEvent
-      console.log("Dashboard: Fetching all MilestoneRejectedEvent...");
-      const rawRejectedEvents = await aptos.event.getModuleEventsByEventType({
-        eventType: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneRejectedEvent`,
-        options: {
-          limit: 100,
-        }
-      });
-      console.log("Dashboard: Fetched raw MilestoneRejectedEvents:", rawRejectedEvents);
-
-
-      const allJobIds = new Set(rawPostedEvents.map((e: any) => e.data.job_id.toString()));
+   
       const jobDetailsMap = new Map<string, any>();
-
       for (const event of rawPostedEvents) {
-        const jobCid = event.data.cid;
+        let jobCid = event.data.cid;
+        if (typeof jobCid === 'string' && jobCid.startsWith('0x')) {
+          const hex = jobCid.replace(/^0x/, '');
+          const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+          jobCid = new TextDecoder().decode(bytes);
+        } else if (Array.isArray(jobCid)) {
+          jobCid = new TextDecoder().decode(new Uint8Array(jobCid));
+        }
         if (jobCid) {
           try {
             const jobDetailsUrl = convertIPFSURL(jobCid);
             const response = await fetch(jobDetailsUrl);
-
-            const contentType = response.headers.get('content-type');
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error(`Dashboard: IPFS fetch failed for CID ${jobCid}. Status: ${response.status}. Response text: ${errorText.slice(0, 500)}`);
-              continue; // Skip this job if HTTP response is not OK
+            if (response.ok) {
+              const jobDataFromIPFS = await response.json();
+              jobDetailsMap.set(event.data.job_id.toString(), jobDataFromIPFS);
             }
-
-            if (!contentType || !contentType.includes('application/json')) {
-              const errorText = await response.text();
-              console.warn(`Dashboard: IPFS response for CID ${jobCid} is not JSON. Content-Type: ${contentType}. Response text: ${errorText.slice(0, 500)}`);
-              continue; // Skip if content type is not JSON
-            }
-
-            let jobDataFromIPFS: any;
-            try {
-              jobDataFromIPFS = await response.json();
-            } catch (jsonError) {
-              const errorText = await response.text();
-              console.error(`Dashboard: Failed to parse JSON for CID ${jobCid}. Error: ${jsonError}. Raw response: ${errorText.slice(0, 500)}`);
-              continue; // Skip if JSON parsing fails
-            }
-            jobDetailsMap.set(event.data.job_id.toString(), jobDataFromIPFS);
-          } catch (ipfsError) {
-            console.error(`Dashboard: Error fetching IPFS data for job ${event.data.job_id}:`, ipfsError);
-          }
+          } catch {}
         }
       }
 
-      console.log("Dashboard: Fetching on-chain Jobs resource...");
       const jobsResource = await aptos.getAccountResource({
-        accountAddress: MODULE_ADDRESS,
-        resourceType: `${MODULE_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Jobs`,
+        accountAddress: JOBS_CONTRACT_ADDRESS,
+        resourceType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Jobs`,
       });
-
       if (!jobsResource || !(jobsResource as any).jobs?.handle) {
-        console.warn("Dashboard: Jobs resource not found or marketplace not initialized.");
         setLoading(false);
         return;
       }
       const jobsTableHandle = (jobsResource as any).jobs.handle;
-      console.log("Dashboard: Jobs resource found. Table handle:", jobsTableHandle);
 
-      for (const jobId of Array.from(allJobIds)) {
+      for (const event of rawPostedEvents) {
+        const jobId = event.data.job_id.toString();
+        let jobOnChain: any = null;
         try {
-          console.log(`Dashboard: Fetching on-chain data for job ID: ${jobId}`);
-          let jobOnChain: any = null;
-          try {
-            jobOnChain = await aptos.getTableItem<any>({
-              handle: jobsTableHandle,
-              data: {
-                key_type: "u64",
-                value_type: `${MODULE_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Job`,
-                key: jobId,
-              },
-            });
-            console.log(`Dashboard: On-chain job data for ${jobId}:`, jobOnChain);
-            console.log(`Dashboard: Job ${jobId} milestones:`, jobOnChain.milestones);
-            console.log(`Dashboard: Job ${jobId} raw milestone_states from on-chain job:`, jobOnChain.milestone_states);
-          } catch (tableError) {
-            console.warn(`Dashboard: Job ${jobId} not found in Jobs table, may be completed or cancelled:`, tableError);
-            continue; // Skip if job is not found in the active table
-          }
-
-          if (!jobOnChain) {
-            console.warn(`Dashboard: No on-chain data found for job ${jobId}.`);
-            continue; // Skip if job resource is not found
-          }
-
-          const jobDataFromIPFS: Record<string, any> = jobDetailsMap.get(jobId) || {};
-          console.log(`Dashboard: IPFS data for job ${jobId}:`, jobDataFromIPFS);
-
-          // Fetch poster profile details using aptosUtils.ts (which has caching)
-          const posterProfile = await fetchProfileDetails(jobOnChain.poster);
-          console.log(`Dashboard: Poster profile for ${jobOnChain.poster}:`, posterProfile);
-
-          // Build applications for this job from WorkerAppliedEvents
-          const jobAppliedEvents = rawAppliedEvents.filter((e: any) => e.data.job_id.toString() === jobId);
-          const applicationsWithProfiles = await Promise.all(jobAppliedEvents.map(async (appEvent: any) => {
-            const workerProfile = await fetchProfileDetails(appEvent.data.worker);
-            console.log(`Dashboard: Worker profile for application ${appEvent.data.worker}:`, workerProfile);
-            return {
-              worker: appEvent.data.worker,
-              apply_time: Number(appEvent.data.apply_time),
-              did: appEvent.data.did,
-              profile_cid: appEvent.data.profile_cid,
-              workerProfileName: workerProfile.name,
-              workerProfilePic: workerProfile.profilePic,
-              workerReputation: workerProfile.reputation,
-            };
-          }));
-
-          // Determine approved worker from WorkerApprovedEvents
-          const approvalEvent = rawApprovedEvents.find((e: any) => e.data.job_id.toString() === jobId);
-          const approvedWorkerAddress = approvalEvent ? approvalEvent.data.worker : null;
-          const isApproved = !!approvalEvent;
-          const approveTime = approvalEvent ? Number(approvalEvent.data.approve_time) : null;
-
-          const jobPost: JobPost = {
-            id: jobId,
-            title: jobDataFromIPFS.title || "Untitled Job",
-            description: jobDataFromIPFS.description || "No description provided.",
-            category: jobDataFromIPFS.category || "Uncategorized",
-            skills: jobDataFromIPFS.skills || [],
-            budget: {
-              min: jobDataFromIPFS.budgetMin || 0,
-              max: jobDataFromIPFS.budgetMax || 0,
-              currency: jobDataFromIPFS.budgetCurrency || "USDC",
+          jobOnChain = await aptos.getTableItem<any>({
+            handle: jobsTableHandle,
+            data: {
+              key_type: "u64",
+              value_type: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Job`,
+              key: jobId,
             },
-            duration: jobDataFromIPFS.duration || "Flexible",
-            location: jobDataFromIPFS.location || "remote",
-            immediate: jobDataFromIPFS.immediate || false,
-            experience: jobDataFromIPFS.experience || "Any",
-            attachments: jobDataFromIPFS.attachments || [],
-            poster: jobOnChain.poster,
-            posterProfile: jobDataFromIPFS.posterProfile || "",
-            postedAt: new Date(Number(jobOnChain.start_time) * 1000).toISOString(),
-            initialFundAmount: Number(jobOnChain.escrowed_amount || 0),
-            client: {
-              id: jobOnChain.poster,
-              name: posterProfile.name,
-              profilePic: posterProfile.profilePic,
-              reputation: posterProfile.reputation,
-            },
-            start_time: Number(jobOnChain.start_time),
-            end_time: Number(jobOnChain.end_time || 0),
-            milestones: jobOnChain.milestones ? jobOnChain.milestones.map(Number) : [],
-            duration_per_milestone: jobOnChain.duration_per_milestone ? jobOnChain.duration_per_milestone.map(Number) : [],
-            worker: approvedWorkerAddress, // Use derived approved worker
-            approved: isApproved, // Use derived approved status
-            active: jobOnChain.active,
-            current_milestone: Number(jobOnChain.current_milestone),
-            // Initialize milestone_states from on-chain data or default
-            milestone_states: await (async () => {
-                const fetchedMilestoneStates: JobPost['milestone_states'] = {};
-                const milestoneStatesHandle = jobOnChain.milestone_states?.handle;
-                console.log(`Dashboard: Job ${jobId} milestoneStatesHandle:`, milestoneStatesHandle);
-                if (milestoneStatesHandle && jobOnChain.milestones) {
-                    for (let i = 0; i < jobOnChain.milestones.length; i++) {
-                        try {
-                            const milestoneData = await aptos.getTableItem<any>({
-                                handle: milestoneStatesHandle,
-                                data: {
-                                    key_type: "u64",
-                                    value_type: `${MODULE_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneData`,
-                                    key: i,
-                                },
-                            });
-                            console.log(`Dashboard: Job ${jobId}, Milestone ${i} fetched data from table:`, milestoneData);
-                            fetchedMilestoneStates[i] = {
-                                submitted: milestoneData.submitted,
-                                accepted: milestoneData.accepted,
-                                submit_time: Number(milestoneData.submit_time),
-                                reject_count: Number(milestoneData.reject_count),
-                            };
-                        } catch (milestoneTableError) {
-                            console.warn(`Dashboard: Could not fetch milestone data for job ${jobId}, milestone ${i} from table:`, milestoneTableError);
-                            fetchedMilestoneStates[i] = {
-                                submitted: false,
-                                accepted: false,
-                                submit_time: 0,
-                                reject_count: 0,
-                            }; // Default if not found
-                        }
-                    }
-                }
-                console.log(`Dashboard: Job ${jobId} Milestone states initialized from table:`, fetchedMilestoneStates);
-                return fetchedMilestoneStates;
-            })(),
-            submit_time: jobOnChain.submit_time ? Number(jobOnChain.submit_time) : null,
-            escrowed_amount: Number(jobOnChain.escrowed_amount),
-            applications: applicationsWithProfiles, // Use applications built from events
-            approve_time: approveTime, // Use derived approve time
-            poster_did: jobOnChain.poster_did,
-            poster_profile_cid: jobOnChain.poster_profile_cid,
-            completed: jobOnChain.completed,
-            rejected_count: Number(jobOnChain.rejected_count),
-            job_expired: jobOnChain.job_expired,
-            auto_confirmed: jobOnChain.auto_confirmed ? jobOnChain.auto_confirmed : [],
-            milestone_deadlines: jobOnChain.milestone_deadlines ? jobOnChain.milestone_deadlines.map(Number) : [],
-            application_deadline: Number(jobOnChain.application_deadline),
-            selected_application_index: jobOnChain.selected_application_index ? Number(jobOnChain.selected_application_index) : null,
-            last_reject_time: jobOnChain.last_reject_time ? Number(jobOnChain.last_reject_time) : null,
-          };
+          });
+        } catch {}
+        if (!jobOnChain) continue;
+        const jobDataFromIPFS: Record<string, any> = jobDetailsMap.get(jobId) || {};
 
-          // --- Process events to update milestone states ---
-          // Use a temporary map to store state based on events, then merge.
-          // This ensures events override table data for real-time status.
-          const tempMilestoneStatesFromEvents: JobPost['milestone_states'] = { ...jobPost.milestone_states }; // Start with table data
-
-          // Process submitted events
-          const jobSubmittedEvents = rawSubmittedEvents.filter((e: any) => e.data.job_id.toString() === jobId);
-          if (jobSubmittedEvents.length > 0) {
-            console.log(`Dashboard: Found ${jobSubmittedEvents.length} submitted events for job ${jobId}. Processing...`);
-            jobSubmittedEvents.forEach((event: any) => {
-              const milestoneIndex = Number(event.data.milestone); // Correct field name
-              if (tempMilestoneStatesFromEvents[milestoneIndex]) {
-                tempMilestoneStatesFromEvents[milestoneIndex] = {
-                  ...tempMilestoneStatesFromEvents[milestoneIndex],
-                  submitted: true,
-                  submit_time: Number(event.data.submit_time)
-                };
-                console.log(`Dashboard: Updated milestone ${milestoneIndex} (submitted) for job ${jobId} based on event:`, tempMilestoneStatesFromEvents[milestoneIndex]);
-              } else {
-                 // Initialize if milestone data wasn't in table (shouldn't happen for existing milestones, but for robustness)
-                 tempMilestoneStatesFromEvents[milestoneIndex] = {
-                    submitted: true, accepted: false, submit_time: Number(event.data.submit_time), reject_count: 0
-                 };
-                 console.log(`Dashboard: Initialized and updated milestone ${milestoneIndex} (submitted) from event for job ${jobId}:`, tempMilestoneStatesFromEvents[milestoneIndex]);
-              }
-            });
-          }
-
-          // Process accepted events
-          const jobAcceptedEvents = rawAcceptedEvents.filter((e: any) => e.data.job_id.toString() === jobId);
-          if (jobAcceptedEvents.length > 0) {
-              console.log(`Dashboard: Found ${jobAcceptedEvents.length} accepted events for job ${jobId}. Processing...`);
-              jobAcceptedEvents.forEach((event: any) => {
-                  const milestoneIndex = Number(event.data.milestone); // Correct field name
-                  if (tempMilestoneStatesFromEvents[milestoneIndex]) {
-                      tempMilestoneStatesFromEvents[milestoneIndex] = {
-                          ...tempMilestoneStatesFromEvents[milestoneIndex],
-                          submitted: true, // Should already be submitted if accepted
-                          accepted: true
-                      };
-                      console.log(`Dashboard: Updated milestone ${milestoneIndex} (accepted) for job ${jobId} based on event:`, tempMilestoneStatesFromEvents[milestoneIndex]);
-                  } else { // Handle case where submitted event was somehow missed or not processed first
-                      tempMilestoneStatesFromEvents[milestoneIndex] = {
-                         submitted: true, accepted: true, submit_time: Number(event.data.accept_time), reject_count: 0 // Using accept_time as submit_time if submitted wasn't seen
-                      };
-                      console.log(`Dashboard: Initialized and updated milestone ${milestoneIndex} (accepted) from event for job ${jobId}:`, tempMilestoneStatesFromEvents[milestoneIndex]);
-                  }
-              });
-          }
-
-          // Process rejected events
-          const jobRejectedEvents = rawRejectedEvents.filter((e: any) => e.data.job_id.toString() === jobId);
-          if (jobRejectedEvents.length > 0) {
-              console.log(`Dashboard: Found ${jobRejectedEvents.length} rejected events for job ${jobId}. Processing...`);
-              jobRejectedEvents.forEach((event: any) => {
-                  const milestoneIndex = Number(event.data.milestone); // Correct field name
-                  if (tempMilestoneStatesFromEvents[milestoneIndex]) {
-                      tempMilestoneStatesFromEvents[milestoneIndex] = {
-                          ...tempMilestoneStatesFromEvents[milestoneIndex],
-                          submitted: false, // Rejected means it's no longer considered submitted for re-submission
-                          accepted: false,
-                          reject_count: Number(event.data.reject_count)
-                      };
-                      console.log(`Dashboard: Updated milestone ${milestoneIndex} (rejected) for job ${jobId} based on event:`, tempMilestoneStatesFromEvents[milestoneIndex]);
-                  } else { // Handle case where milestone data wasn't in table or previous events
-                       tempMilestoneStatesFromEvents[milestoneIndex] = {
-                          submitted: false, accepted: false, submit_time: 0, reject_count: Number(event.data.reject_count)
-                       };
-                       console.log(`Dashboard: Initialized and updated milestone ${milestoneIndex} (rejected) from event for job ${jobId}:`, tempMilestoneStatesFromEvents[milestoneIndex]);
-                  }
-              });
-          }
-
-          // Assign the potentially updated milestone_states
-          jobPost.milestone_states = tempMilestoneStatesFromEvents;
-          console.log(`Dashboard: Final milestone states for job ${jobId} after event processing:`, jobPost.milestone_states);
-
-
-          const userAddress = account.toLowerCase();
-          const isPoster = jobPost.poster.toLowerCase() === userAddress;
-          const isWorker = jobPost.worker && jobPost.worker.toLowerCase() === userAddress;
-          const isApplicant = jobPost.applications.some(app => app.worker && app.worker.toLowerCase() === userAddress);
-
-          // Detailed logging for classification
-          console.log(`Dashboard: --- Processing Job ID: ${jobId} ---`);
-          console.log(`Dashboard: Job Poster (on-chain): ${jobOnChain.poster}, Is Current User Poster: ${isPoster}`);
-          console.log(`Dashboard: Current Account: ${userAddress}`);
-          console.log(`Dashboard: Job Worker (derived): ${jobPost.worker}, Is Current User Worker: ${isWorker}`); // Using derived worker
-          console.log(`Dashboard: Number of applications for Job ${jobId}: ${jobPost.applications.length}, Is Current User Applicant: ${isApplicant}`);
-          console.log(`Dashboard: Job Active: ${jobOnChain.active}, Completed: ${jobOnChain.completed}, Expired: ${jobOnChain.job_expired}`);
-          console.log(`Dashboard: Applications array for Job ${jobId}:`, jobPost.applications);
-
-
-          if (isPoster || isWorker || isApplicant) {
-            if (jobPost.completed || jobPost.job_expired || !jobPost.active) {
-              fetchedCompletedJobs.push(jobPost);
-              console.log(`Dashboard: Job ${jobId} pushed to completed jobs.`);
-            } else {
-              fetchedInProgressJobs.push(jobPost);
-              console.log(`Dashboard: Job ${jobId} pushed to in-progress jobs.`);
+   
+        let worker: string | null = null;
+        if (jobOnChain.worker) {
+          if (typeof jobOnChain.worker === 'string') {
+            worker = jobOnChain.worker;
+          } else if (typeof jobOnChain.worker === 'object' && jobOnChain.worker !== null) {
+            if ('vec' in jobOnChain.worker && Array.isArray(jobOnChain.worker.vec) && jobOnChain.worker.vec.length > 0) {
+              worker = jobOnChain.worker.vec[0];
+            } else if ('some' in jobOnChain.worker) {
+              worker = jobOnChain.worker.some;
             }
           }
-
-          // Logic for 'jobsWithApplications' tab
-          // A job is in "applications" tab if the current user is the poster, it has applications, and no worker has been approved yet.
-          if (isPoster && jobPost.applications.length > 0 && !jobPost.worker) {
-            fetchedJobsWithApplications.push(jobPost);
-            console.log(`Dashboard: Job ${jobId} ADDED to jobs with applications. Current count: ${fetchedJobsWithApplications.length}`);
-          } else {
-            console.log(`Dashboard: Job ${jobId} NOT ADDED to jobs with applications. Conditions (isPoster && applications.length > 0 && !jobPost.worker): ${isPoster} && ${jobPost.applications.length > 0} && ${!jobPost.worker}`);
-          }
-
-        } catch (jobFetchError) {
-          console.error(`Dashboard: Error fetching on-chain data for job ${jobId}:`, jobFetchError);
         }
+
+        const milestoneStatesHandle = jobOnChain.milestone_states?.handle;
+        let milestone_states = {};
+        if (milestoneStatesHandle && Array.isArray(jobOnChain.milestones)) {
+          for (let i = 0; i < jobOnChain.milestones.length; i++) {
+            try {
+              const milestoneData = await aptos.getTableItem({
+                handle: milestoneStatesHandle,
+                data: {
+                  key_type: "u64",
+                  value_type: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneData`,
+                  key: String(i),
+                },
+              }) as MilestoneData;
+              milestone_states[i] = {
+                submitted: milestoneData.submitted,
+                accepted: milestoneData.accepted,
+                submit_time: Number(milestoneData.submit_time),
+                reject_count: Number(milestoneData.reject_count),
+              };
+            } catch (e) {
+ 
+            }
+          }
+        }
+
+        const jobPost: JobPost & { title?: string; description?: string } = {
+          id: jobId,
+          poster: jobOnChain.poster,
+          cid: jobDataFromIPFS.cid || '',
+          start_time: Number(jobOnChain.start_time),
+          end_time: Number(jobOnChain.end_time || 0),
+          milestones: jobOnChain.milestones ? jobOnChain.milestones.map(Number) : [],
+          duration_per_milestone: jobOnChain.duration_per_milestone ? jobOnChain.duration_per_milestone.map(Number) : [],
+          worker: worker,
+          approved: jobOnChain.approved,
+          active: jobOnChain.active,
+          current_milestone: Number(jobOnChain.current_milestone),
+          milestone_states: milestone_states,
+          submit_time: jobOnChain.submit_time ? Number(jobOnChain.submit_time) : null,
+          escrowed_amount: Number(jobOnChain.escrowed_amount),
+          approve_time: jobOnChain.approve_time ? Number(jobOnChain.approve_time) : null,
+          poster_did: jobOnChain.poster_did,
+          poster_profile_cid: jobOnChain.poster_profile_cid,
+          completed: jobOnChain.completed,
+          rejected_count: Number(jobOnChain.rejected_count),
+          job_expired: jobOnChain.job_expired,
+          milestone_deadlines: jobOnChain.milestone_deadlines ? jobOnChain.milestone_deadlines.map(Number) : [],
+          application_deadline: Number(jobOnChain.application_deadline),
+          last_reject_time: jobOnChain.last_reject_time ? Number(jobOnChain.last_reject_time) : null,
+          locked: jobOnChain.locked,
+          title: jobOnChain.title || jobDataFromIPFS.title,
+          description: jobOnChain.description || jobDataFromIPFS.description,
+        };
+        const userAddress = account.toLowerCase();
+        const isPoster = jobPost.poster.toLowerCase() === userAddress;
+        const isWorker = jobPost.worker && jobPost.worker.toLowerCase() === userAddress;
+        if (isPoster || isWorker) {
+          if (jobPost.completed || jobPost.job_expired || !jobPost.active) {
+            fetchedCompletedJobs.push(jobPost);
+          } else {
+            fetchedInProgressJobs.push(jobPost);
+          }
+        }
+
+        console.log('DEBUG milestone_states raw:', jobOnChain.milestone_states);
       }
-
-      console.log("Dashboard: Final job arrays: ", {
-        inProgress: fetchedInProgressJobs.length,
-        completed: fetchedCompletedJobs.length,
-        withApplications: fetchedJobsWithApplications.length
-      });
-
       setInProgressJobs(fetchedInProgressJobs);
       setCompletedJobs(fetchedCompletedJobs);
-      setJobsWithApplications(fetchedJobsWithApplications);
       setLoading(false);
-
     } catch (error: any) {
-      console.error("Dashboard: Failed to load user jobs:", error);
       setError(`Failed to load jobs: ${error.message || "Unknown error"}`);
       setLoading(false);
     }
   };
 
-  const formatPostedTime = (timestamp: number) => {
-    const now = Date.now() / 1000;
-    const diffSeconds = now - timestamp;
+  // const formatPostedTime = (timestamp: number) => {
+  //   const now = Date.now() / 1000;
+  //   const diffSeconds = now - timestamp;
 
-    if (diffSeconds < 60) return `${Math.floor(diffSeconds)} giây trước`;
-    const diffMinutes = diffSeconds / 60;
-    if (diffMinutes < 60) return `${Math.floor(diffMinutes)} phút trước`;
-    const diffHours = diffMinutes / 60;
-    if (diffHours < 24) return `${Math.floor(diffHours)} giờ trước`;
-    const diffDays = diffHours / 24;
-    return `${Math.floor(diffDays)} ngày trước`;
-  };
+  //   if (diffSeconds < 60) return `${Math.floor(diffSeconds)} giây trước`;
+  //   const diffMinutes = diffSeconds / 60;
+  //   if (diffMinutes < 60) return `${Math.floor(diffMinutes)} phút trước`;
+  //   const diffHours = diffMinutes / 60;
+  //   if (diffHours < 24) return `${Math.floor(diffHours)} giờ trước`;
+  //   const diffDays = diffHours / 24;
+  //   return `${Math.floor(diffDays)} ngày trước`;
+  // };
 
   const getMilestoneStatus = (job: JobPost, index: number) => {
     const milestoneData = job.milestone_states[index];
@@ -552,39 +284,47 @@ const Dashboard = () => {
     return 'Chưa nộp';
   };
 
-  const getMilestoneBadgeVariant = (job: JobPost, index: number) => {
-    const milestoneData = job.milestone_states[index];
-    if (!milestoneData) return 'secondary'; // Default to secondary if no data
-    if (milestoneData.accepted) return 'default';
-    if (milestoneData.submitted) return 'secondary';
-    if (milestoneData.reject_count > 0) return 'destructive';
-    return 'outline';
-  };
+  // const getMilestoneBadgeVariant = (job: JobPost, index: number) => {
+  //   const milestoneData = job.milestone_states[index];
+  //   if (!milestoneData) return 'secondary'; 
+  //   if (milestoneData.accepted) return 'default';
+  //   if (milestoneData.submitted) return 'secondary';
+  //   if (milestoneData.reject_count > 0) return 'destructive';
+  //   return 'outline';
+  // };
 
-  const handleApproveWorker = async (jobId: string, applicationIndex: number) => {
+  const handleApproveWorker = async (jobId: string, workerAddress: string) => {
     if (!account || accountType !== 'aptos' || !window.aptos) {
       toast.error('Vui lòng kết nối ví Aptos để chấp nhận ứng viên.');
       return;
     }
-
     try {
       const transaction = await window.aptos.signAndSubmitTransaction({
         type: "entry_function_payload",
-        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::approve_worker`,
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::approve_worker`,
         type_arguments: [],
-        arguments: [
-          jobId, // job_id: u64
-          applicationIndex // application_index: u64
-        ]
+        arguments: [String(jobId), workerAddress]
       });
-
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Ứng viên đã được chấp nhận thành công!');
-      loadUserJobs(); // Reload jobs to reflect the approved worker
-      refetchProfile(); // Refresh profile/reputation
+      loadUserJobs();
+      refetchProfile();
     } catch (error: any) {
-      console.error('Chấp nhận ứng viên thất bại:', error);
-      toast.error(`Chấp nhận ứng viên thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+      if (error?.message?.includes('EALREADY_HAS_WORKER')) {
+        toast.error('Job đã có worker, không thể duyệt lại.');
+      } else if (error?.message?.includes('EWORKER_NOT_APPLIED')) {
+        toast.error('Chưa có ứng viên nào để duyệt.');
+      } else if (error?.message?.includes('ENOT_SELECTED')) {
+        toast.error('Chỉ được duyệt đúng ứng viên đang apply.');
+      } else if (error?.message?.includes('ENOT_POSTER')) {
+        toast.error('Bạn không phải chủ job này.');
+      } else if (error?.message?.includes('ENO_PROFILE')) {
+        toast.error('Ứng viên chưa có hồ sơ.');
+      } else if (error?.message?.includes('EJOB_NOT_FOUND')) {
+        toast.error('Job không tồn tại.');
+      } else {
+        toast.error(`Chấp nhận ứng viên thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+      }
     }
   };
 
@@ -595,20 +335,29 @@ const Dashboard = () => {
     }
 
     try {
+      console.log('Submitting milestone:', { jobId, milestoneIndex });
       const transaction = await window.aptos.signAndSubmitTransaction({
         type: "entry_function_payload",
-        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::submit_milestone`,
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::submit_milestone`,
         type_arguments: [],
         arguments: [
-          jobId, // job_id: u64
-          milestoneIndex // milestone_index: u64
+          Number(jobId), 
+          Number(milestoneIndex) 
         ]
       });
 
+      console.log('Transaction submitted:', transaction);
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
+      console.log('Transaction confirmed');
+      
       toast.success(`Cột mốc ${milestoneIndex + 1} đã được nộp thành công!`);
-      loadUserJobs();
-      refetchProfile(); // Refresh profile/reputation
+      
+
+      console.log('Loading jobs after submission...');
+      await loadUserJobs();
+      console.log('Jobs loaded after submission');
+      
+      refetchProfile();
     } catch (error: any) {
       console.error('Nộp cột mốc thất bại:', error);
       toast.error(`Nộp cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -624,18 +373,18 @@ const Dashboard = () => {
     try {
       const transaction = await window.aptos.signAndSubmitTransaction({
         type: "entry_function_payload",
-        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::accept_milestone`,
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::accept_milestone`,
         type_arguments: [],
         arguments: [
-          jobId, // job_id: u64
-          milestoneIndex // milestone_index: u64
+          Number(jobId), 
+          Number(milestoneIndex) 
         ]
       });
 
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success(`Cột mốc ${milestoneIndex + 1} đã được chấp nhận thành công!`);
       loadUserJobs();
-      refetchProfile(); // Refresh profile/reputation
+      refetchProfile(); 
     } catch (error: any) {
       console.error('Chấp nhận cột mốc thất bại:', error);
       toast.error(`Chấp nhận cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -651,48 +400,21 @@ const Dashboard = () => {
     try {
       const transaction = await window.aptos.signAndSubmitTransaction({
         type: "entry_function_payload",
-        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::reject_milestone`,
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::reject_milestone`,
         type_arguments: [],
         arguments: [
-          jobId, // job_id: u64
-          milestoneIndex // milestone_index: u64
+          Number(jobId),
+          Number(milestoneIndex) 
         ]
       });
 
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success(`Cột mốc ${milestoneIndex + 1} đã được từ chối.`);
       loadUserJobs();
-      refetchProfile(); // Refresh profile/reputation
+      refetchProfile(); 
     } catch (error: any) {
       console.error('Từ chối cột mốc thất bại:', error);
       toast.error(`Từ chối cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
-    }
-  };
-
-  const handleAutoConfirmMilestone = async (jobId: string, milestoneIndex: number) => {
-    if (!account || accountType !== 'aptos' || !window.aptos) {
-      toast.error('Vui lòng kết nối ví Aptos để tự động xác nhận cột mốc.');
-      return;
-    }
-
-    try {
-      const transaction = await window.aptos.signAndSubmitTransaction({
-        type: "entry_function_payload",
-        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::auto_confirm_milestone`,
-        type_arguments: [],
-        arguments: [
-          jobId, // job_id: u64
-          milestoneIndex // milestone_index: u64
-        ]
-      });
-
-      await aptos.waitForTransaction({ transactionHash: transaction.hash });
-      toast.success(`Cột mốc ${milestoneIndex + 1} đã được tự động xác nhận.`);
-      loadUserJobs();
-      refetchProfile(); // Refresh profile/reputation
-    } catch (error: any) {
-      console.error('Tự động xác nhận cột mốc thất bại:', error);
-      toast.error(`Tự động xác nhận cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
     }
   };
 
@@ -705,7 +427,7 @@ const Dashboard = () => {
     try {
       const transaction = await window.aptos.signAndSubmitTransaction({
         type: "entry_function_payload",
-        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::cancel_job`,
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::cancel_job`,
         type_arguments: [],
         arguments: [
           jobId // job_id: u64
@@ -715,7 +437,7 @@ const Dashboard = () => {
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Dự án đã được hủy thành công!');
       loadUserJobs();
-      refetchProfile(); // Refresh profile/reputation
+      refetchProfile(); 
     } catch (error: any) {
       console.error('Hủy dự án thất bại:', error);
       toast.error(`Hủy dự án thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -731,17 +453,17 @@ const Dashboard = () => {
     try {
       const transaction = await window.aptos.signAndSubmitTransaction({
         type: "entry_function_payload",
-        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::complete_job`,
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::complete_job`,
         type_arguments: [],
         arguments: [
-          jobId // job_id: u64
+          jobId 
         ]
       });
 
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Dự án đã được đánh dấu hoàn thành thành công!');
       loadUserJobs();
-      refetchProfile(); // Refresh profile/reputation
+      refetchProfile(); 
     } catch (error: any) {
       console.error('Hoàn thành dự án thất bại:', error);
       toast.error(`Hoàn thành dự án thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
@@ -757,340 +479,352 @@ const Dashboard = () => {
     try {
       const transaction = await window.aptos.signAndSubmitTransaction({
         type: "entry_function_payload",
-        function: `${CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::expire_job`,
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::expire_job`,
         type_arguments: [],
         arguments: [
-          jobId // job_id: u64
+          jobId 
         ]
       });
 
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
       toast.success('Dự án đã được đánh dấu hết hạn thành công!');
       loadUserJobs();
-      refetchProfile(); // Refresh profile/reputation
+      refetchProfile(); 
     } catch (error: any) {
       console.error('Đánh dấu hết hạn dự án thất bại:', error);
       toast.error(`Đánh dấu hết hạn dự án thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
     }
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text)
-      .then(() => toast.success("Đã sao chép địa chỉ ví!"))
-      .catch(() => toast.error("Không thể sao chép."));
-  };
+  // const handleCopy = (text: string) => {
+  //   navigator.clipboard.writeText(text)
+  //     .then(() => toast.success("Đã sao chép địa chỉ ví!"))
+  //     .catch(() => toast.error("Không thể sao chép."));
+  // };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
+  // const handleApplyJob = async (jobId: string) => {
+  //   if (!account || accountType !== 'aptos' || !window.aptos) {
+  //     toast.error('Vui lòng kết nối ví Aptos để ứng tuyển.');
+  //     return;
+  //   }
+  //   try {
+  //     const transaction = await window.aptos.signAndSubmitTransaction({
+  //       type: "entry_function_payload",
+  //       function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::apply`,
+  //       type_arguments: [],
+  //       arguments: [jobId]
+  //     });
+  //     await aptos.waitForTransaction({ transactionHash: transaction.hash });
+  //     toast.success('Đơn ứng tuyển của bạn đã được gửi thành công!');
+  //     loadUserJobs();
+  //   } catch (error: any) {
+  //     if (error?.message?.includes('EALREADY_APPLIED') || error?.message?.includes('code: 15')) {
+  //       toast.error('Bạn đã apply, vui lòng chờ 8 tiếng mới được apply lại.');
+  //     } else {
+  //       toast.error(`Ứng tuyển thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+  //     }
+  //   }
+  // };
+
+  const handleRejectWorker = async (jobId: string) => {
+    if (!account || accountType !== 'aptos' || !window.aptos) {
+      toast.error('Vui lòng kết nối ví Aptos để từ chối ứng viên.');
+      return;
+    }
     try {
-      await loadUserJobs();
-      toast.success('Đã làm mới dữ liệu thành công!');
-    } catch (error) {
-      console.error('Lỗi khi làm mới dữ liệu:', error);
-      toast.error('Không thể làm mới dữ liệu. Vui lòng thử lại sau.');
-    } finally {
-      setIsRefreshing(false);
+      const transaction = await window.aptos.signAndSubmitTransaction({
+        type: "entry_function_payload",
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::reopen_applications`,
+        type_arguments: [],
+        arguments: [jobId]
+      });
+      await aptos.waitForTransaction({ transactionHash: transaction.hash });
+      toast.success('Đã từ chối ứng viên và mở lại job cho người khác apply!');
+      loadUserJobs();
+    } catch (error: any) {
+      toast.error(`Từ chối ứng viên thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
     }
   };
 
-  const renderJobCard = (job: JobPost, type: 'in-progress' | 'completed' | 'applications') => {
+  const renderJobCard = (job: JobPost & { title?: string; description?: string }, type: string) => {
     const userAddress = account?.toLowerCase();
     const isPoster = job.poster.toLowerCase() === userAddress;
     const isWorker = job.worker && job.worker.toLowerCase() === userAddress;
-    const isApplicant = job.applications.some(app => app.worker && app.worker.toLowerCase() === userAddress);
-
-    // Check if the current job has the necessary milestone data to display the section
-    const hasMilestonesToDisplay = job.milestones && job.milestones.length > 0 && type === 'in-progress';
-
-    // Log for debugging
-    console.log(`Job ID: ${job.id}`);
-    console.log(`Milestones array:`, job.milestones);
-    console.log(`Milestone states object:`, job.milestone_states);
-
+    const statusObj = getJobStatus(job);
+    const canCancel = isPoster && job.active && (!job.worker || job.current_milestone === 0);
+    const canComplete = isPoster && job.active && job.worker && job.current_milestone === job.milestones.length;
+    const canExpire = isPoster && !job.completed && !job.job_expired && job.active && (Date.now() / 1000) > job.application_deadline;
+    const canSubmitMilestone = isWorker && job.active && !job.completed;
+    console.log('DEBUG JOB:', job);
 
     return (
-    <motion.div
-      key={job.id}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="w-full"
-    >
-      <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 border border-white/10 backdrop-blur-sm p-6 rounded-2xl shadow-xl hover:border-blue-500/30 transition-all duration-300 flex flex-col h-full">
-        <CardHeader className="px-0 pt-0 pb-4">
-          <CardTitle className="text-xl font-bold text-white mb-2">{job.title}</CardTitle>
-          <CardDescription className="text-gray-400 text-sm line-clamp-2">{job.description}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex-1 px-0 py-0">
-          <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-300 mb-4">
-              <div className="flex items-center gap-2"><Briefcase size={16} className="text-blue-400" /><span>{job.category}</span></div>
-              <div className="flex items-center gap-2"><DollarSign size={16} className="text-green-400" /><span>${job.budget.min.toLocaleString()} - ${job.budget.max.toLocaleString()} {job.budget.currency}</span></div>
-              <div className="flex items-center gap-2"><Clock size={16} className="text-orange-400" /><span>{job.duration}</span></div>
-              <div className="flex items-center gap-2"><CalendarCheck size={16} className="text-purple-400" /><span>Thời hạn ứng tuyển: {new Date(job.application_deadline * 1000).toLocaleDateString()}</span></div>
+      <motion.div
+        key={job.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full"
+      >
+        <Card className="bg-gradient-to-br from-gray-900/70 to-gray-800/80 border border-white/10 p-6 rounded-xl shadow-lg hover:border-blue-500/50 transition-all duration-300 flex flex-col h-full">
+          <CardHeader className="mb-2">
+            <CardTitle className="text-2xl font-bold text-blue-400 mb-1 truncate">
+              {job.title ? job.title : `Job ID: ${job.id}`}
+            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-300 font-medium truncate">
+                Người đăng: {job.poster ? `${job.poster.slice(0, 6)}...${job.poster.slice(-4)}` : ''}
+              </span>
+              <span className="text-sm text-green-400 font-medium truncate ml-4">
+                Người làm: {job.worker ? `${job.worker.slice(0, 6)}...${job.worker.slice(-4)}` : <span className="text-gray-500">Chưa có</span>}
+              </span>
             </div>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {job.skills.map((skill, idx) => (
-                <Badge key={idx} variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/30">{skill}</Badge>
-              ))}
-            </div>
-
-            {/* Hiển thị thông tin Poster/Worker/Applications */}
-            <div className="mb-4 p-4 bg-gray-800/50 rounded-lg border border-white/10">
-              <h3 className="font-semibold text-white mb-3 flex items-center gap-2"><Users size={18} className="text-violet-400" />Thông tin liên quan</h3>
-              <div className="space-y-3">
-                {/* Poster Info */}
-                  {(isPoster || isWorker || isApplicant) && ( // Show poster info to all relevant parties
-                  <div className="flex items-center gap-3">
-                    <Avatar className="w-10 h-10 border-2 border-blue-500">
-                      <AvatarImage src={job.client.profilePic} alt={job.client.name} />
-                      <AvatarFallback>{job.client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <p className="font-medium text-white">
-                          Người đăng: {isPoster ? 'Bạn' : job.client.name}
-                          {job.client.reputation && (
-                            <span className="text-sm text-gray-400 ml-2">
-                              (Danh tiếng: {job.client.reputation.score}, Cấp: {job.client.reputation.level})
-                            </span>
-                          )}
-                        </p>
-                      <p className="text-xs text-gray-400">Đăng lúc: {formatPostedTime(job.start_time)}</p>
-                        <div className="flex items-center gap-1 text-xs text-gray-400">
-                          <span>Địa chỉ ví: {job.poster.slice(0, 6)}...{job.poster.slice(-4)}</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleCopy(job.poster); }}
-                            className="text-gray-500 hover:text-blue-400 p-1 rounded-sm transition-colors"
-                            title="Sao chép địa chỉ ví"
-                          >
-                            <Copy size={12} />
-                          </button>
-                        </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Worker Info */}
-                  {job.worker && (
-                  <div className="flex items-center gap-3">
-                      <Avatar className={`w-10 h-10 border-2 ${isWorker ? 'border-green-500' : 'border-gray-500'}`}>
-                      <AvatarImage src={job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfilePic} alt="Worker Avatar" />
-                      <AvatarFallback>WK</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <p className="font-medium text-white">
-                          Người thực hiện: {isWorker ? 'Bạn' : (job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerProfileName || 'Ẩn danh')}
-                          {job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerReputation && (
-                            <span className="text-sm text-gray-400 ml-2">
-                              (Danh tiếng: {job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerReputation.score}, Cấp: {job.applications.find(app => app.worker.toLowerCase() === job.worker?.toLowerCase())?.workerReputation.level})
-                            </span>
-                          )}
-                        </p>
-                      <p className="text-xs text-gray-400">Được chấp nhận lúc: {formatPostedTime(job.approve_time || 0)}</p>
-                        <div className="flex items-center gap-1 text-xs text-gray-400">
-                          <span>Địa chỉ ví: {job.worker.slice(0, 6)}...{job.worker.slice(-4)}</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleCopy(job.worker); }}
-                            className="text-gray-500 hover:text-blue-400 p-1 rounded-sm transition-colors"
-                            title="Sao chép địa chỉ ví"
-                          >
-                            <Copy size={12} />
-                          </button>
-                    </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Milestones for active jobs */}
-                  {hasMilestonesToDisplay && (
-                  <div className="mt-4">
-                    <h4 className="font-medium text-white mb-2 flex items-center gap-2"><Hourglass size={16} className="text-yellow-400" />Tiến độ dự án ({job.current_milestone}/{job.milestones.length})</h4>
-                    <ul className="space-y-2">
-                        {job.milestones.map((amount, index) => {
-                          const milestoneData = job.milestone_states[index];
-                          const isCurrentMilestone = job.current_milestone === index;
-                          const isSubmitted = milestoneData?.submitted;
-                          const isAccepted = milestoneData?.accepted;
-                          const isRejected = milestoneData?.reject_count > 0 && !isSubmitted && !isAccepted;
-                          
-                          const showSubmitButton = isWorker && isCurrentMilestone && !isSubmitted && !isAccepted;
-                          const showAcceptRejectButtons = isPoster && isCurrentMilestone && isSubmitted && !isAccepted;
-                          const autoConfirmThresholdReached = milestoneData?.submit_time && (Date.now() / 1000) >= (milestoneData.submit_time + AUTO_CONFIRM_DELAY);
-                          const showAutoConfirmButton = (isPoster || isWorker) && isCurrentMilestone && isSubmitted && !isAccepted && autoConfirmThresholdReached;
-
-                          return (
-                            <li key={index} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-700/30 px-3 py-2 rounded-md">
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 sm:mb-0">
-                                <span className="text-sm text-gray-300">Giai đoạn {index + 1}: ${amount / 100_000_000} APT</span>
-                          <Badge variant={getMilestoneBadgeVariant(job, index)}>{getMilestoneStatus(job, index)}</Badge>
-                              </div>
-                              <div className="flex flex-wrap gap-2 justify-end">
-                                {showSubmitButton && (
-                                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => handleSubmitMilestone(job.id, index)}>
-                                    Nộp cột mốc
-                                  </Button>
-                                )}
-                                {showAcceptRejectButtons && (
-                                  <>
-                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleAcceptMilestone(job.id, index)}>
-                                      Chấp nhận
-                                    </Button>
-                                    <Button size="sm" variant="destructive" onClick={() => handleRejectMilestone(job.id, index)}>
-                                      Từ chối
-                                    </Button>
-                                  </>
-                                )}
-                                {showAutoConfirmButton && (
-                                  <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => handleAutoConfirmMilestone(job.id, index)}>
-                                    Tự động xác nhận
-                                  </Button>
-                                )}
-                              </div>
-                        </li>
-                          );
-                        })}
-                    </ul>
-                  </div>
-                )}
-                  {!hasMilestonesToDisplay && job.milestones.length === 0 && type === 'in-progress' && (
-                    <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-white/10 text-center text-gray-400 text-sm">
-                      Dự án này chưa có cột mốc nào được định nghĩa.
-                    </div>
-                  )}
-
-                  {/* Job action buttons (Cancel, Complete, Expire) */}
-                  {type === 'in-progress' && (
-                    <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-3 justify-end">
-                      {isPoster && !job.worker && job.active && (
-                        <Button size="sm" variant="destructive" onClick={() => handleCancelJob(job.id)}>
-                          Hủy dự án
-                        </Button>
-                      )}
-                      {isPoster && job.worker && job.active && job.current_milestone === job.milestones.length && (
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleCompleteJob(job.id)}>
-                          Hoàn thành dự án
-                        </Button>
-                      )}
-                      {isPoster && !job.completed && !job.job_expired && job.active && (Date.now() / 1000) > job.application_deadline && (
-                        <Button size="sm" variant="outline" className="bg-orange-600/20 text-orange-400 hover:bg-orange-600/30" onClick={() => handleExpireJob(job.id)}>
-                          Đánh dấu hết hạn
-                        </Button>
-                      )}
-                  </div>
-                )}
-
-                {/* Application List (for posters) */}
-                  {(type === 'applications' || (type === 'in-progress' && isPoster && !job.worker)) && job.applications.length > 0 && (
-                  <div className="mt-4 p-4 bg-blue-900/20 rounded-lg border border-blue-500/30">
-                    <h4 className="font-semibold text-white mb-3 flex items-center gap-2"><Users size={16} className="text-blue-300" />Đơn ứng tuyển ({job.applications.length})</h4>
-                    <ul className="space-y-3">
-                      {job.applications.map((app, index) => (
-                        <li key={index} className="flex items-center justify-between bg-blue-800/30 p-3 rounded-md">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="w-9 h-9">
-                              <AvatarImage src={app.workerProfilePic} alt={app.workerProfileName} />
-                              <AvatarFallback>{app.workerProfileName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium text-white">{app.workerProfileName}</p>
-                              <p className="text-xs text-gray-400">Ứng tuyển lúc: {formatPostedTime(app.apply_time)}</p>
-                                <div className="flex items-center gap-1 text-xs text-gray-400">
-                                  <span>Địa chỉ ví: {app.worker.slice(0, 6)}...{app.worker.slice(-4)}</span>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleCopy(app.worker); }}
-                                    className="text-gray-500 hover:text-blue-400 p-1 rounded-sm transition-colors"
-                                    title="Sao chép địa chỉ ví"
-                                  >
-                                    <Copy size={12} />
-                                  </button>
-                                </div>
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => handleApproveWorker(job.id, index)}
-                          >
-                            Chấp nhận
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                  {(type === 'applications' || (type === 'in-progress' && isPoster && !job.worker)) && job.applications.length === 0 && (
-                  <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-white/10 text-center text-gray-400 text-sm">
-                    Chưa có đơn ứng tuyển nào.
-                  </div>
-                )}
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-between">
+            {job.description && (
+              <div className="mb-2 text-gray-300 text-sm line-clamp-2 break-words">
+                {job.description}
+              </div>
+            )}
+            <div className="mb-2 text-gray-400 text-sm space-y-1">
+              <div>
+                <Clock className="inline w-4 h-4 text-orange-400 mr-1" />
+                Bắt đầu: {job.start_time ? new Date(job.start_time * 1000).toLocaleString() : '-'}
+              </div>
+              <div>
+                <Clock className="inline w-4 h-4 text-orange-400 mr-1" />
+                Deadline ứng tuyển: {job.application_deadline ? new Date(job.application_deadline * 1000).toLocaleString() : '-'}
+              </div>
+              <div>
+                <DollarSign className="w-5 h-5 inline mr-1 text-green-400" />
+                Escrowed: {job.escrowed_amount ? job.escrowed_amount / 100_000_000 : 0} APT
+              </div>
+              <div>
+                <span className="text-xs text-gray-400">Số lần bị từ chối: {job.rejected_count || 0}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-400">{job.locked ? 'Job đã bị khóa' : ''}</span>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-  };
 
-  const renderPaginationControls = (totalItems: number, currentPage: number, onPageChange: (page: number) => void) => {
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    
+            {job.active && !job.completed && job.milestone_states && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <h4 className="text-sm font-medium text-gray-300 mb-2">Cột mốc hiện tại:</h4>
+                {Object.entries(job.milestone_states).map(([index, state]: [string, any]) => {
+                  const milestoneIndex = Number(index);
+                  const milestoneData = state;
+               
+                  console.log({ milestoneIndex, milestoneData, isPoster, isWorker, jobId: job.id, jobActive: job.active, jobCompleted: job.completed, currentUser: account, poster: job.poster, worker: job.worker, currentMilestone: job.current_milestone });
+                  // DEBUG: Luôn hiển thị button accept/reject nếu bật DEBUG_ALWAYS_SHOW_BUTTONS
+                  // if (DEBUG_ALWAYS_SHOW_BUTTONS || (isPoster && milestoneData.submitted && !milestoneData.accepted)) {
+                  //   return (
+                  //     <div key={index} className="flex items-center justify-between gap-2 mb-2">
+                  //       {/* <span className="text-sm text-gray-400">
+                  //         [DEBUG] Cột mốc {milestoneIndex + 1} - submitted: {String(milestoneData.submitted)} - accepted: {String(milestoneData.accepted)}
+                  //       </span> */}
+                  //       <div className="flex gap-2">
+                  //         <Button
+                  //           size="sm"
+                  //           className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
+                  //           onClick={() => handleAcceptMilestone(job.id, milestoneIndex)}
+                  //         >
+                  //           Chấp nhận
+                  //         </Button>
+                  //         <Button
+                  //           size="sm"
+                  //           variant="destructive"
+                  //           className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
+                  //           onClick={() => handleRejectMilestone(job.id, milestoneIndex)}
+                  //         >
+                  //           Từ chối
+                  //         </Button>
+                  //       </div>
+                  //     </div>
+                  //   );
+                  // }
+                  // Worker can submit milestone
+                  if (isWorker && !milestoneData.submitted && milestoneIndex === job.current_milestone) {
+                    return (
+                      <div key={index} className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-sm text-gray-400">
+                          Cột mốc {milestoneIndex + 1} chưa được nộp
+                        </span>
+                        <Button
+                          size="sm"
+                          className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+                          onClick={() => handleSubmitMilestone(job.id, milestoneIndex)}
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Nộp cột mốc
+                        </Button>
+                      </div>
+                    );
+                  }
+             
+                  return (
+                    <div key={index} className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-sm text-gray-400">
+                        Cột mốc {milestoneIndex + 1}: {getMilestoneStatus(job, milestoneIndex)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-    if (totalPages <= 1) return null;
-
-    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-
-    return (
-      <div className="flex justify-center items-center gap-2 mt-8">
-        <Button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          variant="outline"
-          className="bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
-        >
-          Trang trước
-        </Button>
-        {pages.map(page => (
-          <Button
-            key={page}
-            onClick={() => onPageChange(page)}
-            variant={currentPage === page ? "default" : "outline"}
-            className={`${currentPage === page ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 text-white hover:bg-gray-700'} border-blue-600`}
-          >
-            {page}
-          </Button>
-        ))}
-        <Button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          variant="outline"
-          className="bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50"
-        >
-          Trang sau
-        </Button>
-      </div>
+            {Array.isArray(job.milestones) && job.milestones.length > 0 && (
+              <div className="mt-2">
+                <h4 className="text-sm font-medium text-gray-300 mb-1">Milestones:</h4>
+                <ul className="space-y-1">
+                  {job.milestones.map((m, idx) => {
+                    const milestoneData = job.milestone_states && job.milestone_states[idx];
+                    let milestoneStatus = '-';
+                    if (milestoneData) {
+                      if (milestoneData.accepted) milestoneStatus = 'Đã chấp nhận';
+                      else if (milestoneData.submitted) milestoneStatus = 'Đã nộp';
+                      else if (milestoneData.reject_count > 0) milestoneStatus = `Từ chối (${milestoneData.reject_count})`;
+                      else milestoneStatus = 'Chưa nộp';
+                    }
+                    let deadline = '';
+                    if (job.approved && job.milestone_deadlines && job.milestone_deadlines[idx]) {
+                      deadline = new Date(job.milestone_deadlines[idx] * 1000).toLocaleDateString();
+                    }
+                    let completedAt = '';
+                    if (milestoneData && milestoneData.accepted && milestoneData.submit_time) {
+                      completedAt = new Date(milestoneData.submit_time * 1000).toLocaleDateString();
+                    }
+                    let durationDays = '';
+                    if (Array.isArray(job.duration_per_milestone) && job.duration_per_milestone[idx]) {
+                      durationDays = `${Math.round(job.duration_per_milestone[idx] / (24 * 60 * 60))} ngày`;
+                    }
+                    
+                    const canSubmit = isWorker && job.active && !job.completed && job.current_milestone === idx && !milestoneData?.submitted && !job.locked;
+                    return (
+                      <li key={idx} className="flex flex-col gap-1 mb-2">
+                        <div className="flex justify-between items-center text-xs text-gray-300">
+                          <span>
+                            Cột mốc {idx + 1}: {typeof m === 'number' ? m / 100_000_000 : 0} APT
+                            {durationDays && <span className="ml-2 text-yellow-400">({durationDays})</span>}
+                            {deadline && <span className="ml-2 text-gray-400">(Hạn: {deadline})</span>}
+                            {completedAt && <span className="ml-2 text-green-400">(Hoàn thành: {completedAt})</span>}
+                          </span>
+                          <span className="ml-2 truncate">{milestoneStatus}</span>
+                        </div>
+                        {canSubmit && (
+                          <div className="flex gap-2 mt-1">
+                            <Button
+                              size="sm"
+                              className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+                              onClick={() => handleSubmitMilestone(job.id, idx)}
+                            >
+                              Nộp cột mốc
+                            </Button>
+                          </div>
+                        )}
+                        {isPoster && milestoneData && milestoneData.submitted && !milestoneData.accepted && (
+                          <div className="flex gap-2 mt-1">
+                            <Button
+                              size="sm"
+                              className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
+                              onClick={() => handleAcceptMilestone(job.id, idx)}
+                            >
+                              Chấp nhận
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
+                              onClick={() => handleRejectMilestone(job.id, idx)}
+                            >
+                              Từ chối
+                            </Button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {/* Action Buttons */}
+            {(canCancel || canComplete || canExpire || canSubmitMilestone) && (
+              <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-3 justify-end">
+                {canCancel && (
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
+                    onClick={() => handleCancelJob(job.id)}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Hủy dự án
+                  </Button>
+                )}
+                {canComplete && (
+                  <Button 
+                    size="sm" 
+                    className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
+                    onClick={() => handleCompleteJob(job.id)}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Hoàn thành dự án
+                  </Button>
+                )}
+                {canExpire && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="bg-orange-600/20 text-orange-400 hover:bg-orange-600/30"
+                    onClick={() => handleExpireJob(job.id)}
+                  >
+                    <Clock className="w-4 h-4 mr-2" />
+                    Đánh dấu hết hạn
+                  </Button>
+                )}
+                {canSubmitMilestone && (
+                  <Button 
+                    size="sm" 
+                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+                    onClick={() => handleSubmitMilestone(job.id, job.current_milestone)}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Nộp cột mốc
+                  </Button>
+                )}
+              </div>
+            )}
+            {isPoster && job.worker && !job.approved && (
+              <div className="flex gap-2 mt-2">
+                <Button
+                  size="sm"
+                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
+                  onClick={() => handleApproveWorker(job.id, job.worker)}
+                >
+                  Duyệt ứng viên
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
+                  onClick={() => handleRejectWorker(job.id)}
+                >
+                  Từ chối ứng viên
+                </Button>
+              </div>
+            )}
+            <div className="flex gap-2 mt-4 justify-end">
+              <Badge className={statusObj.color}>{statusObj.label}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     );
   };
 
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
-
-      {/* Fixed Refresh Button */}
-      <div className="fixed bottom-8 right-8 z-50">
-        <Button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 shadow-lg rounded-full w-12 h-12 p-0"
-          title="Làm mới dữ liệu"
-        >
-          {isRefreshing ? (
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-refresh-ccw"><path d="M21 12a9 9 0 0 0-9-9V3a10 10 0 0 1 10 10Z"/><path d="M3 12a9 9 0 0 0 9 9V21a10 10 0 0 1-10-10Z"/><path d="M8 17.924L5.1 14.85a2 2 0 0 1-.3-2.004L6.083 10"/><path d="M16 6.076L18.9 9.15a2 2 0 0 1 .3 2.004L17.917 14"/></svg>
-          )}
-        </Button>
-      </div>
+ 
 
       <section ref={heroRef} className="relative py-20 bg-gradient-to-br from-blue-900/20 via-violet-900/30 to-black">
         <div className="absolute inset-0 bg-[url('/img/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
@@ -1124,46 +858,25 @@ const Dashboard = () => {
               <div className="text-gray-400">Dự án đang tiến hành</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-violet-400">{jobsWithApplications.length}</div>
-              <div className="text-gray-400">Dự án đang ứng tuyển</div>
-            </div>
-            <div className="text-center">
               <div className="text-3xl font-bold text-purple-400">{completedJobs.length}</div>
               <div className="text-gray-400">Dự án đã hoàn thành</div>
             </div>
           </motion.div>
 
           <div className="flex border-b border-white/10 mb-8">
-            <button
-              onClick={() => setActiveTab('in-progress')}
-              className={`px-6 py-3 text-lg font-semibold ${
-                activeTab === 'in-progress'
-                  ? 'text-blue-400 border-b-2 border-blue-400'
-                  : 'text-gray-400 hover:text-white'
-              } transition-colors duration-200`}
-            >
-              Đang tiến hành
-            </button>
-            <button
-              onClick={() => setActiveTab('applications')}
-              className={`px-6 py-3 text-lg font-semibold ${
-                activeTab === 'applications'
-                  ? 'text-blue-400 border-b-2 border-blue-400'
-                  : 'text-gray-400 hover:text-white'
-              } transition-colors duration-200`}
-            >
-              Đang ứng tuyển ({jobsWithApplications.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('completed')}
-              className={`px-6 py-3 text-lg font-semibold ${
-                activeTab === 'completed'
-                  ? 'text-blue-400 border-b-2 border-blue-400'
-                  : 'text-gray-400 hover:text-white'
-              } transition-colors duration-200`}
-            >
-              Đã hoàn thành
-            </button>
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-6 py-3 text-lg font-semibold ${
+                  activeTab === tab.key
+                    ? 'text-blue-400 border-b-2 border-blue-400'
+                    : 'text-gray-400 hover:text-white'
+                } transition-colors duration-200`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           {loading && (
@@ -1184,59 +897,20 @@ const Dashboard = () => {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
             >
-              {activeTab === 'in-progress' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {inProgressJobs.length > 0 ? (
-                    <>
-                      {inProgressJobs.slice(
-                        (inProgressCurrentPage - 1) * itemsPerPage,
-                        inProgressCurrentPage * itemsPerPage
-                      ).map(job => renderJobCard(job, 'in-progress'))}
-                      {renderPaginationControls(inProgressJobs.length, inProgressCurrentPage, handleInProgressPageChange)}
-                    </>
-                  ) : (
-                    <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
-                      Bạn chưa có dự án nào đang tiến hành.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'applications' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {jobsWithApplications.length > 0 ? (
-                    <>
-                      {jobsWithApplications.slice(
-                        (applicationsCurrentPage - 1) * itemsPerPage,
-                        applicationsCurrentPage * itemsPerPage
-                      ).map(job => renderJobCard(job, 'applications'))}
-                      {renderPaginationControls(jobsWithApplications.length, applicationsCurrentPage, handleApplicationsPageChange)}
-                    </>
-                  ) : (
-                    <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
-                      Chưa có đơn ứng tuyển nào.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'completed' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {completedJobs.length > 0 ? (
-                    <>
-                      {completedJobs.slice(
-                        (completedCurrentPage - 1) * itemsPerPage,
-                        completedCurrentPage * itemsPerPage
-                      ).map(job => renderJobCard(job, 'completed'))}
-                      {renderPaginationControls(completedJobs.length, completedCurrentPage, handleCompletedPageChange)}
-                    </>
-                  ) : (
-                    <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
-                      Bạn chưa có dự án nào đã hoàn thành.
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {(() => {
+                  const allJobs = [...inProgressJobs, ...completedJobs];
+                  const filtered = allJobs.filter(job => getJobStatus(job).key === activeTab);
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="lg:col-span-2 text-center py-10 bg-gray-900/50 rounded-lg border border-white/10 text-gray-400">
+                        Không có dự án nào ở trạng thái này.
+                      </div>
+                    );
+                  }
+                  return filtered.map(job => renderJobCard(job, activeTab));
+                })()}
+              </div>
             </motion.div>
           )}
         </div>

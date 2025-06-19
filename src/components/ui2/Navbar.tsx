@@ -169,26 +169,13 @@ const Navbar = () => {
                           </div>
                         </div>
                       </div>
-                      <DropdownMenuItem 
-                        onClick={() => navigate('/profile')} 
-                        className="py-2 px-3 rounded-md hover:bg-blue-500/10 text-blue-200 hover:text-white cursor-pointer"
-                      >
-                        <User className="mr-3 h-4 w-4 text-gray-500" />
-                        <span>Trang cá nhân</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => navigate('/reputation-calculation')} 
-                        className="py-2 px-3 rounded-md hover:bg-blue-500/10 text-blue-200 hover:text-white cursor-pointer"
-                      >
-                        <BarChart3 className="mr-3 h-4 w-4 text-gray-500" />
-                        <span>Cách tính điểm danh tiếng</span>
-                      </DropdownMenuItem>
+
                       <DropdownMenuItem 
                         onClick={() => navigate('/settings')} 
                         className="py-2 px-3 rounded-md hover:bg-blue-500/10 text-blue-200 hover:text-white cursor-pointer"
                       >
                         <Settings className="mr-3 h-4 w-4 text-gray-500" />
-                        <span>Định danh DID</span>
+                        <span>Định danh</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
@@ -278,28 +265,7 @@ const Navbar = () => {
                       )}
                     </div>
                   </div>
-                  <Button 
-                    onClick={() => {
-                      navigate('/profile');
-                      setIsMobileMenuOpen(false);
-                    }}
-                    variant="ghost"
-                    className="w-full justify-start flex items-center space-x-3 px-4 py-2 text-blue-200 hover:text-white hover:bg-blue-500/10 rounded-xl"
-                  >
-                    <User className="w-5 h-5" />
-                    <span>Trang cá nhân</span>
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      navigate('/reputation-calculation');
-                      setIsMobileMenuOpen(false);
-                    }}
-                    variant="ghost"
-                    className="w-full justify-start flex items-center space-x-3 px-4 py-2 text-blue-200 hover:text-white hover:bg-blue-500/10 rounded-xl"
-                  >
-                    <BarChart3 className="w-5 h-5" />
-                    <span>Cách tính điểm danh tiếng</span>
-                  </Button>
+
                   <Button 
                     onClick={() => {
                       navigate('/settings');
@@ -309,7 +275,7 @@ const Navbar = () => {
                     className="w-full justify-start flex items-center space-x-3 px-4 py-2 text-blue-200 hover:text-white hover:bg-blue-500/10 rounded-xl"
                   >
                     <Settings className="w-5 h-5" />
-                    <span>Định danh DID</span>
+                    <span>Định danh</span>
                   </Button>
                   <Button 
                     onClick={() => {
@@ -324,10 +290,10 @@ const Navbar = () => {
                   </Button>
                 </div>
               )}
-            </div>
+          </div>
           </motion.div>
         )}
-      </div>
+    </div>
     </motion.header>
   );
 };
