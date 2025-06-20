@@ -19,6 +19,12 @@ profiles:
     public_key: ed25519-pub-0x9ae320f17f4b166862b76ba02c2871b4ed7408b5169e0ffa919ceb3527628ae5
     account: 9f08893410072976ece933091d470418c45b1a8df44d0fe7c0868bd0c6d23ae8
     rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v10:
+    network: Testnet
+    private_key: ed25519-priv-0x464c2aed14b972529932b741e7e87d3330d3d142459a058db7fcb39d44133070
+    public_key: ed25519-pub-0xef40fb3f1536724c65d12d3b7f30a0b38c2fefffdd5ecc8d50b588434292d054
+    account: 1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
   farm_v2:
     network: Testnet
     private_key: ed25519-priv-0x7924b8169c8b9dd75989be10cac86333a94bea9a223f876dee476796bcdacbb4
@@ -48,6 +54,24 @@ profiles:
     private_key: ed25519-priv-0x389d3dc5c64f4dd89e26cf9da9c597fc82a63bbf9e1c9cae283853bdcf92f9eb
     public_key: ed25519-pub-0xd874b0d7aed4f1ccb05c79269e60cb1e886d7e1f3a3e5d0694eca8e43ee9c684
     account: 3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v7:
+    network: Testnet
+    private_key: ed25519-priv-0xc405a664774316e6c2848ec656f9953080daf58aa58739bb00f5f7dc6d0fdfd8
+    public_key: ed25519-pub-0x29c2359a65e37f440f5ed9a7fab73e975403ae5af3d57597cc067c311ad3e2ef
+    account: 8be739b731f059fd9a77937536ce867dd60c28e4e7aedded8f7ad606c59203d1
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v8:
+    network: Testnet
+    private_key: ed25519-priv-0x217062f53ee63cad6236f69e84cec822be1ba4f67db22636544148ed9d4b1dc0
+    public_key: ed25519-pub-0x7c0855e14b8fcdeaeb6e16f64d32b38c0a1c4dd02e4b1a4b84201555612becfe
+    account: 652683e06eb3e0be4f9a0812fff84856d455b279e72c3a633917c46d500d10bc
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v9:
+    network: Testnet
+    private_key: ed25519-priv-0x5d8f4627b93b7fcc0ff1a2ac10ca10dad11fda8d0c71fec1c97902db4992781f
+    public_key: ed25519-pub-0x3db95abf2dff4d430f54a943b8f19fa37b86ad9cad46fd94cb94743fe76c59b3
+    account: 24fa559c51addca98472645c28190d5d735e3f1b6dfb07956cfe42c91fb036a9
     rest_url: "https://fullnode.testnet.aptoslabs.com"
   job:
     network: Testnet

@@ -21,13 +21,14 @@ import {
   CheckCircle,
   Info,
   AlertCircle,
-
+  Eye,
+  Download
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
-import { aptos, fetchProfileDetails } from '@/utils/aptosUtils';
+import { aptos, fetchProfileDetails, decodeCID, fetchMilestoneDetails, getMilestoneCIDs } from '@/utils/aptosUtils';
 declare global { interface Window { ethereum?: any } }
-const MODULE_ADDRESS = "0x3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490";
-const JOBS_CONTRACT_ADDRESS = "0x3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490";
+const MODULE_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
+const JOBS_CONTRACT_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
 const PROFILE_MODULE_NAME = "web3_profiles_v29";
 
@@ -43,7 +44,15 @@ export interface JobPost {
   approved: boolean;
   active: boolean;
   current_milestone: number;
-  milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } };
+  milestone_states: { [key: number]: { 
+    submitted: boolean; 
+    accepted: boolean; 
+    submit_time: number; 
+    reject_count: number;
+    submission_cid?: any;
+    acceptance_cid?: any;
+    rejection_cid?: any;
+  } };
   submit_time: number | null;
   escrowed_amount: number;
   approve_time: number | null;
@@ -58,6 +67,16 @@ export interface JobPost {
   locked: boolean;
   title?: string;
   description?: string;
+}
+
+interface MilestoneData {
+  submitted: boolean;
+  accepted: boolean;
+  submit_time: number | string;
+  reject_count: number;
+  submission_cid?: any;
+  acceptance_cid?: any;
+  rejection_cid?: any;
 }
 
 const EVENT_TYPES = [
@@ -185,6 +204,33 @@ const Jobs = () => {
     last_reject_time: number | null;
   }[]>([]);
 
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [jobEvents, setJobEvents] = useState<any[]>([]);
+  const [hasApplied, setHasApplied] = useState(false);
+
+  // Milestone details dialog states
+  const [viewMilestoneDialogOpen, setViewMilestoneDialogOpen] = useState(false);
+  const [milestoneDetails, setMilestoneDetails] = useState<any>(null);
+  const [loadingMilestoneDetails, setLoadingMilestoneDetails] = useState(false);
+  const [selectedMilestoneCid, setSelectedMilestoneCid] = useState<string>('');
+  const [selectedMilestoneType, setSelectedMilestoneType] = useState<'submission' | 'acceptance' | 'rejection'>('submission');
+  const [selectedJobId, setSelectedJobId] = useState<string>('');
+  const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState<number>(0);
+
+  // Job events dialog states
+  const [viewJobEventsDialogOpen, setViewJobEventsDialogOpen] = useState(false);
+  const [jobEventsDetails, setJobEventsDetails] = useState<any[]>([]);
+  const [loadingJobEvents, setLoadingJobEvents] = useState(false);
+  const [selectedJobForEvents, setSelectedJobForEvents] = useState<string>('');
+
+  const [canceledJobIds, setCanceledJobIds] = useState<Set<string>>(new Set());
+  const [profileFullInfo, setProfileFullInfo] = useState<{
+    profile: any;
+    jobsCreated: any[];
+    jobsApplied: any[];
+    historyResult: any[];
+  } | null>(null);
+
   const getJobStatus = (job) => {
     if (job.status === 'Đã hoàn thành') return { label: 'Đã hoàn thành', key: 'completed', color: 'bg-blue-700/30 text-blue-300' };
     if (job.status === 'Đã hủy') return { label: 'Đã hủy', key: 'canceled', color: 'bg-red-700/30 text-red-300' };
@@ -194,13 +240,79 @@ const Jobs = () => {
     if (job.status === 'Đã hết hạn') return { label: 'Đã hết hạn', key: 'closed', color: 'bg-red-800/30 text-red-400' };
     return { label: 'Đã đóng', key: 'closed', color: 'bg-gray-400/20 text-gray-400' };
   };
-  const [canceledJobIds, setCanceledJobIds] = useState<Set<string>>(new Set());
-  const [profileFullInfo, setProfileFullInfo] = useState<{
-    profile: any;
-    jobsCreated: any[];
-    jobsApplied: any[];
-    historyResult: any[];
-  } | null>(null);
+
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleString('vi-VN');
+  };
+
+  const getActionDisplayName = (action: string) => {
+    switch (action) {
+      case 'submit': return 'Nộp cột mốc';
+      case 'accept': return 'Chấp nhận';
+      case 'reject': return 'Từ chối';
+      default: return action;
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleViewMilestoneDetails = async (jobId: string, milestoneIndex: number, cid: string, type: 'submission' | 'acceptance' | 'rejection') => {
+    setSelectedJobId(jobId);
+    setSelectedMilestoneIndex(milestoneIndex);
+    setSelectedMilestoneCid(cid);
+    setSelectedMilestoneType(type);
+    setMilestoneDetails(null);
+    setLoadingMilestoneDetails(true);
+    setViewMilestoneDialogOpen(true);
+
+    try {
+      // Convert CID bytes to string if needed
+      let cidString = cid;
+      if (Array.isArray(cid)) {
+        cidString = decodeCID(cid);
+      } else if (typeof cid === 'string' && cid.startsWith('0x')) {
+        cidString = decodeCID(cid);
+      }
+
+      if (!cidString) {
+        throw new Error('Invalid CID format');
+      }
+
+      // Fetch data from IPFS
+      const data = await fetchMilestoneDetails(cidString);
+      setMilestoneDetails(data);
+    } catch (error) {
+      console.error('Error fetching milestone details:', error);
+      toast.error('Không thể tải thông tin chi tiết từ IPFS');
+      setMilestoneDetails({ error: 'Không thể tải dữ liệu' });
+    } finally {
+      setLoadingMilestoneDetails(false);
+    }
+  };
+
+  const handleViewJobEvents = async (jobId: string) => {
+    setSelectedJobForEvents(jobId);
+    setJobEventsDetails([]);
+    setLoadingJobEvents(true);
+    setViewJobEventsDialogOpen(true);
+
+    try {
+      // Fetch all events for this job
+      const events = await fetchJobEvents(jobId);
+      setJobEventsDetails(events);
+    } catch (error) {
+      console.error('Error fetching job events:', error);
+      toast.error('Không thể tải sự kiện của dự án');
+    } finally {
+      setLoadingJobEvents(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = jobs;
@@ -286,29 +398,7 @@ const Jobs = () => {
             end_time: Number(jobOnChain?.end_time ?? eventData.end_time),
             locked: jobOnChain?.locked ?? eventData.locked,
             milestones: jobOnChain?.milestones ? jobOnChain.milestones.map(Number) : (Array.isArray(eventData.milestones) ? eventData.milestones.map(Number) : []),
-            milestone_states: jobOnChain?.milestone_states?.data ?
-              Object.fromEntries(
-                Object.entries(jobOnChain.milestone_states.data).map(([key, value]: [string, any]) => [
-                  Number(key),
-                  {
-                    submitted: value.submitted || false,
-                    accepted: value.accepted || false,
-                    submit_time: Number(value.submit_time || 0),
-                    reject_count: Number(value.reject_count || 0),
-                  },
-                ])
-              ) : (eventData.milestone_states?.data ?
-                Object.fromEntries(
-                  Object.entries(eventData.milestone_states.data).map(([key, value]: [string, any]) => [
-                    Number(key),
-                    {
-                      submitted: value.submitted || false,
-                      accepted: value.accepted || false,
-                      submit_time: Number(value.submit_time || 0),
-                      reject_count: Number(value.reject_count || 0),
-                    },
-                  ])
-                ) : {}),
+            milestone_states: {},
             application_deadline: Number(jobOnChain?.application_deadline ?? eventData.application_deadline),
             duration_per_milestone: jobOnChain?.duration_per_milestone ? jobOnChain.duration_per_milestone.map(Number) : (Array.isArray(eventData.duration_per_milestone) ? eventData.duration_per_milestone.map(Number) : []),
             approved: jobOnChain?.approved ?? eventData.approved,
@@ -326,6 +416,34 @@ const Jobs = () => {
             title: jobOnChain?.title || jobDataFromIPFS.title,
             description: jobOnChain?.description || jobDataFromIPFS.description,
           };
+
+          // Fetch milestone states with CID fields
+          if (jobOnChain?.milestone_states?.handle && Array.isArray(jobPost.milestones)) {
+            for (let i = 0; i < jobPost.milestones.length; i++) {
+              try {
+                const milestoneData = await aptos.getTableItem({
+                  handle: jobOnChain.milestone_states.handle,
+                  data: {
+                    key_type: "u64",
+                    value_type: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneData`,
+                    key: String(i),
+                  },
+                }) as MilestoneData;
+                jobPost.milestone_states[i] = {
+                  submitted: milestoneData.submitted,
+                  accepted: milestoneData.accepted,
+                  submit_time: Number(milestoneData.submit_time),
+                  reject_count: Number(milestoneData.reject_count),
+                  submission_cid: milestoneData.submission_cid,
+                  acceptance_cid: milestoneData.acceptance_cid,
+                  rejection_cid: milestoneData.rejection_cid,
+                };
+              } catch (e) {
+                // Handle error silently
+              }
+            }
+          }
+
           fetchedJobs.push(jobPost);
         } catch (ipfsError) {
           console.error(`Error processing job from IPFS CID ${jobCid}:`, ipfsError);
@@ -392,6 +510,28 @@ const Jobs = () => {
       }
     }
   };
+
+  const handleWithdrawApply = async () => {
+    if (!selectedJob) return;
+    setWithdrawing(true);
+    try {
+      const tx = await window.aptos.signAndSubmitTransaction({
+        type: "entry_function_payload",
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::worker_withdraw_apply`,
+        type_arguments: [],
+        arguments: [selectedJob.id]
+      });
+      await aptos.waitForTransaction({ transactionHash: tx.hash });
+      toast.success('Bạn đã rút ứng tuyển, stake đã được hoàn lại!');
+      setApplyDialogOpen(false);
+      loadJobs();
+    } catch (error: any) {
+      toast.error(`Rút ứng tuyển thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   const handleFullQuery = async () => {
     setProfileLoading(true);
     setProfileError(null);
@@ -477,6 +617,57 @@ const Jobs = () => {
           const response = await fetch(jobDetailsUrl);
           if (!response.ok) return null;
           const jobData = await response.json();
+
+          // Fetch job data from blockchain to get milestone states
+          let jobOnChain: any = null;
+          try {
+            const jobsResource = await aptos.getAccountResource({
+              accountAddress: JOBS_CONTRACT_ADDRESS,
+              resourceType: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Jobs`,
+            });
+            const jobsTableHandle = jobsResource && (jobsResource as any).jobs?.handle;
+            if (jobsTableHandle) {
+              jobOnChain = await aptos.getTableItem({
+                handle: jobsTableHandle,
+                data: {
+                  key_type: "u64",
+                  value_type: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::Job`,
+                  key: jobIdStr,
+                },
+              });
+            }
+          } catch (e) {
+            // Handle error silently
+          }
+
+          // Fetch milestone states with CID fields
+          let milestone_states = {};
+          if (jobOnChain?.milestone_states?.handle && Array.isArray(jobOnChain.milestones)) {
+            for (let i = 0; i < jobOnChain.milestones.length; i++) {
+              try {
+                const milestoneData = await aptos.getTableItem({
+                  handle: jobOnChain.milestone_states.handle,
+                  data: {
+                    key_type: "u64",
+                    value_type: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::MilestoneData`,
+                    key: String(i),
+                  },
+                }) as MilestoneData;
+                milestone_states[i] = {
+                  submitted: milestoneData.submitted,
+                  accepted: milestoneData.accepted,
+                  submit_time: Number(milestoneData.submit_time),
+                  reject_count: Number(milestoneData.reject_count),
+                  submission_cid: milestoneData.submission_cid,
+                  acceptance_cid: milestoneData.acceptance_cid,
+                  rejection_cid: milestoneData.rejection_cid,
+                };
+              } catch (e) {
+                // Handle error silently
+              }
+            }
+          }
+
           return {
             id: jobIdStr,
             title: jobData.title || `Job ID: ${jobIdStr}`,
@@ -501,7 +692,7 @@ const Jobs = () => {
             escrowed_amount: Number(event.data.escrowed_amount || 0),
             application_deadline: Number(event.data.application_deadline || 0),
             current_milestone: Number(event.data.current_milestone || 0),
-            milestone_states: event.data.milestone_states || {},
+            milestone_states: milestone_states,
             submit_time: event.data.submit_time ? Number(event.data.submit_time) : null,
             approve_time: event.data.approve_time ? Number(event.data.approve_time) : null,
             poster_did: event.data.poster_did || '',
@@ -547,6 +738,23 @@ const Jobs = () => {
       setProfileLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedJob && account) {
+      fetchJobEvents(selectedJob.id).then(events => {
+        setJobEvents(events);
+        setHasApplied(
+          events.some(ev =>
+            ev.type === 'WorkerAppliedEvent' &&
+            ev.data.worker && ev.data.worker.toLowerCase() === account.toLowerCase()
+          )
+        );
+      });
+    } else {
+      setHasApplied(false);
+      setJobEvents([]);
+    }
+  }, [selectedJob, account]);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -684,83 +892,82 @@ const Jobs = () => {
                                     </ul>
                                   </div>
                                 )}
-                                {Array.isArray(job.events) && job.events.length > 0 && (
+                                {/* Milestone Details Buttons */}
+                                {job.milestone_states && Object.keys(job.milestone_states).length > 0 && (
                                   <div className="mt-2">
-                                    <h4 className="text-xs font-medium text-blue-300 mb-1">Lịch sử sự kiện:</h4>
-                                    <ul className="space-y-2">
-                                      {job.events.map((ev, idx) => {
-                                        const time = ev.data.apply_time || ev.data.approve_time || ev.data.submit_time || ev.data.accept_time || ev.data.reject_time || ev.data.cancel_time || ev.data.complete_time || ev.data.expire_time || ev.data.start_time || 0;
-                             
-                                        let content = null;
-                                        switch (ev.type) {
-                                          case "JobPostedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-blue-400">Đăng dự án</span>
-                                                <div className="text-xs text-gray-400">Người đăng: <span className="font-mono">{ev.data.poster?.slice(0, 6)}...{ev.data.poster?.slice(-4)}</span></div>
-                                              </>
-                                            );
-                                            break;
-                                          case "WorkerAppliedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-yellow-400">Ứng tuyển</span>
-                                                <div className="text-xs text-gray-400">Người ứng tuyển: <span className="font-mono">{ev.data.worker?.slice(0, 6)}...{ev.data.worker?.slice(-4)}</span></div>
-                                              </>
-                                            );
-                                            break;
-                                          case "WorkerApprovedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-green-400">Duyệt ứng viên</span>
-                                                <div className="text-xs text-gray-400">Người được duyệt: <span className="font-mono">{ev.data.worker?.slice(0, 6)}...{ev.data.worker?.slice(-4)}</span></div>
-                                              </>
-                                            );
-                                            break;
-                                          case "MilestoneRejectedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-red-400">Từ chối cột mốc #{ev.data.milestone + 1}</span>
-                                                <div className="text-xs text-gray-400">Số lần từ chối: {ev.data.reject_count}</div>
-                                              </>
-                                            );
-                                            break;
-                                          case "JobCanceledEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-red-400">Hủy dự án</span>
-                                              </>
-                                            );
-                                            break;
-                                          case "JobCompletedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-blue-400">Hoàn thành dự án</span>
-                                              </>
-                                            );
-                                            break;
-                                          case "JobExpiredEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-gray-400">Dự án hết hạn</span>
-                                              </>
-                                            );
-                                            break;
-                                          default:
-                                            content = <span>{ev.type}</span>;
-                                        }
+                                    <h4 className="text-xs font-medium text-blue-300 mb-1">Chi tiết cột mốc:</h4>
+                                    <div className="space-y-2">
+                                      {Object.entries(job.milestone_states).map(([index, state]: [string, any]) => {
+                                        const milestoneIndex = Number(index);
                                         return (
-                                          <li key={idx} className="bg-gray-800/70 rounded p-2 flex flex-col gap-1">
-                                            <div className="flex justify-between items-center">
-                                              {content}
-                                              <span className="text-xs text-gray-500">{time ? new Date(time * 1000).toLocaleString() : ""}</span>
-                                            </div>
-                                          </li>
+                                          <div key={index} className="flex flex-wrap gap-1">
+                                            {state.submission_cid && (
+                                              <div className="flex flex-col gap-1">
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 text-xs"
+                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.submission_cid, 'submission')}
+                                                >
+                                                  <Eye className="w-3 h-3 mr-1" />
+                                                  Nộp {milestoneIndex + 1}
+                                                </Button>
+                                                <div className="text-xs text-gray-500">
+                                                  CID: {decodeCID(state.submission_cid).slice(0, 10)}...
+                                                </div>
+                                              </div>
+                                            )}
+                                            {state.acceptance_cid && (
+                                              <div className="flex flex-col gap-1">
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30 text-xs"
+                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.acceptance_cid, 'acceptance')}
+                                                >
+                                                  <Eye className="w-3 h-3 mr-1" />
+                                                  Chấp nhận {milestoneIndex + 1}
+                                                </Button>
+                                                <div className="text-xs text-gray-500">
+                                                  CID: {decodeCID(state.acceptance_cid).slice(0, 10)}...
+                                                </div>
+                                              </div>
+                                            )}
+                                            {state.rejection_cid && (
+                                              <div className="flex flex-col gap-1">
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border-red-400/30 text-xs"
+                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.rejection_cid, 'rejection')}
+                                                >
+                                                  <Eye className="w-3 h-3 mr-1" />
+                                                  Từ chối {milestoneIndex + 1}
+                                                </Button>
+                                                <div className="text-xs text-gray-500">
+                                                  CID: {decodeCID(state.rejection_cid).slice(0, 10)}...
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
                                         );
                                       })}
-                                    </ul>
+                                    </div>
                                   </div>
                                 )}
+
+                                {/* View All Events Button */}
+                                <div className="mt-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 border-purple-400/30 text-xs w-full"
+                                    onClick={() => handleViewJobEvents(job.id)}
+                                  >
+                                    <Eye className="w-3 h-3 mr-1" />
+                                    Xem tất cả sự kiện
+                                  </Button>
+                                </div>
                               </li>
                             ))}
                           </ul>
@@ -791,80 +998,67 @@ const Jobs = () => {
                                     </ul>
                                   </div>
                                 )}
-                                {Array.isArray(job.events) && job.events.length > 0 && (
+                                {/* Milestone Details Buttons */}
+                                {job.milestone_states && Object.keys(job.milestone_states).length > 0 && (
                                   <div className="mt-2">
-                                    <h4 className="text-xs font-medium text-blue-300 mb-1">Lịch sử sự kiện:</h4>
-                                    <ul className="space-y-2">
-                                      {job.events.map((ev, idx) => {
-                                        const time = ev.data.apply_time || ev.data.approve_time || ev.data.submit_time || ev.data.accept_time || ev.data.reject_time || ev.data.cancel_time || ev.data.complete_time || ev.data.expire_time || ev.data.start_time || 0;
-                                        let content = null;
-                                        switch (ev.type) {
-                                          case "JobPostedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-blue-400">Đăng dự án</span>
-                                                <div className="text-xs text-gray-400">Người đăng: <span className="font-mono">{ev.data.poster?.slice(0, 6)}...{ev.data.poster?.slice(-4)}</span></div>
-                                              </>
-                                            );
-                                            break;
-                                          case "WorkerAppliedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-yellow-400">Ứng tuyển</span>
-                                                <div className="text-xs text-gray-400">Người ứng tuyển: <span className="font-mono">{ev.data.worker?.slice(0, 6)}...{ev.data.worker?.slice(-4)}</span></div>
-                                              </>
-                                            );
-                                            break;
-                                          case "WorkerApprovedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-green-400">Duyệt ứng viên</span>
-                                                <div className="text-xs text-gray-400">Người được duyệt: <span className="font-mono">{ev.data.worker?.slice(0, 6)}...{ev.data.worker?.slice(-4)}</span></div>
-                                              </>
-                                            );
-                                            break;
-                                          case "MilestoneRejectedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-red-400">Từ chối cột mốc #{ev.data.milestone + 1}</span>
-                                                <div className="text-xs text-gray-400">Số lần từ chối: {ev.data.reject_count}</div>
-                                              </>
-                                            );
-                                            break;
-                                          case "JobCanceledEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-red-400">Hủy dự án</span>
-                                              </>
-                                            );
-                                            break;
-                                          case "JobCompletedEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-blue-400">Hoàn thành dự án</span>
-                                              </>
-                                            );
-                                            break;
-                                          case "JobExpiredEvent":
-                                            content = (
-                                              <>
-                                                <span className="font-bold text-gray-400">Dự án hết hạn</span>
-                                              </>
-                                            );
-                                            break;
-                                          default:
-                                            content = <span>{ev.type}</span>;
-                                        }
+                                    <h4 className="text-xs font-medium text-blue-300 mb-1">Chi tiết cột mốc:</h4>
+                                    <div className="space-y-2">
+                                      {Object.entries(job.milestone_states).map(([index, state]: [string, any]) => {
+                                        const milestoneIndex = Number(index);
                                         return (
-                                          <li key={idx} className="bg-gray-800/70 rounded p-2 flex flex-col gap-1">
-                                            <div className="flex justify-between items-center">
-                                              {content}
-                                              <span className="text-xs text-gray-500">{time ? new Date(time * 1000).toLocaleString() : ""}</span>
-                                            </div>
-                                          </li>
+                                          <div key={index} className="flex flex-wrap gap-1">
+                                            {state.submission_cid && (
+                                              <div className="flex flex-col gap-1">
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 text-xs"
+                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.submission_cid, 'submission')}
+                                                >
+                                                  <Eye className="w-3 h-3 mr-1" />
+                                                  Nộp {milestoneIndex + 1}
+                                                </Button>
+                                                <div className="text-xs text-gray-500">
+                                                  CID: {decodeCID(state.submission_cid).slice(0, 10)}...
+                                                </div>
+                                              </div>
+                                            )}
+                                            {state.acceptance_cid && (
+                                              <div className="flex flex-col gap-1">
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30 text-xs"
+                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.acceptance_cid, 'acceptance')}
+                                                >
+                                                  <Eye className="w-3 h-3 mr-1" />
+                                                  Chấp nhận {milestoneIndex + 1}
+                                                </Button>
+                                                <div className="text-xs text-gray-500">
+                                                  CID: {decodeCID(state.acceptance_cid).slice(0, 10)}...
+                                                </div>
+                                              </div>
+                                            )}
+                                            {state.rejection_cid && (
+                                              <div className="flex flex-col gap-1">
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border-red-400/30 text-xs"
+                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.rejection_cid, 'rejection')}
+                                                >
+                                                  <Eye className="w-3 h-3 mr-1" />
+                                                  Từ chối {milestoneIndex + 1}
+                                                </Button>
+                                                <div className="text-xs text-gray-500">
+                                                  CID: {decodeCID(state.rejection_cid).slice(0, 10)}...
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
                                         );
                                       })}
-                                    </ul>
+                                    </div>
                                   </div>
                                 )}
                               </li>
@@ -1011,6 +1205,19 @@ const Jobs = () => {
                             </Button>
                           )}
                         </div>
+
+                        {/* View All Events Button */}
+                        <div className="mt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 border-purple-400/30 text-xs w-full"
+                            onClick={() => handleViewJobEvents(job.id)}
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            Xem tất cả sự kiện
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   </motion.div>
@@ -1123,6 +1330,9 @@ const Jobs = () => {
                 </div>
               )}
             </div>
+            <div className="text-xs text-yellow-400 bg-yellow-900/20 rounded p-2">
+              Khi ứng tuyển, bạn sẽ bị khóa tạm thời 1 APT. Nếu bị từ chối hoặc tự rút ứng tuyển, số tiền này sẽ được hoàn lại.
+            </div>
             <div className="flex gap-3">
               <Button
                 onClick={handleSendApplication}
@@ -1138,6 +1348,16 @@ const Jobs = () => {
                   </div>
                 </span>
               </Button>
+              {selectedJob && selectedJob.active && !selectedJob.approved && hasApplied && (
+                <Button
+                  variant="outline"
+                  onClick={handleWithdrawApply}
+                  disabled={withdrawing}
+                  className="group relative w-full z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10"
+                >
+                  {withdrawing ? 'Đang rút...' : 'Rút ứng tuyển'}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => setApplyDialogOpen(false)}
@@ -1153,6 +1373,330 @@ const Jobs = () => {
                 </span>
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Milestone Details Dialog */}
+      <Dialog open={viewMilestoneDialogOpen} onOpenChange={setViewMilestoneDialogOpen}>
+        <DialogContent className="bg-gray-900 border border-white/10 text-white max-w-2xl w-full">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-white">
+              Chi tiết cột mốc {selectedMilestoneIndex + 1}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {selectedMilestoneType === 'submission' ? 'Thông tin nộp cột mốc' : 
+               selectedMilestoneType === 'acceptance' ? 'Thông tin chấp nhận cột mốc' : 
+               'Thông tin từ chối cột mốc'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {loadingMilestoneDetails ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+              </div>
+            ) : milestoneDetails ? (
+              <div className="space-y-4">
+                {/* Basic Info */}
+                <div className="bg-gray-800/50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-white mb-2">Thông tin cơ bản</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Job ID:</span>
+                      <span className="text-white ml-2">{selectedJobId}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Cột mốc:</span>
+                      <span className="text-white ml-2">{selectedMilestoneIndex + 1}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Loại:</span>
+                      <span className="text-white ml-2">
+                        {selectedMilestoneType === 'submission' ? 'Nộp' : 
+                         selectedMilestoneType === 'acceptance' ? 'Chấp nhận' : 'Từ chối'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">CID:</span>
+                      <span className="text-white ml-2 font-mono text-xs break-all">{selectedMilestoneCid}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Details */}
+                {milestoneDetails.action && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">Chi tiết hành động</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-400">Hành động:</span>
+                        <span className="text-white ml-2">{getActionDisplayName(milestoneDetails.action)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Thời gian:</span>
+                        <span className="text-white ml-2">{formatTimestamp(milestoneDetails.timestamp)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Địa chỉ người dùng:</span>
+                        <span className="text-white ml-2 font-mono text-xs">{milestoneDetails.userAddress}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Message */}
+                {milestoneDetails.message && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">
+                      {selectedMilestoneType === 'submission' ? 'Mô tả công việc' : 
+                       selectedMilestoneType === 'acceptance' ? 'Ghi chú chấp nhận' : 'Lý do từ chối'}
+                    </h3>
+                    <p className="text-gray-300 text-sm whitespace-pre-wrap">{milestoneDetails.message}</p>
+                  </div>
+                )}
+
+                {/* Link */}
+                {milestoneDetails.link && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">Link tham khảo</h3>
+                    <a 
+                      href={milestoneDetails.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 text-sm break-all"
+                    >
+                      {milestoneDetails.link}
+                    </a>
+                  </div>
+                )}
+
+                {/* File Info */}
+                {milestoneDetails.fileInfo && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">Thông tin file</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-400">Tên file:</span>
+                        <span className="text-white ml-2">{milestoneDetails.fileInfo.name}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Kích thước:</span>
+                        <span className="text-white ml-2">{formatFileSize(milestoneDetails.fileInfo.size)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Loại file:</span>
+                        <span className="text-white ml-2">{milestoneDetails.fileInfo.type}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Metadata */}
+                {milestoneDetails.metadata && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">Metadata</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-400">Loại hành động:</span>
+                        <span className="text-white ml-2">{milestoneDetails.metadata.actionType}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Mô tả:</span>
+                        <span className="text-white ml-2">{milestoneDetails.metadata.description}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Raw Data (for debugging) */}
+                <details className="bg-gray-800/50 p-4 rounded-lg">
+                  <summary className="text-lg font-semibold text-white cursor-pointer">Dữ liệu thô</summary>
+                  <pre className="text-xs text-gray-300 mt-2 overflow-x-auto">
+                    {JSON.stringify(milestoneDetails, null, 2)}
+                  </pre>
+                </details>
+
+                {/* CID Debug Info */}
+                <details className="bg-gray-800/50 p-4 rounded-lg">
+                  <summary className="text-lg font-semibold text-white cursor-pointer">Thông tin CID (Debug)</summary>
+                  <div className="mt-2 space-y-2 text-xs">
+                    <div>
+                      <span className="text-gray-400">CID gốc:</span>
+                      <span className="text-white ml-2 font-mono break-all">{JSON.stringify(selectedMilestoneCid)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">CID đã decode:</span>
+                      <span className="text-white ml-2 font-mono break-all">{decodeCID(selectedMilestoneCid)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">IPFS URL:</span>
+                      <a 
+                        href={convertIPFSURL(decodeCID(selectedMilestoneCid))} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 ml-2 break-all"
+                      >
+                        {convertIPFSURL(decodeCID(selectedMilestoneCid))}
+                      </a>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <p>Không có thông tin chi tiết</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Job Events Dialog */}
+      <Dialog open={viewJobEventsDialogOpen} onOpenChange={setViewJobEventsDialogOpen}>
+        <DialogContent className="bg-gray-900 border border-white/10 text-white max-w-2xl w-full">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-white">
+              Chi tiết sự kiện của dự án {selectedJobForEvents}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {loadingJobEvents ? 'Đang tải sự kiện...' : 'Tất cả sự kiện blockchain của dự án này'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {loadingJobEvents ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+              </div>
+            ) : jobEventsDetails.length > 0 ? (
+              <div className="space-y-4">
+                {jobEventsDetails.map((event, index) => (
+                  <div key={index} className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">{event.type}</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-400">Job ID:</span>
+                        <span className="text-white ml-2">{event.data.job_id}</span>
+                      </div>
+                      {event.data.start_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian đăng dự án:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.start_time)}</span>
+                        </div>
+                      )}
+
+                      {event.data.application_deadline && (
+                        <div>
+                          <span className="text-gray-400">Thời hạn ứng tuyển:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.application_deadline)}</span>
+                        </div>
+                      )}
+                      {event.data.poster && (
+                        <div>
+                          <span className="text-gray-400">Người đăng:</span>
+                          <span className="text-white ml-2 font-mono text-xs">{event.data.poster}</span>
+                        </div>
+                      )}
+                      {event.data.worker && (
+                        <div>
+                          <span className="text-gray-400">Người làm:</span>
+                          <span className="text-white ml-2 font-mono text-xs">{event.data.worker}</span>
+                        </div>
+                      )}
+                      {event.data.milestone !== undefined && (
+                        <div>
+                          <span className="text-gray-400">Cột mốc:</span>
+                          <span className="text-white ml-2">{Number(event.data.milestone) + 1}</span>
+                        </div>
+                      )}
+                      {event.data.submit_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian nộp:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.submit_time)}</span>
+                        </div>
+                      )}
+                      {event.data.accept_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian chấp nhận:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.accept_time)}</span>
+                        </div>
+                      )}
+                      {event.data.reject_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian từ chối:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.reject_time)}</span>
+                        </div>
+                      )}
+                      {event.data.approve_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian duyệt:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.approve_time)}</span>
+                        </div>
+                      )}
+                      {event.data.apply_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian ứng tuyển:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.apply_time)}</span>
+                        </div>
+                      )}
+                      {event.data.cancel_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian hủy:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.cancel_time)}</span>
+                        </div>
+                      )}
+                      {event.data.complete_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian hoàn thành:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.complete_time)}</span>
+                        </div>
+                      )}
+                      {event.data.expire_time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian hết hạn:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.expire_time)}</span>
+                        </div>
+                      )}
+                      {event.data.reject_count !== undefined && (
+                        <div>
+                          <span className="text-gray-400">Số lần từ chối:</span>
+                          <span className="text-white ml-2">{event.data.reject_count}</span>
+                        </div>
+                      )}
+                      {event.data.work_cid && (
+                        <div>
+                          <span className="text-gray-400">CID công việc:</span>
+                          <span className="text-white ml-2 font-mono text-xs break-all">{decodeCID(event.data.work_cid)}</span>
+                        </div>
+                      )}
+                      {event.data.acceptance_cid && (
+                        <div>
+                          <span className="text-gray-400">CID chấp nhận:</span>
+                          <span className="text-white ml-2 font-mono text-xs break-all">{decodeCID(event.data.acceptance_cid)}</span>
+                        </div>
+                      )}
+                      {event.data.rejection_cid && (
+                        <div>
+                          <span className="text-gray-400">CID từ chối:</span>
+                          <span className="text-white ml-2 font-mono text-xs break-all">{decodeCID(event.data.rejection_cid)}</span>
+                        </div>
+                      )}
+                      {event.data.cid && (
+                        <div>
+                          <span className="text-gray-400">CID:</span>
+                          <span className="text-white ml-2 font-mono text-xs break-all">{decodeCID(event.data.cid)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <p>Không có sự kiện nào cho dự án này</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
