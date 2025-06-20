@@ -1,7 +1,7 @@
 import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 import { convertIPFSURL } from "@/utils/ipfs";
 
-const MODULE_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
+const MODULE_ADDRESS = "0x5de1dd560f3136745d46807f1b3e599077966a3b1d87047faef143a71c39d511";
 const PROFILE_MODULE_NAME = "web3_profiles_v29";
 const PROFILE_RESOURCE_NAME = "Profiles";
 

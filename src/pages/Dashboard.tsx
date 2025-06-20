@@ -22,7 +22,8 @@ import {
   FileText,
   Send,
   Eye,
-  Download
+  Download,
+  XCircle
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { useWallet } from '../context/WalletContext';
@@ -68,6 +69,10 @@ interface JobPost {
   locked: boolean;
   title?: string;
   description?: string;
+  withdraw_request?: string | null;
+  cancel_request?: boolean;
+  unlock_confirm_poster?: boolean;
+  unlock_confirm_worker?: boolean;
 }
 
 
@@ -81,7 +86,7 @@ type MilestoneData = {
   rejection_cid?: any;
 };
 
-const JOBS_CONTRACT_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
+const JOBS_CONTRACT_ADDRESS = "0x5de1dd560f3136745d46807f1b3e599077966a3b1d87047faef143a71c39d511";
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
 
 const TABS = [
@@ -93,6 +98,15 @@ const TABS = [
 ];
 
 const getJobStatus = (job: JobPost) => {
+  console.log('DEBUG getJobStatus:', {
+    jobId: job.id,
+    completed: job.completed,
+    job_expired: job.job_expired,
+    locked: job.locked,
+    active: job.active,
+    worker: job.worker
+  });
+  
   if (job.completed) return { label: 'Đã hoàn thành', color: 'bg-blue-700/30 text-blue-300', key: 'completed' };
   if (job.job_expired) return { label: 'Đã hủy', color: 'bg-red-700/30 text-red-300', key: 'canceled' };
   if (job.locked) return { label: 'Đã khóa', color: 'bg-gray-700/30 text-gray-300', key: 'locked' };
@@ -276,12 +290,17 @@ const Dashboard = () => {
           locked: jobOnChain.locked,
           title: jobOnChain.title || jobDataFromIPFS.title,
           description: jobOnChain.description || jobDataFromIPFS.description,
+          withdraw_request: jobOnChain.withdraw_request,
+          cancel_request: jobOnChain.cancel_request,
+          unlock_confirm_poster: jobOnChain.unlock_confirm_poster,
+          unlock_confirm_worker: jobOnChain.unlock_confirm_worker,
         };
         const userAddress = account.toLowerCase();
         const isPoster = jobPost.poster.toLowerCase() === userAddress;
         const isWorker = jobPost.worker && jobPost.worker.toLowerCase() === userAddress;
         if (isPoster || isWorker) {
-          if (jobPost.completed || jobPost.job_expired || !jobPost.active) {
+          // Job đã mở khóa và có worker nên đưa vào in-progress
+          if (jobPost.completed || jobPost.job_expired || (!jobPost.active && jobPost.locked)) {
             fetchedCompletedJobs.push(jobPost);
           } else {
             fetchedInProgressJobs.push(jobPost);
@@ -667,6 +686,94 @@ const Dashboard = () => {
     };
   };
 
+  const handleRequestWithdraw = async (jobId: string) => {
+    if (!account || accountType !== 'aptos' || !window.aptos) {
+      toast.error('Vui lòng kết nối ví Aptos để rút ứng tuyển.');
+      return;
+    }
+    try {
+      const tx = await window.aptos.signAndSubmitTransaction({
+        type: 'entry_function_payload',
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::request_withdraw_apply`,
+        type_arguments: [],
+        arguments: [jobId]
+      });
+      await aptos.waitForTransaction({ transactionHash: tx.hash });
+      toast.success('Đã gửi yêu cầu rút ứng tuyển, chờ poster duyệt!');
+      loadUserJobs();
+    } catch (error: any) {
+      toast.error(`Gửi yêu cầu rút thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+    }
+  };
+
+  const handleApproveWithdraw = async (jobId: string, approve: boolean) => {
+    if (!account || accountType !== 'aptos' || !window.aptos) {
+      toast.error('Vui lòng kết nối ví Aptos để duyệt yêu cầu rút.');
+      return;
+    }
+    try {
+      const tx = await window.aptos.signAndSubmitTransaction({
+        type: 'entry_function_payload',
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::approve_withdraw_apply`,
+        type_arguments: [],
+        arguments: [jobId, approve]
+      });
+      await aptos.waitForTransaction({ transactionHash: tx.hash });
+      toast.success(approve ? 'Đã duyệt rút ứng tuyển!' : 'Đã từ chối yêu cầu rút!');
+      loadUserJobs();
+    } catch (error: any) {
+      toast.error(`Duyệt yêu cầu rút thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+    }
+  };
+
+  const handleApproveCancelJob = async (jobId: string, approve: boolean) => {
+    if (!account || accountType !== 'aptos' || !window.aptos) {
+      toast.error('Vui lòng kết nối ví Aptos để duyệt yêu cầu hủy.');
+      return;
+    }
+    try {
+      const tx = await window.aptos.signAndSubmitTransaction({
+        type: 'entry_function_payload',
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::approve_cancel_job`,
+        type_arguments: [],
+        arguments: [jobId, approve]
+      });
+      await aptos.waitForTransaction({ transactionHash: tx.hash });
+      toast.success(approve ? 'Đã duyệt hủy dự án!' : 'Đã từ chối yêu cầu hủy!');
+      loadUserJobs();
+    } catch (error: any) {
+      toast.error(`Duyệt yêu cầu hủy thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+    }
+  };
+
+  const handleRequestCancelJob = async (jobId: string) => {
+    if (!account || accountType !== 'aptos' || !window.aptos) {
+      toast.error('Vui lòng kết nối ví Aptos để gửi yêu cầu hủy.');
+      return;
+    }
+    try {
+      const tx = await window.aptos.signAndSubmitTransaction({
+        type: 'entry_function_payload',
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::request_cancel_job`,
+        type_arguments: [],
+        arguments: [jobId]
+      });
+      await aptos.waitForTransaction({ transactionHash: tx.hash });
+      toast.success('Đã gửi yêu cầu hủy dự án, chờ worker duyệt!');
+      loadUserJobs();
+    } catch (error: any) {
+      toast.error(`Gửi yêu cầu hủy thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+    }
+  };
+
+  // Helper để lấy giá trị thực từ Option hoặc string/null
+  function getOptionValue(val: any): string | null {
+    if (!val) return null;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'object' && val !== null && 'some' in val) return val.some;
+    return null;
+  }
+
   const renderJobCard = (job: JobPost & { title?: string; description?: string }, type: string) => {
     const userAddress = account?.toLowerCase();
     const isPoster = job.poster.toLowerCase() === userAddress;
@@ -677,6 +784,10 @@ const Dashboard = () => {
     const canExpire = isPoster && !job.completed && !job.job_expired && job.active && (Date.now() / 1000) > job.application_deadline;
     const canSubmitMilestone = isWorker && job.active && !job.completed;
     console.log('DEBUG JOB:', job);
+
+    // Chuyển đổi Option về boolean đúng kiểu
+    const hasCancelRequest = !!getOptionValue(job.cancel_request);
+    const hasWithdrawRequest = !!getOptionValue(job.withdraw_request);
 
     return (
       <motion.div
@@ -736,33 +847,6 @@ const Dashboard = () => {
                   const milestoneData = state;
                
                   console.log({ milestoneIndex, milestoneData, isPoster, isWorker, jobId: job.id, jobActive: job.active, jobCompleted: job.completed, currentUser: account, poster: job.poster, worker: job.worker, currentMilestone: job.current_milestone });
-                  // DEBUG: Luôn hiển thị button accept/reject nếu bật DEBUG_ALWAYS_SHOW_BUTTONS
-                  // if (DEBUG_ALWAYS_SHOW_BUTTONS || (isPoster && milestoneData.submitted && !milestoneData.accepted)) {
-                  //   return (
-                  //     <div key={index} className="flex items-center justify-between gap-2 mb-2">
-                  //       {/* <span className="text-sm text-gray-400">
-                  //         [DEBUG] Cột mốc {milestoneIndex + 1} - submitted: {String(milestoneData.submitted)} - accepted: {String(milestoneData.accepted)}
-                  //       </span> */}
-                  //       <div className="flex gap-2">
-                  //         <Button
-                  //           size="sm"
-                  //           className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
-                  //           onClick={() => handleAcceptMilestone(job.id, milestoneIndex)}
-                  //         >
-                  //           Chấp nhận
-                  //         </Button>
-                  //         <Button
-                  //           size="sm"
-                  //           variant="destructive"
-                  //           className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
-                  //           onClick={() => handleRejectMilestone(job.id, milestoneIndex)}
-                  //         >
-                  //           Từ chối
-                  //         </Button>
-                  //       </div>
-                  //     </div>
-                  //   );
-                  // }
                   // Worker can submit milestone
                   if (isWorker && !milestoneData.submitted && milestoneIndex === job.current_milestone) {
                     return (
@@ -772,10 +856,10 @@ const Dashboard = () => {
                         </span>
                         <Button
                           size="sm"
-                          className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+                          variant="outline"
+                          className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                           onClick={() => handleOpenSubmitDialog(job.id, milestoneIndex)}
                         >
-                          <Upload className="w-4 h-4 mr-2" />
                           Nộp cột mốc
                         </Button>
                       </div>
@@ -787,6 +871,27 @@ const Dashboard = () => {
                       <span className="text-sm text-gray-400">
                         Cột mốc {milestoneIndex + 1}: {getMilestoneStatus(job, milestoneIndex)}
                       </span>
+                      {/* Hiển thị button accept/reject cho poster nếu milestone đã submit nhưng chưa accept */}
+                      {isPoster && milestoneData.submitted && !milestoneData.accepted && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30"
+                            onClick={() => handleOpenAcceptDialog(job.id, milestoneIndex)}
+                          >
+                            Chấp nhận
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border-red-400/30"
+                            onClick={() => handleOpenRejectDialog(job.id, milestoneIndex)}
+                          >
+                            Từ chối
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -886,7 +991,7 @@ const Dashboard = () => {
                           </div>
                         )}
                         
-                        {canSubmit && (
+                        {/* {canSubmit && (
                           <div className="flex gap-2 mt-1">
                             <Button
                               size="sm"
@@ -897,27 +1002,7 @@ const Dashboard = () => {
                               Nộp cột mốc
                             </Button>
                           </div>
-                        )}
-                        {isPoster && milestoneData && milestoneData.submitted && !milestoneData.accepted && (
-                          <div className="flex gap-2 mt-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30"
-                              onClick={() => handleOpenAcceptDialog(job.id, idx)}
-                            >
-                              Chấp nhận
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border-red-400/30"
-                              onClick={() => handleOpenRejectDialog(job.id, idx)}
-                            >
-                              Từ chối
-                            </Button>
-                          </div>
-                        )}
+                        )} */}
                       </li>
                     );
                   })}
@@ -925,71 +1010,169 @@ const Dashboard = () => {
               </div>
             )}
             {/* Action Buttons */}
-            {(canCancel || canComplete || canExpire || canSubmitMilestone) && (
-              <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-3 justify-end">
-                {canCancel && (
-                  <Button 
-                    size="sm" 
-                    variant="destructive"
-                    className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
-                    onClick={() => handleCancelJob(job.id)}
+            <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-3 justify-end">
+              {/* Worker: Luôn hiển thị 3 button cạnh nhau */}
+              {isWorker && (
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-yellow-700/80 text-yellow-300 font-bold hover:bg-yellow-600/80"
+                    onClick={() => handleRequestWithdraw(job.id)}
+                  
                   >
-                    <X className="w-4 h-4 mr-2" />
-                    Hủy dự án
+                    Rút ứng tuyển
                   </Button>
-                )}
-                {canComplete && (
-                  <Button 
-                    size="sm" 
-                    className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
-                    onClick={() => handleCompleteJob(job.id)}
+                  <Button
+                    size="sm"
+                    className="bg-green-900/80 text-green-300 font-bold hover:bg-green-700/80"
+                    onClick={() => handleApproveCancelJob(job.id, true)}
+              
                   >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Hoàn thành dự án
+                    Duyệt hủy dự án
                   </Button>
-                )}
-                {canExpire && (
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="bg-orange-600/20 text-orange-400 hover:bg-orange-600/30"
-                    onClick={() => handleExpireJob(job.id)}
+                  <Button
+                    size="sm"
+                    className="bg-red-900/80 text-red-300 font-bold hover:bg-red-700/80"
+                    onClick={() => handleApproveCancelJob(job.id, false)}
+                 
                   >
-                    <Clock className="w-4 h-4 mr-2" />
-                    Đánh dấu hết hạn
+                    Từ chối hủy
                   </Button>
-                )}
-                {canSubmitMilestone && (
-                  <Button 
-                    size="sm" 
-                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
-                    onClick={() => handleOpenSubmitDialog(job.id, job.current_milestone)}
+                </>
+              )}
+              {/* Poster: Luôn hiển thị duyệt rút ứng tuyển và từ chối rút nếu là poster và có worker */}
+              {isPoster && job.worker && (
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-green-700/80 text-green-300 font-bold hover:bg-green-600/80"
+                    onClick={() => handleApproveWithdraw(job.id, true)}
+                
                   >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Nộp cột mốc
+                    Duyệt rút ứng tuyển
                   </Button>
-                )}
-              </div>
-            )}
-            {isPoster && job.worker && !job.approved && (
-              <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    className="bg-red-700/80 text-red-300 font-bold hover:bg-red-600/80"
+                    onClick={() => handleApproveWithdraw(job.id, false)}
+                    
+                  >
+                    Từ chối rút
+                  </Button>
+                </>
+              )}
+              {/* Button duyệt/từ chối ứng viên cho poster */}
+              {isPoster && job.worker && !job.approved && (
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-green-600/20 text-green-400 hover:bg-green-600/30 font-semibold"
+                    onClick={() => handleApproveWorker(job.id, job.worker)}
+                  >
+                    Duyệt ứng viên
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-red-600/20 text-red-400 hover:bg-red-600/30 font-semibold"
+                    onClick={() => handleRejectWorker(job.id)}
+                  >
+                    Từ chối ứng viên
+                  </Button>
+                </>
+              )}
+              {/* Poster: Luôn hiển thị nút gửi yêu cầu hủy dự án */}
+              {isPoster && (
                 <Button
                   size="sm"
-                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
-                  onClick={() => handleApproveWorker(job.id, job.worker)}
+                  className="bg-orange-700/80 text-yellow-300 font-bold hover:bg-orange-600/80"
+                  onClick={() => handleRequestCancelJob(job.id)}
                 >
-                  Duyệt ứng viên
+                  Gửi yêu cầu hủy
                 </Button>
-                <Button
-                  size="sm"
+              )}
+              {/* Tab Đã khóa: Hiển thị button xác nhận mở khóa cho cả poster và worker */}
+              {activeTab === 'locked' && job.locked && (
+                <div className="flex gap-2 mt-2">
+                  {(isPoster || isWorker) && (
+                    <Button
+                      size="sm"
+                      className="bg-blue-700/80 text-blue-200 font-bold hover:bg-blue-600/80"
+                      disabled={
+                        (isPoster && job.unlock_confirm_poster) ||
+                        (isWorker && job.unlock_confirm_worker)
+                      }
+                      onClick={async () => {
+                        try {
+                          if (!account || accountType !== 'aptos' || !window.aptos) {
+                            toast.error('Vui lòng kết nối ví Aptos để xác nhận mở khóa.');
+                            return;
+                          }
+                          const tx = await window.aptos.signAndSubmitTransaction({
+                            type: 'entry_function_payload',
+                            function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::confirm_unlock_job`,
+                            type_arguments: [],
+                            arguments: [job.id]
+                          });
+                          await aptos.waitForTransaction({ transactionHash: tx.hash });
+                          toast.success('Đã xác nhận mở khóa dự án!');
+                          console.log('DEBUG: Đã mở khóa job, đang load lại...');
+                          await loadUserJobs();
+                          console.log('DEBUG: Đã load lại jobs, chuyển về tab in-progress');
+                          // Chuyển về tab đang thực hiện sau khi mở khóa
+                          setTimeout(() => {
+                            setActiveTab('in-progress');
+                          }, 500);
+                        } catch (error: any) {
+                          toast.error(`Xác nhận mở khóa thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+                        }
+                      }}
+                    >
+                      {((isPoster && job.unlock_confirm_poster) || (isWorker && job.unlock_confirm_worker)) ? 'Đã xác nhận' : 'Xác nhận mở khóa'}
+                    </Button>
+                  )}
+                  {/* Hiển thị trạng thái xác nhận của cả 2 bên */}
+                  <div className="text-xs text-gray-400 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1">Poster: {job.unlock_confirm_poster ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}</span>
+                    <span className="inline-flex items-center gap-1">Worker: {job.unlock_confirm_worker ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}</span>
+                  </div>
+                </div>
+              )}
+              {/* Các action khác giữ nguyên */}
+              {canCancel && (
+                <Button 
+                  size="sm" 
                   variant="destructive"
                   className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
-                  onClick={() => handleRejectWorker(job.id)}
+                  onClick={() => handleCancelJob(job.id)}
                 >
-                  Từ chối ứng viên
+                  <X className="w-4 h-4 mr-2" />
+                  Hủy dự án
                 </Button>
-              </div>
-            )}
+              )}
+              {canComplete && (
+                <Button 
+                  size="sm" 
+                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
+                  onClick={() => handleCompleteJob(job.id)}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Hoàn thành dự án
+                </Button>
+              )}
+              {canExpire && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="bg-orange-600/20 text-orange-400 hover:bg-orange-600/30"
+                  onClick={() => handleExpireJob(job.id)}
+                >
+                  <Clock className="w-4 h-4 mr-2" />
+                  Đánh dấu hết hạn
+                </Button>
+              )}
+ 
+
+            </div>
             <div className="flex gap-2 mt-4 justify-end">
               <Badge className={statusObj.color}>{statusObj.label}</Badge>
             </div>

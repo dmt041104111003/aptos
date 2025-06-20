@@ -25,6 +25,36 @@ profiles:
     public_key: ed25519-pub-0xef40fb3f1536724c65d12d3b7f30a0b38c2fefffdd5ecc8d50b588434292d054
     account: 1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72
     rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v11:
+    network: Testnet
+    private_key: ed25519-priv-0xf3f4146633219692606111e558f6f9f65b9bd56e2eaa9d411629e6760ed41d7f
+    public_key: ed25519-pub-0x51072c0eca542874ddb6b5fc6e14d8a2ccddf9b186469cbaf7f7da098ea087d9
+    account: 3bea38c017b2224f96f193632014739ae94d37673409ba18242897d774ee94c1
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v12:
+    network: Testnet
+    private_key: ed25519-priv-0x1644d5620e880722548f09b76bab72f993f3d95b1169f6459234f89a44d13c0e
+    public_key: ed25519-pub-0x427b1a2d233dec2bc34921351bcddef50f3989a6d88d33bbcc5ca3bb1a88916c
+    account: 8ba57a0877ee71181b9b01ac9f3c85b741b1d4270951a7f8fa0ee1dc991c970e
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v13:
+    network: Testnet
+    private_key: ed25519-priv-0x2b2827aa590ef6b57a1db8e8a167148aaf48028720b5f3b941f73f83e26bd906
+    public_key: ed25519-pub-0x11067ac3bf28e7f8267e2001051d9a18626d79f23ac29786d4d26c3abfb3b838
+    account: a1696d396e5a7ad1775c50351fa4eb16a2deb60612cb0365f2dfbf6d52db7e4e
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v14:
+    network: Testnet
+    private_key: ed25519-priv-0xd1e5ef73e896bb1889e952a3228fe07d8c116451662f448e8c555dd2fe9f10eb
+    public_key: ed25519-pub-0x40bfc62d4b9205180b0f7d497fcb47c79ad7bfc4d75f1506381ce58100737200
+    account: a31a2e4f3657fdfb38bd4ece34a97599f3f7a3e43c3ecff91a81965337b6c97e
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
+  farm_v15:
+    network: Testnet
+    private_key: ed25519-priv-0x107383b50064b7c2b8a2840d519a15f93d88b85a4697319fe4a5c647c5a0cae1
+    public_key: ed25519-pub-0x4d52bdbd25c9f6de62a7be9ef8e164036699d7302c1a88f9c9db26917ade4e0d
+    account: 5de1dd560f3136745d46807f1b3e599077966a3b1d87047faef143a71c39d511
+    rest_url: "https://fullnode.testnet.aptoslabs.com"
   farm_v2:
     network: Testnet
     private_key: ed25519-priv-0x7924b8169c8b9dd75989be10cac86333a94bea9a223f876dee476796bcdacbb4
