@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
 import { TiLocationArrow } from "react-icons/ti";
-import AnimatedTitle from "./AnimatedTitle";
+import { motion } from "framer-motion";
+import { Fingerprint, ShieldCheck, Star, Gavel, TrendingDown } from "lucide-react";
+
 export const BentoTilt = ({ children, className = "" }) => {
   const [transformStyle, setTransformStyle] = useState("");
   const itemRef = useRef(null);
@@ -79,91 +81,126 @@ export const BentoCard = ({ src, title, description, isComingSoon }) => {
   );
 };
 
-const Features = () => (
-  <section className="bg-black pb-52">
-    <div className="container mx-auto px-3 md:px-10">
-      <div className="px-5 py-32 flex flex-col items-center justify-center relative">
+const featuresData = [
+  {
+    icon: <Fingerprint className="w-8 h-8 text-blue-400" />,
+    title: "Danh tính phi tập trung",
+    description: "Xây dựng danh tiếng của bạn trên blockchain. Mọi thành tích và đánh giá đều được ghi lại minh bạch, không thể thay đổi.",
+    video: "/videos/feature-1.mp4",
+  },
+  {
+    icon: <ShieldCheck className="w-8 h-8 text-blue-400" />,
+    title: "Hợp đồng thông minh ký quỹ",
+    description: "Các khoản thanh toán được giữ an toàn trong hợp đồng thông minh và chỉ được giải ngân khi các cột mốc công việc được hoàn thành.",
+    video: "/videos/feature-2.mp4",
+  },
+  {
+    icon: <Star className="w-8 h-8 text-blue-400" />,
+    title: "Hệ thống danh tiếng",
+    description: "Hệ thống đánh giá và xếp hạng on-chain giúp bạn xây dựng uy tín và dễ dàng tìm kiếm các đối tác chất lượng.",
+    video: "/videos/feature-3.mp4",
+  },
+  {
+    icon: <Gavel className="w-8 h-8 text-blue-400" />,
+    title: "Giải quyết tranh chấp phi tập trung",
+    description: "Cơ chế giải quyết tranh chấp công bằng, minh bạch và phi tập trung, đảm bảo quyền lợi cho cả hai bên.",
+    video: "/videos/feature-4.mp4",
+  },
+  {
+    icon: <TrendingDown className="w-8 h-8 text-blue-400" />,
+    title: "Phí giao dịch thấp",
+    description: "Tận hưởng mức phí giao dịch cực thấp trên blockchain Aptos, tối ưu hóa lợi nhuận của bạn.",
+    video: "/videos/feature-5.mp4",
+  },
+];
 
-        <div className="relative z-10 flex flex-col items-center justify-center">
+const Features = () => {
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2,
+      },
+    },
+  };
 
-          <AnimatedTitle
-          title="Dành cho <br /> freelancer Việt <br /> trên Web3"
-          containerClass="mt-5 pointer-events-none mix-blend-difference relative z-10 font-primary font-black text-center !leading-[1.1] md:px-10 gap-y-2"
-        />
-     
-          <p className="mt-3 max-w-sm text-center font-primary text-violet-50">
-              Nơi các freelancer Việt Nam hội tụ, kết nối và phát triển sự nghiệp trên nền tảng Web3 toàn cầu. Khám phá cơ hội, xây dựng thương hiệu cá nhân và chinh phục những dự án mới mỗi ngày.
+  const itemVariants = {
+    hidden: { opacity: 0, y: 50 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut",
+      },
+    },
+  };
+
+  return (
+    <div className="py-20 sm:py-32 relative overflow-hidden">
+      {/* Background Glow */}
+      <div className="absolute -top-1/2 left-1/2 -translate-x-1/2 w-[150%] h-[150%] bg-gradient-to-br from-purple-900/10 via-blue-900/10 to-transparent rounded-full blur-[100px]" />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-4xl md:text-5xl font-bold font-sans">
+            <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">
+              Tính năng nổi bật
+            </span>
+          </h2>
+          <p className="mt-4 text-lg text-gray-300 max-w-2xl mx-auto font-sans">
+            Khám phá những công nghệ đột phá giúp định hình lại tương lai của công việc tự do.
           </p>
-        </div>
-      </div>
+        </motion.div>
 
-      <BentoTilt className="border-hsla relative mb-7 h-96 w-full overflow-hidden rounded-md md:h-[65vh]">
-        <BentoCard
-          src="videos/feature-1.mp4"
-          title={
-            <>Nền tảng Metagame</>
-          }
-          description="Ứng dụng metagame đa nền tảng giúp freelancer ghi nhận thành tích, xây dựng uy tín và nhận thưởng khi hoàn thành dự án Web3."
-          isComingSoon
-        />
-      </BentoTilt>
-
-      <div className="grid h-[135vh] w-full grid-cols-2 grid-rows-3 gap-7">
-        <BentoTilt className="bento-tilt_1 row-span-1 md:col-span-1 md:row-span-2">
-          <BentoCard
-            src="videos/feature-2.mp4"
-            title={
-              <>NFT Freelancer</>
-            }
-            description="Bộ sưu tập NFT độc quyền cho freelancer – khẳng định thương hiệu cá nhân, mở rộng mạng lưới và nhận ưu đãi từ cộng đồng."
-            isComingSoon
-          />
-        </BentoTilt>
-
-        <BentoTilt className="bento-tilt_1 row-span-1 ms-32 md:col-span-1 md:ms-0">
-          <BentoCard
-            src="videos/feature-3.mp4"
-            title={
-              <>Mạng xã hội Web3</>
-            }
-            description="Mạng xã hội chuyên biệt cho freelancer Web3 – kết nối, chia sẻ kinh nghiệm, tìm kiếm đối tác và dự án chất lượng."
-            isComingSoon
-          />
-        </BentoTilt>
-
-        <BentoTilt className="bento-tilt_1 me-14 md:col-span-1 md:me-0">
-          <BentoCard
-            src="videos/feature-4.mp4"
-            title={
-              <>Trợ lý AI Freelancer</>
-            }
-            description="Trợ lý AI hỗ trợ freelancer quản lý công việc, tối ưu hóa thời gian và nâng cao hiệu suất khi làm việc từ xa."
-            isComingSoon
-          />
-        </BentoTilt>
-
-        <BentoTilt className="bento-tilt_2">
-          <div className="flex size-full flex-col justify-between bg-violet-300 p-5">
-            <h1 className="bento-title font-primary font-black uppercase text-5xl md:text-6xl max-w-64 ">
-              N<b>h</b>ững t<b>í</b>nh n<b>ă</b>ng m<b>ớ</b>i.
-            </h1>
-
-            <TiLocationArrow className="m-5 scale-[5] self-end" />
-          </div>
-        </BentoTilt>
-
-        <BentoTilt className="bento-tilt_2">
-          <video
-            src="videos/feature-5.mp4"
-            loop
-            muted
-            autoPlay
-            className="size-full object-cover object-center"
-          />
-        </BentoTilt>
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          className="flex flex-row flex-wrap justify-center gap-8"
+        >
+          {featuresData.map((feature, index) => (
+            <motion.div
+              key={index}
+              variants={itemVariants}
+              className="basis-full md:basis-[calc(50%-1rem)] lg:basis-[calc(33.333%-1.334rem)] group relative bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-8 overflow-hidden transition-all duration-300 hover:border-blue-400/50 hover:shadow-2xl hover:shadow-blue-600/10"
+            >
+              <div className="absolute top-0 left-0 w-full h-full opacity-0 group-hover:opacity-10 transition-opacity duration-500">
+                <div className="absolute w-48 h-48 bg-blue-500 rounded-full -top-10 -left-10 blur-2xl"></div>
+                <div className="absolute w-48 h-48 bg-purple-500 rounded-full -bottom-10 -right-10 blur-2xl"></div>
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-center w-16 h-16 bg-blue-600/10 rounded-lg mb-6 border border-blue-400/20">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3 font-sans">{feature.title}</h3>
+                <p className="text-gray-400 font-sans leading-relaxed">{feature.description}</p>
+              </div>
+              
+              <div className="mt-6 rounded-lg overflow-hidden">
+                <video
+                  className="w-full h-auto transform group-hover:scale-105 transition-transform duration-500"
+                  src={feature.video}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </div>
-  </section>
-);
+  );
+};
 
 export default Features;

@@ -58,21 +58,21 @@ const Messages = () => {
           senderId: 'client1',
         receiverId: 'me',
           content: 'Chào bạn! Công ty chúng tôi đang tìm kiếm một nhà phát triển hợp đồng thông minh cho dự án DeFi mới. Hồ sơ của bạn trông rất ấn tượng.',
-          timestamp: '2023-05-24T10:30:00Z',
+          timestamp: '2025-05-24T10:30:00Z',
       },
       {
         id: '1-2',
           senderId: 'me',
           receiverId: 'client1',
           content: 'Cảm ơn! Tôi rất quan tâm đến các dự án DeFi. Yêu cầu cụ thể của dự án là gì?',
-          timestamp: '2023-05-24T10:32:00Z',
+          timestamp: '2025-05-24T10:32:00Z',
         },
         {
           id: '1-3',
           senderId: 'client1',
         receiverId: 'me',
           content: 'Chúng tôi cần xây dựng một giao thức cho vay phi tập trung trên Aptos. Bạn có kinh nghiệm với các tiêu chuẩn Move và các giao thức như Lending/Borrowing không?',
-          timestamp: '2023-05-24T10:35:00Z',
+          timestamp: '2025-05-24T10:35:00Z',
       }
     ],
     '2': [
@@ -81,21 +81,21 @@ const Messages = () => {
           senderId: 'client2',
         receiverId: 'me',
           content: 'Chào bạn, chúng tôi đã xem xét ứng tuyển của bạn cho vị trí phát triển frontend.',
-          timestamp: '2023-05-23T09:15:00Z',
+          timestamp: '2025-05-23T09:15:00Z',
       },
       {
         id: '2-2',
         senderId: 'me',
           receiverId: 'client2',
           content: "Chào bạn! Tôi có 3 năm kinh nghiệm với React và đã làm việc với Aptos SDK trong nhiều dự án. Tôi có thể chia sẻ các demo nếu cần.",
-          timestamp: '2023-05-23T09:20:00Z',
+          timestamp: '2025-05-23T09:20:00Z',
       },
       {
         id: '2-3',
           senderId: 'client2',
         receiverId: 'me',
           content: 'Tuyệt vời! Chúng ta có thể sắp xếp một cuộc gọi trong tuần này để thảo luận sâu hơn không?',
-          timestamp: '2023-05-23T09:25:00Z',
+          timestamp: '2025-05-23T09:25:00Z',
       }
     ],
     '3': [
@@ -104,14 +104,14 @@ const Messages = () => {
           senderId: 'me',
           receiverId: 'client3',
           content: 'Tôi đã gửi đề xuất dự án cho vị trí quản lý cộng đồng. Bạn có thể xem xét và cho tôi phản hồi không?',
-          timestamp: '2023-05-21T14:10:00Z',
+          timestamp: '2025-05-21T14:10:00Z',
         },
         {
           id: '3-2',
           senderId: 'client3',
         receiverId: 'me',
           content: 'Đã nhận được đề xuất của bạn. Về ngân sách, chúng tôi có thể thảo luận thêm không?',
-          timestamp: '2023-05-21T14:15:00Z',
+          timestamp: '2025-05-21T14:15:00Z',
       }
     ]
     }
@@ -152,17 +152,15 @@ const Messages = () => {
 
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    // Custom format to show just time if today, otherwise date
     const today = new Date();
     if (date.toDateString() === today.toDateString()) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else {
-      return date.toLocaleDateString('vi-VN'); // Vietnamese date format
+      return date.toLocaleDateString('vi-VN');
     }
   };
 
   const getParticipant = (participantId: string) => {
-    // Assuming mockClients needs to be updated to match client1, client2, client3
     const updatedMockClients = [
         { id: 'client1', name: 'Công ty A', avatar: '/img/client-a.png', lensHandle: '@congtyA' },
         { id: 'client2', name: 'Dự án Blockchain XYZ', avatar: '/img/client-b.png', lensHandle: '@duanXYZ' },
@@ -198,11 +196,12 @@ const Messages = () => {
                 <div className="overflow-y-auto h-full">
                   {conversations.map(conversation => {
                     const participant = getParticipant(conversation.participantId);
+                    const isActive = activeConversation === conversation.id;
                     return (
                       <div 
                         key={conversation.id}
                         className={`flex p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 transition-all duration-200 group ${
-                          activeConversation === conversation.id ? 'bg-white/10 border-l-4 border-l-blue-500 shadow-sm' : 'hover:border-l-2 hover:border-l-blue-400/30'
+                          isActive ? 'bg-white/10 border-l-4 border-l-blue-500 shadow-sm' : 'hover:border-l-2 hover:border-l-blue-400/30'
                         }`}
                         onClick={() => handleConversationSelect(conversation.id)}
                       >
@@ -256,45 +255,48 @@ const Messages = () => {
                     </div>
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-gray-900/30 to-black/10">
-                      {messages[activeConversation]?.map(message => (
-                        <div 
-                          key={message.id}
-                          className={`flex ${message.senderId === 'me' ? 'justify-end' : 'justify-start'}`}
-                        >
+                      {messages[activeConversation]?.map(message => {
+                        const isOwnMessage = message.senderId === 'me';
+                        return (
                           <div 
-                            className={`max-w-xs md:max-w-md p-3 rounded-lg shadow-sm font-primary transition-all duration-200 ${
-                              message.senderId === 'me' 
-                                ? 'bg-gradient-to-br from-blue-600 to-violet-600 text-white rounded-br-none shadow-blue-500/20' 
-                                : 'bg-white/10 border border-white/10 rounded-bl-none text-white/90'
-                            }`}
+                            key={message.id}
+                            className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                           >
-                            <p className="leading-relaxed">{message.content}</p>
-                            <div className={`text-xs mt-1 font-medium ${
-                              message.senderId === 'me' ? 'text-white/70' : 'text-gray-400'
-                            }`}>
-                              {formatMessageTime(message.timestamp)}
+                            <div 
+                              className={`max-w-xs md:max-w-md p-3 rounded-lg shadow-sm font-primary transition-all duration-200 ${
+                                isOwnMessage 
+                                  ? 'bg-blue-600/20 text-blue-400 border border-blue-400/30 rounded-br-none shadow-blue-500/20' 
+                                  : 'bg-white/10 border border-white/10 rounded-bl-none text-white/90'
+                              }`}
+                            >
+                              <p className="leading-relaxed">{message.content}</p>
+                              <div className={`text-xs mt-1 font-medium ${
+                                isOwnMessage ? 'text-blue-400/70' : 'text-gray-400'
+                              }`}>
+                                {formatMessageTime(message.timestamp)}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     {/* Message Input */}
                     <div className="p-4 border-t border-white/10 bg-gray-900/50 flex items-center gap-3">
                         <Input
-                        type="text"
+                          type="text"
                           placeholder="Nhập tin nhắn..."
                           value={messageInput}
                           onChange={(e) => setMessageInput(e.target.value)}
-                        onKeyPress={(e) => {
+                          onKeyPress={(e) => {
                             if (e.key === 'Enter') {
                               handleSendMessage();
                             }
                           }}
-                        className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-blue-500/20"
+                          className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 focus:ring-blue-500/20"
                         />
                         <Button 
                           onClick={handleSendMessage}
-                        className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white"
+                          className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                         >
                           Gửi
                         </Button>

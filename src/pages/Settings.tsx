@@ -230,7 +230,7 @@ export default function Settings() {
 
                 <button
                   type="button"
-                  className="w-full mt-6 flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 text-white font-semibold shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full mt-6 flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 font-semibold shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => document.getElementById('profilePicInput')?.click()}
                   disabled={uploading}
                 >
@@ -319,7 +319,7 @@ export default function Settings() {
                               setNewSkill('');
                             }
                           }}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-4 py-2 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           disabled={uploading || !newSkill.trim()}
                         >
                           Thêm
@@ -346,12 +346,12 @@ export default function Settings() {
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="px-8 py-3 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-8 py-3 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     disabled={uploading}
                   >
                     {uploading ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
                         <span>Đang lưu...</span>
                       </>
                     ) : (
@@ -365,8 +365,8 @@ export default function Settings() {
               </form>
 
               {/* Transfer Ownership Section */}
-              <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-yellow-400/20 rounded-2xl p-8 mt-8 shadow-xl">
-                <h2 className="text-lg font-semibold mb-4 font-heading text-yellow-400 flex items-center gap-2">
+              <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-blue-400/20 rounded-2xl p-8 mt-8 shadow-xl">
+                <h2 className="text-lg font-semibold mb-4 font-heading text-blue-400 flex items-center gap-2">
                   <ArrowRight className="w-5 h-5" /> Chuyển quyền sở hữu hồ sơ
                 </h2>
                 <p className="text-gray-300 text-sm mb-4">Bạn có thể chuyển toàn bộ hồ sơ sang địa chỉ ví Aptos khác. Sau khi chuyển, bạn sẽ không còn quyền chỉnh sửa hồ sơ này.</p>
@@ -408,16 +408,16 @@ export default function Settings() {
                     value={newOwnerAddress}
                     onChange={e => setNewOwnerAddress(e.target.value)}
                     placeholder="Nhập địa chỉ ví Aptos mới..."
-                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-gray-400 focus:border-yellow-400/50 focus:ring-yellow-400/20 font-primary"
+                    className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-gray-400 focus:border-blue-400/50 focus:ring-blue-400/20 font-primary"
                     disabled={transferring}
                   />
                   <button
                     type="submit"
-                    className="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full px-6 py-3 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 font-semibold shadow transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     disabled={transferring || !newOwnerAddress.trim()}
                   >
                     {transferring ? (
-                      <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
+                      <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400 mr-2"></span>
                     ) : (
                       <ArrowRight className="w-5 h-5" />
                     )}

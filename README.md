@@ -1,8 +1,8 @@
-APT - UTC: Decentralized Talent Marketplace on Aptos
-====================================================
+APT-UTC: Decentralized Talent Marketplace on Aptos
+===================================================
 
 ## Project Overview
-PT - UTC is a next-generation decentralized freelance platform built on the Aptos blockchain. It empowers clients and freelancers to collaborate transparently, securely, and efficiently, leveraging smart contracts for milestone-based payments, escrow, and trustless interactions. The platform is designed for the future of work in the Web3 era, with a focus on security, automation, and community-driven growth.
+APT-UTC is a next-generation decentralized freelance platform built on the Aptos blockchain. It empowers clients and freelancers to collaborate transparently, securely, and efficiently, leveraging smart contracts for milestone-based payments, escrow, and trustless interactions. The platform is designed for the future of work in the Web3 era, with a focus on security, automation, and community-driven growth.
 
 ## Key Features
 - **Decentralized Job Posting:** Clients can post jobs with detailed requirements, milestones, and deadlines. All job data is stored on-chain and/or IPFS for transparency and immutability.
