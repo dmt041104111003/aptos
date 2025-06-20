@@ -43,6 +43,7 @@ module job_work_board::job_marketplace_v29 {
     const ENOT_AUTHORIZED: u64 = 29;
     const ETOO_EARLY_AUTO_CONFIRM: u64 = 30;
     const ENO_PROFILE: u64 = 31;
+    const EINVALID_CID: u64 = 32;
 
     const APPLY_FEE: u64 = 100_000_000;
     const MAX_REJECTIONS: u8 = 3;
@@ -68,6 +69,9 @@ module job_work_board::job_marketplace_v29 {
         accepted: bool,
         submit_time: u64,
         reject_count: u8,
+        submission_cid: vector<u8>,
+        acceptance_cid: vector<u8>,
+        rejection_cid: vector<u8>,
     }
 
     struct FundFlowEvent has copy, drop, store {
@@ -102,6 +106,7 @@ module job_work_board::job_marketplace_v29 {
         last_reject_time: Option<u64>,
         locked: bool,
         last_apply_time: Option<u64>,
+        worker_stake: u64,
     }
 
     struct Jobs has key {
@@ -120,6 +125,7 @@ module job_work_board::job_marketplace_v29 {
         expire_event: event::EventHandle<JobExpiredEvent>,
         fund_flow_event: event::EventHandle<FundFlowEvent>,
         apply_event: event::EventHandle<WorkerAppliedEvent>,
+        worker_stake_refunded_event: event::EventHandle<WorkerStakeRefundedEvent>,
     }
 
     struct JobPostedEvent has copy, drop, store {
@@ -139,20 +145,23 @@ module job_work_board::job_marketplace_v29 {
     struct MilestoneSubmittedEvent has copy, drop, store {
         job_id: u64,
         milestone: u64,
-        submit_time: u64
+        submit_time: u64,
+        work_cid: vector<u8>
     }
 
     struct MilestoneAcceptedEvent has copy, drop, store {
         job_id: u64,
         milestone: u64,
-        accept_time: u64
+        accept_time: u64,
+        acceptance_cid: vector<u8>
     }
 
     struct MilestoneRejectedEvent has copy, drop, store {
         job_id: u64,
         milestone: u64,
         reject_time: u64,
-        reject_count: u8
+        reject_count: u8,
+        rejection_cid: vector<u8>
     }
 
     struct JobCanceledEvent has copy, drop, store {
@@ -176,9 +185,39 @@ module job_work_board::job_marketplace_v29 {
         apply_time: u64
     }
 
+    struct WorkerStakeRefundedEvent has copy, drop, store {
+        job_id: u64,
+        worker: address,
+        reason: u8, // 1: worker withdraw, 2: poster reject, 3: reopen
+        time: u64
+    }
+
     struct MarketplaceCapability has key {
         cap: SignerCapability,
         escrow_address: address, 
+    }
+
+   
+    fun is_valid_cid(cid: &vector<u8>): bool {
+        let len = vector::length(cid);
+      
+        if (len < 10 || len > 100) return false;
+        
+        let i = 0;
+        while (i < len) {
+            let byte = *vector::borrow(cid, i);
+        
+            if (!((byte >= 48 && byte <= 57) || // 0-9
+                  (byte >= 65 && byte <= 90) || // A-Z
+                  (byte >= 97 && byte <= 122) || // a-z
+                  byte == 45 || // -
+                  byte == 95 || // _
+                  byte == 46)) { // .
+                return false
+            };
+            i = i + 1;
+        };
+        true
     }
 
     public entry fun init_events(account: &signer) {
@@ -193,6 +232,7 @@ module job_work_board::job_marketplace_v29 {
             expire_event: account::new_event_handle<JobExpiredEvent>(account),
             fund_flow_event: account::new_event_handle<FundFlowEvent>(account),
             apply_event: account::new_event_handle<WorkerAppliedEvent>(account),
+            worker_stake_refunded_event: account::new_event_handle<WorkerStakeRefundedEvent>(account),
         });
     }
 
@@ -261,7 +301,10 @@ module job_work_board::job_marketplace_v29 {
                 submitted: false,
                 accepted: false,
                 submit_time: 0,
-                reject_count: 0
+                reject_count: 0,
+                submission_cid: vector::empty<u8>(),
+                acceptance_cid: vector::empty<u8>(),
+                rejection_cid: vector::empty<u8>(),
             });
             i = i + 1;
         };
@@ -291,6 +334,7 @@ module job_work_board::job_marketplace_v29 {
             last_reject_time: option::none(),
             locked: false,
             last_apply_time: option::none(),
+            worker_stake: 0,
         };
 
         table::add(&mut jobs_res.jobs, job_id, new_job);
@@ -363,10 +407,12 @@ module job_work_board::job_marketplace_v29 {
     public entry fun submit_milestone(
         worker: &signer,
         job_id: u64,
-        milestone_index: u64
+        milestone_index: u64,
+        work_cid: vector<u8> 
     ) acquires Jobs, Events {
         let worker_addr = signer::address_of(worker);
         assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED); 
+        assert!(is_valid_cid(&work_cid), EINVALID_CID);
         let jobs = borrow_global_mut<Jobs>(@job_work_board);
         assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
@@ -384,6 +430,7 @@ module job_work_board::job_marketplace_v29 {
 
         milestone_data.submitted = true;
         milestone_data.submit_time = timestamp::now_seconds();
+        milestone_data.submission_cid = work_cid;
 
         if (exists<Events>(@job_work_board)) {
             let events = borrow_global_mut<Events>(@job_work_board);
@@ -392,7 +439,8 @@ module job_work_board::job_marketplace_v29 {
                 MilestoneSubmittedEvent {
                     job_id,
                     milestone: milestone_index,
-                    submit_time: timestamp::now_seconds()
+                    submit_time: timestamp::now_seconds(),
+                    work_cid: work_cid
                 }
             );
         }
@@ -401,15 +449,16 @@ module job_work_board::job_marketplace_v29 {
     public entry fun accept_milestone(
         poster: &signer,
         job_id: u64,
-        milestone_index: u64
+        milestone_index: u64,
+        acceptance_cid: vector<u8> 
     ) acquires Jobs, Events, MarketplaceCapability {
         let poster_addr = signer::address_of(poster);
         assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
+        assert!(is_valid_cid(&acceptance_cid), EINVALID_CID);
         let jobs = borrow_global_mut<Jobs>(@job_work_board);
         assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
 
-  
         assert!(job.poster == poster_addr, ENOT_POSTER);
         assert!(job.active, ENOT_ACTIVE);
         assert!(option::is_some(&job.worker), ENOT_WORKER);
@@ -420,17 +469,16 @@ module job_work_board::job_marketplace_v29 {
         assert!(milestone_data.submitted, ENOT_SUBMITTED);
         assert!(!milestone_data.accepted, EALREADY_SUBMITTED);
 
-
         let milestone_amount = *vector::borrow(&job.milestones, milestone_index);
         assert!(milestone_amount > 0, EINVALID_AMOUNT);
         let worker_addr = *option::borrow(&job.worker);
 
-     
         let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
         let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
         coin::transfer<AptosCoin>(&module_signer, worker_addr, milestone_amount);
         job.escrowed_amount = job.escrowed_amount - milestone_amount;
         milestone_data.accepted = true;
+        milestone_data.acceptance_cid = acceptance_cid;
         job.current_milestone = milestone_index + 1;
         if (job.current_milestone == vector::length(&job.milestones)) {
             job.completed = true;
@@ -444,7 +492,8 @@ module job_work_board::job_marketplace_v29 {
                 MilestoneAcceptedEvent {
                     job_id,
                     milestone: milestone_index,
-                    accept_time: timestamp::now_seconds()
+                    accept_time: timestamp::now_seconds(),
+                    acceptance_cid: acceptance_cid
                 }
             );
             event::emit_event(
@@ -462,10 +511,12 @@ module job_work_board::job_marketplace_v29 {
     public entry fun reject_milestone(
         poster: &signer,
         job_id: u64,
-        milestone_index: u64
+        milestone_index: u64,
+        rejection_cid: vector<u8>
     ) acquires Jobs, Events {
         let poster_addr = signer::address_of(poster);
         assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED); 
+        assert!(is_valid_cid(&rejection_cid), EINVALID_CID);
         let jobs = borrow_global_mut<Jobs>(@job_work_board);
         assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
         let job = table::borrow_mut(&mut jobs.jobs, job_id);
@@ -481,6 +532,7 @@ module job_work_board::job_marketplace_v29 {
         assert!(milestone_data.reject_count < MAX_REJECTIONS, EREJECT_LIMIT_REACHED);
         milestone_data.submitted = false;
         milestone_data.reject_count = milestone_data.reject_count + 1;
+        milestone_data.rejection_cid = rejection_cid;
         job.rejected_count = job.rejected_count + 1;
         job.last_reject_time = option::some(timestamp::now_seconds());
         if (milestone_data.reject_count == MAX_REJECTIONS) {
@@ -495,7 +547,8 @@ module job_work_board::job_marketplace_v29 {
                     job_id,
                     milestone: milestone_index,
                     reject_time: timestamp::now_seconds(),
-                    reject_count: milestone_data.reject_count
+                    reject_count: milestone_data.reject_count,
+                    rejection_cid: rejection_cid
                 }
             );
         }
@@ -504,7 +557,7 @@ module job_work_board::job_marketplace_v29 {
     public entry fun cancel_job(
         account: &signer,
         job_id: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, MarketplaceCapability {
         let account_addr = signer::address_of(account);
         assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@job_work_board);
@@ -518,7 +571,9 @@ module job_work_board::job_marketplace_v29 {
 
         let remaining_funds = job.escrowed_amount;
         if (remaining_funds > 0) {
-            coin::transfer<AptosCoin>(account, account_addr, remaining_funds);
+            let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
+            let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+            coin::transfer<AptosCoin>(&module_signer, account_addr, remaining_funds);
             job.escrowed_amount = 0; 
         };
 
@@ -538,47 +593,49 @@ module job_work_board::job_marketplace_v29 {
     }
 
     public entry fun complete_job(
-        account: &signer,
-        job_id: u64
-    ) acquires Jobs, Events, MarketplaceCapability {
-        let account_addr = signer::address_of(account);
-        assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED); 
-        let jobs = borrow_global_mut<Jobs>(@job_work_board);
-        assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
-        let job = table::borrow_mut(&mut jobs.jobs, job_id);
+    account: &signer,
+    job_id: u64
+) acquires Jobs, Events, MarketplaceCapability {
+    let account_addr = signer::address_of(account);
+    assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED); 
+    let jobs = borrow_global_mut<Jobs>(@job_work_board);
+    assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
+    let job = table::borrow_mut(&mut jobs.jobs, job_id);
 
-        assert!(job.poster == account_addr, ENOT_POSTER);
-        assert!(job.active, ENOT_ACTIVE);
-        assert!(option::is_some(&job.worker), ENOT_WORKER);
+    assert!(job.poster == account_addr, ENOT_POSTER);
+    assert!(job.active, ENOT_ACTIVE);
+    assert!(option::is_some(&job.worker), ENOT_WORKER);
 
-        assert!(job.current_milestone == vector::length(&job.milestones), ENOT_READY_TO_AUTO_CONFIRM);
+    assert!(job.current_milestone == vector::length(&job.milestones), ENOT_READY_TO_AUTO_CONFIRM);
 
-        job.active = false;
-        job.completed = true;
+    job.active = false;
+    job.completed = true;
 
-        let principal = job.escrowed_amount;
-        let worker_addr = *option::borrow(&job.worker);
-        let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
-        let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
-        coin::transfer<AptosCoin>(&module_signer, worker_addr, principal);
-        job.escrowed_amount = 0;
+    let principal = job.escrowed_amount;
+    let worker_addr = *option::borrow(&job.worker);
+    let total = principal + job.worker_stake;
+    let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
+    let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+    coin::transfer<AptosCoin>(&module_signer, worker_addr, total);
+    job.escrowed_amount = 0;
+    job.worker_stake = 0;
 
-        if (exists<Events>(@job_work_board)) {
-            let events = borrow_global_mut<Events>(@job_work_board);
-            event::emit_event(
-                &mut events.complete_event,
-                JobCompletedEvent {
-                    job_id,
-                    complete_time: timestamp::now_seconds()
-                }
-            );
-        }
+    if (exists<Events>(@job_work_board)) {
+        let events = borrow_global_mut<Events>(@job_work_board);
+        event::emit_event(
+            &mut events.complete_event,
+            JobCompletedEvent {
+                job_id,
+                complete_time: timestamp::now_seconds()
+            }
+        );
     }
+}
 
     public entry fun expire_job(
         account: &signer,
         job_id: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, MarketplaceCapability {
         let _account_addr = signer::address_of(account);
         assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@job_work_board);
@@ -592,7 +649,9 @@ module job_work_board::job_marketplace_v29 {
         if (option::is_none(&job.worker)) {
             let remaining_funds = job.escrowed_amount;
             if (remaining_funds > 0) {
-                coin::transfer<AptosCoin>(account, job.poster, remaining_funds);
+                let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
+                let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+                coin::transfer<AptosCoin>(&module_signer, job.poster, remaining_funds);
                 job.escrowed_amount = 0; 
             };
         };
@@ -614,7 +673,7 @@ module job_work_board::job_marketplace_v29 {
     public entry fun reopen_applications(
         poster: &signer,
         job_id: u64
-    ) acquires Jobs {
+    ) acquires Jobs, MarketplaceCapability, Events {
         let poster_addr = signer::address_of(poster);
         assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
         let jobs = borrow_global_mut<Jobs>(@job_work_board);
@@ -627,6 +686,25 @@ module job_work_board::job_marketplace_v29 {
 
         assert!(timestamp::now_seconds() <= job.application_deadline, EAPPLICATION_DEADLINE_PASSED);
         
+        if (job.worker_stake > 0 && option::is_some(&job.worker)) {
+            let worker_addr = *option::borrow(&job.worker);
+            let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
+            let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+            coin::transfer<AptosCoin>(&module_signer, worker_addr, job.worker_stake);
+            if (exists<Events>(@job_work_board)) {
+                let events = borrow_global_mut<Events>(@job_work_board);
+                event::emit_event(
+                    &mut events.worker_stake_refunded_event,
+                    WorkerStakeRefundedEvent {
+                        job_id: job_id,
+                        worker: worker_addr,
+                        reason: 3,
+                        time: timestamp::now_seconds()
+                    }
+                );
+            };
+            job.worker_stake = 0;
+        };
         job.worker = option::none();
         job.approved = false;
         job.approve_time = option::none(); 
@@ -637,7 +715,7 @@ module job_work_board::job_marketplace_v29 {
     public entry fun apply(
         worker: &signer,
         job_id: u64
-    ) acquires Jobs, Events {
+    ) acquires Jobs, Events, MarketplaceCapability {
         let worker_addr = signer::address_of(worker);
         assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
         assert!(web3_profiles_v29::has_profile(worker_addr), ENO_PROFILE);
@@ -658,9 +736,13 @@ module job_work_board::job_marketplace_v29 {
                 assert!(false, EALREADY_HAS_WORKER);
             }
         };
+        let stake_amount = ONE_APT; // 1 APT
+        let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
+        coin::transfer<AptosCoin>(worker, marketplace_cap.escrow_address, stake_amount);
         job.worker = option::some(worker_addr);
         job.approved = false;
         job.last_apply_time = option::some(timestamp::now_seconds());
+        job.worker_stake = stake_amount;
         if (exists<Events>(@job_work_board)) {
             let events = borrow_global_mut<Events>(@job_work_board);
             event::emit_event(
@@ -672,5 +754,77 @@ module job_work_board::job_marketplace_v29 {
                 }
             );
         }
+    }
+
+    public entry fun worker_withdraw_apply(
+        worker: &signer,
+        job_id: u64
+    ) acquires Jobs, MarketplaceCapability, Events {
+        let worker_addr = signer::address_of(worker);
+        assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
+        let jobs = borrow_global_mut<Jobs>(@job_work_board);
+        assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
+        let job = table::borrow_mut(&mut jobs.jobs, job_id);
+        assert!(option::is_some(&job.worker), EWORKER_NOT_APPLIED);
+        let current_worker = *option::borrow(&job.worker);
+        assert!(current_worker == worker_addr, ENOT_WORKER);
+        assert!(!job.approved, EALREADY_HAS_WORKER);
+        if (job.worker_stake > 0) {
+            let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
+            let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+            coin::transfer<AptosCoin>(&module_signer, worker_addr, job.worker_stake);
+            if (exists<Events>(@job_work_board)) {
+                let events = borrow_global_mut<Events>(@job_work_board);
+                event::emit_event(
+                    &mut events.worker_stake_refunded_event,
+                    WorkerStakeRefundedEvent {
+                        job_id: job_id,
+                        worker: worker_addr,
+                        reason: 1,
+                        time: timestamp::now_seconds()
+                    }
+                );
+            };
+            job.worker_stake = 0;
+        };
+        job.worker = option::none();
+        job.approved = false;
+        job.approve_time = option::none();
+    }
+
+    public entry fun poster_reject_worker(
+        poster: &signer,
+        job_id: u64
+    ) acquires Jobs, MarketplaceCapability, Events {
+        let poster_addr = signer::address_of(poster);
+        assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
+        let jobs = borrow_global_mut<Jobs>(@job_work_board);
+        assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
+        let job = table::borrow_mut(&mut jobs.jobs, job_id);
+        assert!(job.poster == poster_addr, ENOT_POSTER);
+        assert!(option::is_some(&job.worker), EWORKER_NOT_APPLIED);
+        assert!(!job.approved, EALREADY_HAS_WORKER);
+        let worker_addr = *option::borrow(&job.worker);
+        if (job.worker_stake > 0) {
+            let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
+            let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+            coin::transfer<AptosCoin>(&module_signer, worker_addr, job.worker_stake);
+            if (exists<Events>(@job_work_board)) {
+                let events = borrow_global_mut<Events>(@job_work_board);
+                event::emit_event(
+                    &mut events.worker_stake_refunded_event,
+                    WorkerStakeRefundedEvent {
+                        job_id: job_id,
+                        worker: worker_addr,
+                        reason: 2,
+                        time: timestamp::now_seconds()
+                    }
+                );
+            };
+            job.worker_stake = 0;
+        };
+        job.worker = option::none();
+        job.approved = false;
+        job.approve_time = option::none();
     }
 }

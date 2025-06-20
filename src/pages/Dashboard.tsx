@@ -3,21 +3,35 @@ import { motion, useInView } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
-
   DollarSign,
   Clock,
   CheckCircle,
-
   X,
-  Upload
+  Upload,
+  Link,
+  FileText,
+  Send,
+  Eye,
+  Download
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { useWallet } from '../context/WalletContext';
 import { useProfile } from '../contexts/ProfileContext';
 import { convertIPFSURL } from '@/utils/ipfs';
 import { toast } from '@/components/ui/sonner';
-import { aptos, fetchProfileDetails } from '@/utils/aptosUtils';
+import { aptos, fetchProfileDetails, decodeCID, fetchMilestoneDetails, getMilestoneCIDs } from '@/utils/aptosUtils';
+import { Label } from '@/components/ui/label';
+import { uploadJSONToIPFS, uploadFileToIPFS } from '@/utils/pinata';
 
 interface JobPost {
   id: string; 
@@ -31,7 +45,15 @@ interface JobPost {
   approved: boolean;
   active: boolean;
   current_milestone: number;
-  milestone_states: { [key: number]: { submitted: boolean; accepted: boolean; submit_time: number; reject_count: number } };
+  milestone_states: { [key: number]: { 
+    submitted: boolean; 
+    accepted: boolean; 
+    submit_time: number; 
+    reject_count: number;
+    submission_cid?: any;
+    acceptance_cid?: any;
+    rejection_cid?: any;
+  } };
   submit_time: number | null;
   escrowed_amount: number;
   approve_time: number | null;
@@ -54,9 +76,12 @@ type MilestoneData = {
   accepted: boolean;
   submit_time: number | string;
   reject_count: number;
+  submission_cid?: any;
+  acceptance_cid?: any;
+  rejection_cid?: any;
 };
 
-const JOBS_CONTRACT_ADDRESS = "0x3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490";
+const JOBS_CONTRACT_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
 
 const TABS = [
@@ -86,7 +111,23 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
- 
+  // Milestone dialog states
+  const [milestoneDialogOpen, setMilestoneDialogOpen] = useState(false);
+  const [milestoneAction, setMilestoneAction] = useState<'submit' | 'accept' | 'reject'>('submit');
+  const [selectedJobId, setSelectedJobId] = useState<string>('');
+  const [selectedMilestoneIndex, setSelectedMilestoneIndex] = useState<number>(0);
+  const [message, setMessage] = useState('');
+  const [link, setLink] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // View milestone details dialog states
+  const [viewMilestoneDialogOpen, setViewMilestoneDialogOpen] = useState(false);
+  const [milestoneDetails, setMilestoneDetails] = useState<any>(null);
+  const [loadingMilestoneDetails, setLoadingMilestoneDetails] = useState(false);
+  const [selectedMilestoneCid, setSelectedMilestoneCid] = useState<string>('');
+  const [selectedMilestoneType, setSelectedMilestoneType] = useState<'submission' | 'acceptance' | 'rejection'>('submission');
+
   const heroRef = useRef(null);
   const statsRef = useRef(null);
   const heroInView = useInView(heroRef, { once: true });
@@ -127,14 +168,7 @@ const Dashboard = () => {
    
       const jobDetailsMap = new Map<string, any>();
       for (const event of rawPostedEvents) {
-        let jobCid = event.data.cid;
-        if (typeof jobCid === 'string' && jobCid.startsWith('0x')) {
-          const hex = jobCid.replace(/^0x/, '');
-          const bytes = new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
-          jobCid = new TextDecoder().decode(bytes);
-        } else if (Array.isArray(jobCid)) {
-          jobCid = new TextDecoder().decode(new Uint8Array(jobCid));
-        }
+        let jobCid = decodeCID(event.data.cid);
         if (jobCid) {
           try {
             const jobDetailsUrl = convertIPFSURL(jobCid);
@@ -205,9 +239,12 @@ const Dashboard = () => {
                 accepted: milestoneData.accepted,
                 submit_time: Number(milestoneData.submit_time),
                 reject_count: Number(milestoneData.reject_count),
+                submission_cid: milestoneData.submission_cid,
+                acceptance_cid: milestoneData.acceptance_cid,
+                rejection_cid: milestoneData.rejection_cid,
               };
             } catch (e) {
- 
+              // Handle error silently
             }
           }
         }
@@ -262,19 +299,6 @@ const Dashboard = () => {
     }
   };
 
-  // const formatPostedTime = (timestamp: number) => {
-  //   const now = Date.now() / 1000;
-  //   const diffSeconds = now - timestamp;
-
-  //   if (diffSeconds < 60) return `${Math.floor(diffSeconds)} giây trước`;
-  //   const diffMinutes = diffSeconds / 60;
-  //   if (diffMinutes < 60) return `${Math.floor(diffMinutes)} phút trước`;
-  //   const diffHours = diffMinutes / 60;
-  //   if (diffHours < 24) return `${Math.floor(diffHours)} giờ trước`;
-  //   const diffDays = diffHours / 24;
-  //   return `${Math.floor(diffDays)} ngày trước`;
-  // };
-
   const getMilestoneStatus = (job: JobPost, index: number) => {
     const milestoneData = job.milestone_states[index];
     if (!milestoneData) return 'Chưa khởi tạo';
@@ -283,15 +307,6 @@ const Dashboard = () => {
     if (milestoneData.reject_count > 0) return `Đã từ chối (${milestoneData.reject_count})`;
     return 'Chưa nộp';
   };
-
-  // const getMilestoneBadgeVariant = (job: JobPost, index: number) => {
-  //   const milestoneData = job.milestone_states[index];
-  //   if (!milestoneData) return 'secondary'; 
-  //   if (milestoneData.accepted) return 'default';
-  //   if (milestoneData.submitted) return 'secondary';
-  //   if (milestoneData.reject_count > 0) return 'destructive';
-  //   return 'outline';
-  // };
 
   const handleApproveWorker = async (jobId: string, workerAddress: string) => {
     if (!account || accountType !== 'aptos' || !window.aptos) {
@@ -328,93 +343,148 @@ const Dashboard = () => {
     }
   };
 
-  const handleSubmitMilestone = async (jobId: string, milestoneIndex: number) => {
+  const handleOpenMilestoneDialog = (action: 'submit' | 'accept' | 'reject', jobId: string, milestoneIndex: number) => {
+    setMilestoneAction(action);
+    setSelectedJobId(jobId);
+    setSelectedMilestoneIndex(milestoneIndex);
+    setMessage('');
+    setLink('');
+    setSelectedFile(null);
+    setMilestoneDialogOpen(true);
+  };
+
+  const handleOpenSubmitDialog = (jobId: string, milestoneIndex: number) => {
+    setMilestoneAction('submit');
+    setSelectedJobId(jobId);
+    setSelectedMilestoneIndex(milestoneIndex);
+    setMessage('');
+    setLink('');
+    setSelectedFile(null);
+    setMilestoneDialogOpen(true);
+  };
+
+  const handleOpenAcceptDialog = (jobId: string, milestoneIndex: number) => {
+    setMilestoneAction('accept');
+    setSelectedJobId(jobId);
+    setSelectedMilestoneIndex(milestoneIndex);
+    setMessage('');
+    setLink('');
+    setSelectedFile(null);
+    setMilestoneDialogOpen(true);
+  };
+
+  const handleOpenRejectDialog = (jobId: string, milestoneIndex: number) => {
+    setMilestoneAction('reject');
+    setSelectedJobId(jobId);
+    setSelectedMilestoneIndex(milestoneIndex);
+    setMessage('');
+    setLink('');
+    setSelectedFile(null);
+    setMilestoneDialogOpen(true);
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleSubmitMilestoneAction = async () => {
     if (!account || accountType !== 'aptos' || !window.aptos) {
-      toast.error('Vui lòng kết nối ví Aptos để nộp cột mốc.');
+      toast.error('Vui lòng kết nối ví Aptos.');
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      console.log('Submitting milestone:', { jobId, milestoneIndex });
+      // Create JSON data with all information
+      const milestoneData = {
+        action: milestoneAction,
+        jobId: selectedJobId,
+        milestoneIndex: selectedMilestoneIndex,
+        timestamp: Date.now(),
+        userAddress: account,
+        message: message,
+        link: link,
+        fileInfo: selectedFile ? {
+          name: selectedFile.name,
+          size: selectedFile.size,
+          type: selectedFile.type
+        } : null,
+        metadata: {
+          actionType: milestoneAction,
+          description: milestoneAction === 'submit' ? 'Milestone submission' : 
+                      milestoneAction === 'accept' ? 'Milestone acceptance' : 
+                      'Milestone rejection'
+        }
+      };
+
+      // Upload JSON data to IPFS
+      const finalCid = await uploadJSONToIPFS(milestoneData);
+      toast.success(`Dữ liệu đã được upload lên IPFS với CID: ${finalCid}`);
+
+      // Convert CID to bytes for blockchain
+      const cidBytes = Array.from(new TextEncoder().encode(finalCid));
+
+      // Call smart contract with CID bytes
+      let functionName = '';
+      let arguments_array: any[] = [];
+
+      switch (milestoneAction) {
+        case 'submit':
+          functionName = 'submit_milestone';
+          arguments_array = [Number(selectedJobId), Number(selectedMilestoneIndex), cidBytes];
+          break;
+        case 'accept':
+          functionName = 'accept_milestone';
+          arguments_array = [Number(selectedJobId), Number(selectedMilestoneIndex), cidBytes];
+          break;
+        case 'reject':
+          functionName = 'reject_milestone';
+          arguments_array = [Number(selectedJobId), Number(selectedMilestoneIndex), cidBytes];
+          break;
+      }
+
       const transaction = await window.aptos.signAndSubmitTransaction({
         type: "entry_function_payload",
-        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::submit_milestone`,
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::${functionName}`,
         type_arguments: [],
-        arguments: [
-          Number(jobId), 
-          Number(milestoneIndex) 
-        ]
+        arguments: arguments_array
       });
 
-      console.log('Transaction submitted:', transaction);
       await aptos.waitForTransaction({ transactionHash: transaction.hash });
-      console.log('Transaction confirmed');
       
-      toast.success(`Cột mốc ${milestoneIndex + 1} đã được nộp thành công!`);
+      const actionText = milestoneAction === 'submit' ? 'nộp' : milestoneAction === 'accept' ? 'chấp nhận' : 'từ chối';
+      toast.success(`Cột mốc ${selectedMilestoneIndex + 1} đã được ${actionText} thành công! CID: ${finalCid}`);
       
-
-      console.log('Loading jobs after submission...');
+      setMilestoneDialogOpen(false);
       await loadUserJobs();
-      console.log('Jobs loaded after submission');
-      
       refetchProfile();
     } catch (error: any) {
-      console.error('Nộp cột mốc thất bại:', error);
-      toast.error(`Nộp cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+      console.error(`${milestoneAction} milestone thất bại:`, error);
+      const actionText = milestoneAction === 'submit' ? 'Nộp' : milestoneAction === 'accept' ? 'Chấp nhận' : 'Từ chối';
+      toast.error(`${actionText} cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleAcceptMilestone = async (jobId: string, milestoneIndex: number) => {
-    if (!account || accountType !== 'aptos' || !window.aptos) {
-      toast.error('Vui lòng kết nối ví Aptos để chấp nhận cột mốc.');
-      return;
-    }
-
-    try {
-      const transaction = await window.aptos.signAndSubmitTransaction({
-        type: "entry_function_payload",
-        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::accept_milestone`,
-        type_arguments: [],
-        arguments: [
-          Number(jobId), 
-          Number(milestoneIndex) 
-        ]
-      });
-
-      await aptos.waitForTransaction({ transactionHash: transaction.hash });
-      toast.success(`Cột mốc ${milestoneIndex + 1} đã được chấp nhận thành công!`);
-      loadUserJobs();
-      refetchProfile(); 
-    } catch (error: any) {
-      console.error('Chấp nhận cột mốc thất bại:', error);
-      toast.error(`Chấp nhận cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+  const getDialogTitle = () => {
+    switch (milestoneAction) {
+      case 'submit': return 'Nộp cột mốc';
+      case 'accept': return 'Chấp nhận cột mốc';
+      case 'reject': return 'Từ chối cột mốc';
+      default: return 'Thao tác cột mốc';
     }
   };
 
-  const handleRejectMilestone = async (jobId: string, milestoneIndex: number) => {
-    if (!account || accountType !== 'aptos' || !window.aptos) {
-      toast.error('Vui lòng kết nối ví Aptos để từ chối cột mốc.');
-      return;
-    }
-
-    try {
-      const transaction = await window.aptos.signAndSubmitTransaction({
-        type: "entry_function_payload",
-        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::reject_milestone`,
-        type_arguments: [],
-        arguments: [
-          Number(jobId),
-          Number(milestoneIndex) 
-        ]
-      });
-
-      await aptos.waitForTransaction({ transactionHash: transaction.hash });
-      toast.success(`Cột mốc ${milestoneIndex + 1} đã được từ chối.`);
-      loadUserJobs();
-      refetchProfile(); 
-    } catch (error: any) {
-      console.error('Từ chối cột mốc thất bại:', error);
-      toast.error(`Từ chối cột mốc thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+  const getDialogDescription = () => {
+    switch (milestoneAction) {
+      case 'submit': return `Nộp cột mốc ${selectedMilestoneIndex + 1} - Vui lòng cung cấp thông tin và bằng chứng`;
+      case 'accept': return `Chấp nhận cột mốc ${selectedMilestoneIndex + 1} - Vui lòng cung cấp bằng chứng chấp nhận`;
+      case 'reject': return `Từ chối cột mốc ${selectedMilestoneIndex + 1} - Vui lòng cung cấp lý do từ chối`;
+      default: return '';
     }
   };
 
@@ -496,36 +566,6 @@ const Dashboard = () => {
     }
   };
 
-  // const handleCopy = (text: string) => {
-  //   navigator.clipboard.writeText(text)
-  //     .then(() => toast.success("Đã sao chép địa chỉ ví!"))
-  //     .catch(() => toast.error("Không thể sao chép."));
-  // };
-
-  // const handleApplyJob = async (jobId: string) => {
-  //   if (!account || accountType !== 'aptos' || !window.aptos) {
-  //     toast.error('Vui lòng kết nối ví Aptos để ứng tuyển.');
-  //     return;
-  //   }
-  //   try {
-  //     const transaction = await window.aptos.signAndSubmitTransaction({
-  //       type: "entry_function_payload",
-  //       function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::apply`,
-  //       type_arguments: [],
-  //       arguments: [jobId]
-  //     });
-  //     await aptos.waitForTransaction({ transactionHash: transaction.hash });
-  //     toast.success('Đơn ứng tuyển của bạn đã được gửi thành công!');
-  //     loadUserJobs();
-  //   } catch (error: any) {
-  //     if (error?.message?.includes('EALREADY_APPLIED') || error?.message?.includes('code: 15')) {
-  //       toast.error('Bạn đã apply, vui lòng chờ 8 tiếng mới được apply lại.');
-  //     } else {
-  //       toast.error(`Ứng tuyển thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
-  //     }
-  //   }
-  // };
-
   const handleRejectWorker = async (jobId: string) => {
     if (!account || accountType !== 'aptos' || !window.aptos) {
       toast.error('Vui lòng kết nối ví Aptos để từ chối ứng viên.');
@@ -544,6 +584,87 @@ const Dashboard = () => {
     } catch (error: any) {
       toast.error(`Từ chối ứng viên thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
     }
+  };
+
+  const handleViewMilestoneDetails = async (jobId: string, milestoneIndex: number, cid: string, type: 'submission' | 'acceptance' | 'rejection') => {
+    setSelectedJobId(jobId);
+    setSelectedMilestoneIndex(milestoneIndex);
+    setSelectedMilestoneCid(cid);
+    setSelectedMilestoneType(type);
+    setMilestoneDetails(null);
+    setLoadingMilestoneDetails(true);
+    setViewMilestoneDialogOpen(true);
+
+    try {
+      // Convert CID bytes to string if needed
+      let cidString = cid;
+      if (Array.isArray(cid)) {
+        cidString = decodeCID(cid);
+      } else if (typeof cid === 'string' && cid.startsWith('0x')) {
+        cidString = decodeCID(cid);
+      }
+
+      if (!cidString) {
+        throw new Error('Invalid CID format');
+      }
+
+      // Fetch data from IPFS
+      const data = await fetchMilestoneDetails(cidString);
+      setMilestoneDetails(data);
+    } catch (error) {
+      console.error('Error fetching milestone details:', error);
+      toast.error('Không thể tải thông tin chi tiết từ IPFS');
+      setMilestoneDetails({ error: 'Không thể tải dữ liệu' });
+    } finally {
+      setLoadingMilestoneDetails(false);
+    }
+  };
+
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString('vi-VN');
+  };
+
+  const getActionDisplayName = (action: string) => {
+    switch (action) {
+      case 'submit': return 'Nộp cột mốc';
+      case 'accept': return 'Chấp nhận';
+      case 'reject': return 'Từ chối';
+      default: return action;
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getCIDDisplayInfo = (cid: any) => {
+    if (!cid) return null;
+    const decodedCID = decodeCID(cid);
+    return {
+      original: cid,
+      decoded: decodedCID,
+      ipfsUrl: convertIPFSURL(decodedCID)
+    };
+  };
+
+  const debugCIDInfo = (job: JobPost, milestoneIndex: number) => {
+    const milestoneData = job.milestone_states[milestoneIndex];
+    if (!milestoneData) return null;
+
+    const submissionInfo = getCIDDisplayInfo(milestoneData.submission_cid);
+    const acceptanceInfo = getCIDDisplayInfo(milestoneData.acceptance_cid);
+    const rejectionInfo = getCIDDisplayInfo(milestoneData.rejection_cid);
+
+    return {
+      submission: submissionInfo,
+      acceptance: acceptanceInfo,
+      rejection: rejectionInfo,
+      milestoneData
+    };
   };
 
   const renderJobCard = (job: JobPost & { title?: string; description?: string }, type: string) => {
@@ -652,7 +773,7 @@ const Dashboard = () => {
                         <Button
                           size="sm"
                           className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
-                          onClick={() => handleSubmitMilestone(job.id, milestoneIndex)}
+                          onClick={() => handleOpenSubmitDialog(job.id, milestoneIndex)}
                         >
                           <Upload className="w-4 h-4 mr-2" />
                           Nộp cột mốc
@@ -710,12 +831,68 @@ const Dashboard = () => {
                           </span>
                           <span className="ml-2 truncate">{milestoneStatus}</span>
                         </div>
+                        
+                        {/* Milestone Details Buttons */}
+                        {milestoneData && (
+                          <div className="flex gap-2 mt-1 flex-wrap">
+                            {milestoneData.submission_cid && (
+                              <div className="flex flex-col gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
+                                  onClick={() => handleViewMilestoneDetails(job.id, idx, milestoneData.submission_cid, 'submission')}
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Xem nộp
+                                </Button>
+                                <div className="text-xs text-gray-500">
+                                  CID: {decodeCID(milestoneData.submission_cid).slice(0, 10)}...
+                                </div>
+                              </div>
+                            )}
+                            {milestoneData.acceptance_cid && (
+                              <div className="flex flex-col gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30"
+                                  onClick={() => handleViewMilestoneDetails(job.id, idx, milestoneData.acceptance_cid, 'acceptance')}
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Xem chấp nhận
+                                </Button>
+                                <div className="text-xs text-gray-500">
+                                  CID: {decodeCID(milestoneData.acceptance_cid).slice(0, 10)}...
+                                </div>
+                              </div>
+                            )}
+                            {milestoneData.rejection_cid && (
+                              <div className="flex flex-col gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border-red-400/30"
+                                  onClick={() => handleViewMilestoneDetails(job.id, idx, milestoneData.rejection_cid, 'rejection')}
+                                >
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Xem từ chối
+                                </Button>
+                                <div className="text-xs text-gray-500">
+                                  CID: {decodeCID(milestoneData.rejection_cid).slice(0, 10)}...
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
                         {canSubmit && (
                           <div className="flex gap-2 mt-1">
                             <Button
                               size="sm"
-                              className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
-                              onClick={() => handleSubmitMilestone(job.id, idx)}
+                              variant="outline"
+                              className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
+                              onClick={() => handleOpenSubmitDialog(job.id, idx)}
                             >
                               Nộp cột mốc
                             </Button>
@@ -725,16 +902,17 @@ const Dashboard = () => {
                           <div className="flex gap-2 mt-1">
                             <Button
                               size="sm"
-                              className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
-                              onClick={() => handleAcceptMilestone(job.id, idx)}
+                              variant="outline"
+                              className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30"
+                              onClick={() => handleOpenAcceptDialog(job.id, idx)}
                             >
                               Chấp nhận
                             </Button>
                             <Button
                               size="sm"
-                              variant="destructive"
-                              className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
-                              onClick={() => handleRejectMilestone(job.id, idx)}
+                              variant="outline"
+                              className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border-red-400/30"
+                              onClick={() => handleOpenRejectDialog(job.id, idx)}
                             >
                               Từ chối
                             </Button>
@@ -785,7 +963,7 @@ const Dashboard = () => {
                   <Button 
                     size="sm" 
                     className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
-                    onClick={() => handleSubmitMilestone(job.id, job.current_milestone)}
+                    onClick={() => handleOpenSubmitDialog(job.id, job.current_milestone)}
                   >
                     <Upload className="w-4 h-4 mr-2" />
                     Nộp cột mốc
@@ -915,6 +1093,269 @@ const Dashboard = () => {
           )}
         </div>
       </section>
+
+      <Dialog open={milestoneDialogOpen} onOpenChange={setMilestoneDialogOpen}>
+        <DialogContent className="bg-gray-900 border border-white/10 text-white max-w-lg w-full">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-white">
+              {milestoneAction === 'submit' ? 'Nộp cột mốc' : 
+               milestoneAction === 'accept' ? 'Chấp nhận cột mốc' : 'Từ chối cột mốc'}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {milestoneAction === 'submit' ? 'Nhập thông tin và file cho cột mốc' : 
+               milestoneAction === 'accept' ? 'Nhập ghi chú chấp nhận' : 'Nhập lý do từ chối'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Message */}
+            <div className="space-y-2">
+              <Label htmlFor="message" className="text-white">
+                {milestoneAction === 'submit' ? 'Mô tả công việc' : 
+                 milestoneAction === 'accept' ? 'Ghi chú chấp nhận' : 'Lý do từ chối'}
+              </Label>
+              <Textarea
+                id="message"
+                placeholder={milestoneAction === 'submit' ? 'Mô tả chi tiết công việc đã hoàn thành...' : 
+                            milestoneAction === 'accept' ? 'Ghi chú khi chấp nhận cột mốc...' : 
+                            'Lý do từ chối cột mốc...'}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                rows={4}
+              />
+            </div>
+
+            {/* Link */}
+            <div className="space-y-2">
+              <Label htmlFor="link" className="text-white">Link tham khảo (tùy chọn)</Label>
+              <Input
+                id="link"
+                type="url"
+                placeholder="https://example.com"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+              />
+            </div>
+
+            {/* File Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="file" className="text-white">File đính kèm (tùy chọn)</Label>
+              <Input
+                id="file"
+                type="file"
+                onChange={handleFileChange}
+                className="bg-gray-800 border-gray-600 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+              />
+              {selectedFile && (
+                <div className="text-sm text-gray-400">
+                  Đã chọn: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setMilestoneDialogOpen(false)}
+                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSubmitMilestoneAction}
+                disabled={isSubmitting}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Đang xử lý...
+                  </div>
+                ) : (
+                  milestoneAction === 'submit' ? 'Nộp cột mốc' : 
+                  milestoneAction === 'accept' ? 'Chấp nhận' : 'Từ chối'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewMilestoneDialogOpen} onOpenChange={setViewMilestoneDialogOpen}>
+        <DialogContent className="bg-gray-900 border border-white/10 text-white max-w-2xl w-full">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-white">
+              Chi tiết cột mốc {selectedMilestoneIndex + 1}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {selectedMilestoneType === 'submission' ? 'Thông tin nộp cột mốc' : 
+               selectedMilestoneType === 'acceptance' ? 'Thông tin chấp nhận cột mốc' : 
+               'Thông tin từ chối cột mốc'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {loadingMilestoneDetails ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+              </div>
+            ) : milestoneDetails ? (
+              <div className="space-y-4">
+                {/* Basic Info */}
+                <div className="bg-gray-800/50 p-4 rounded-lg">
+                  <h3 className="text-lg font-semibold text-white mb-2">Thông tin cơ bản</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Job ID:</span>
+                      <span className="text-white ml-2">{selectedJobId}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Cột mốc:</span>
+                      <span className="text-white ml-2">{selectedMilestoneIndex + 1}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Loại:</span>
+                      <span className="text-white ml-2">
+                        {selectedMilestoneType === 'submission' ? 'Nộp' : 
+                         selectedMilestoneType === 'acceptance' ? 'Chấp nhận' : 'Từ chối'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">CID:</span>
+                      <span className="text-white ml-2 font-mono text-xs break-all">{selectedMilestoneCid}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Details */}
+                {milestoneDetails.action && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">Chi tiết hành động</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-400">Hành động:</span>
+                        <span className="text-white ml-2">{getActionDisplayName(milestoneDetails.action)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Thời gian:</span>
+                        <span className="text-white ml-2">{formatTimestamp(milestoneDetails.timestamp)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Địa chỉ người dùng:</span>
+                        <span className="text-white ml-2 font-mono text-xs">{milestoneDetails.userAddress}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Message */}
+                {milestoneDetails.message && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">
+                      {selectedMilestoneType === 'submission' ? 'Mô tả công việc' : 
+                       selectedMilestoneType === 'acceptance' ? 'Ghi chú chấp nhận' : 'Lý do từ chối'}
+                    </h3>
+                    <p className="text-gray-300 text-sm whitespace-pre-wrap">{milestoneDetails.message}</p>
+                  </div>
+                )}
+
+                {/* Link */}
+                {milestoneDetails.link && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">Link tham khảo</h3>
+                    <a 
+                      href={milestoneDetails.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 text-sm break-all"
+                    >
+                      {milestoneDetails.link}
+                    </a>
+                  </div>
+                )}
+
+                {/* File Info */}
+                {milestoneDetails.fileInfo && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">Thông tin file</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-400">Tên file:</span>
+                        <span className="text-white ml-2">{milestoneDetails.fileInfo.name}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Kích thước:</span>
+                        <span className="text-white ml-2">{formatFileSize(milestoneDetails.fileInfo.size)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Loại file:</span>
+                        <span className="text-white ml-2">{milestoneDetails.fileInfo.type}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Metadata */}
+                {milestoneDetails.metadata && (
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <h3 className="text-lg font-semibold text-white mb-2">Metadata</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-gray-400">Loại hành động:</span>
+                        <span className="text-white ml-2">{milestoneDetails.metadata.actionType}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Mô tả:</span>
+                        <span className="text-white ml-2">{milestoneDetails.metadata.description}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Raw Data (for debugging) */}
+                <details className="bg-gray-800/50 p-4 rounded-lg">
+                  <summary className="text-lg font-semibold text-white cursor-pointer">Dữ liệu thô</summary>
+                  <pre className="text-xs text-gray-300 mt-2 overflow-x-auto">
+                    {JSON.stringify(milestoneDetails, null, 2)}
+                  </pre>
+                </details>
+
+                {/* CID Debug Info */}
+                <details className="bg-gray-800/50 p-4 rounded-lg">
+                  <summary className="text-lg font-semibold text-white cursor-pointer">Thông tin CID (Debug)</summary>
+                  <div className="mt-2 space-y-2 text-xs">
+                    <div>
+                      <span className="text-gray-400">CID gốc:</span>
+                      <span className="text-white ml-2 font-mono break-all">{JSON.stringify(selectedMilestoneCid)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">CID đã decode:</span>
+                      <span className="text-white ml-2 font-mono break-all">{decodeCID(selectedMilestoneCid)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">IPFS URL:</span>
+                      <a 
+                        href={convertIPFSURL(decodeCID(selectedMilestoneCid))} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 ml-2 break-all"
+                      >
+                        {convertIPFSURL(decodeCID(selectedMilestoneCid))}
+                      </a>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <p>Không có thông tin chi tiết</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

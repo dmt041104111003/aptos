@@ -1,7 +1,7 @@
 import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
 import { convertIPFSURL } from "@/utils/ipfs";
 
-const MODULE_ADDRESS = "0x3bedba4da817a6ef620393ed3f1d5ccf4a527af2586dff6b3aaa35201ca04490";
+const MODULE_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
 const PROFILE_MODULE_NAME = "web3_profiles_v29";
 const PROFILE_RESOURCE_NAME = "Profiles";
 
@@ -95,4 +95,54 @@ export const fetchProfileDetails = async (address: string): Promise<ProfileData>
   const result: ProfileData = { name, bio, profilePic, wallet, did, profile_cid, cccd, created_at, skills };
   profileCache.set(address, result);
   return result;
+};
+
+// Utility function to decode CID from vector<u8> format
+export const decodeCID = (cidBytes: any): string => {
+  if (typeof cidBytes === 'string') {
+    // If it's already a string, check if it's hex format
+    if (cidBytes.startsWith('0x')) {
+      const hex = cidBytes.replace(/^0x/, '');
+      const bytes = new Uint8Array(hex.match(/.{1,2}/g)?.map(b => parseInt(b, 16)) || []);
+      return new TextDecoder().decode(bytes);
+    }
+    return cidBytes;
+  } else if (Array.isArray(cidBytes)) {
+    // If it's an array of numbers, convert to string
+    return new TextDecoder().decode(new Uint8Array(cidBytes));
+  }
+  return '';
+};
+
+// Function to fetch milestone details from IPFS
+export const fetchMilestoneDetails = async (cid: string): Promise<any> => {
+  try {
+    const ipfsUrl = convertIPFSURL(cid);
+    const response = await fetch(ipfsUrl);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching milestone details:', error);
+    throw error;
+  }
+};
+
+// Function to get milestone CIDs from job data
+export const getMilestoneCIDs = (job: any, milestoneIndex: number): {
+  submissionCID?: string;
+  acceptanceCID?: string;
+  rejectionCID?: string;
+} => {
+  const milestoneData = job.milestone_states?.[milestoneIndex];
+  if (!milestoneData) return {};
+
+  return {
+    submissionCID: milestoneData.submission_cid ? decodeCID(milestoneData.submission_cid) : undefined,
+    acceptanceCID: milestoneData.acceptance_cid ? decodeCID(milestoneData.acceptance_cid) : undefined,
+    rejectionCID: milestoneData.rejection_cid ? decodeCID(milestoneData.rejection_cid) : undefined,
+  };
 }; 
