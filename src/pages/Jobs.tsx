@@ -866,7 +866,7 @@ const Jobs = () => {
                       <Button
                         onClick={handleFullQuery}
                         disabled={profileLoading || !profileAddress}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+                        className="w-full bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 rounded-lg font-medium flex items-center justify-center gap-2"
                       >
                         <Search className="w-4 h-4" />
                         Truy vấn
@@ -966,113 +966,7 @@ const Jobs = () => {
                                                 <Button
                                                   size="sm"
                                                   variant="outline"
-                                                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30 text-xs"
-                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.acceptance_cid, 'acceptance')}
-                                                >
-                                                  <Eye className="w-3 h-3 mr-1" />
-                                                  Chấp nhận {milestoneIndex + 1}
-                                                </Button>
-                                                <div className="text-xs text-gray-500">
-                                                  CID: {decodeCID(state.acceptance_cid).slice(0, 10)}...
-                                                </div>
-                                              </div>
-                                            )}
-                                            {state.rejection_cid && (
-                                              <div className="flex flex-col gap-1">
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border-red-400/30 text-xs"
-                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.rejection_cid, 'rejection')}
-                                                >
-                                                  <Eye className="w-3 h-3 mr-1" />
-                                                  Từ chối {milestoneIndex + 1}
-                                                </Button>
-                                                <div className="text-xs text-gray-500">
-                                                  CID: {decodeCID(state.rejection_cid).slice(0, 10)}...
-                                                </div>
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* View All Events Button */}
-                                <div className="mt-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 border-purple-400/30 text-xs w-full"
-                                    onClick={() => handleViewJobEvents(job.id)}
-                                  >
-                                    <Eye className="w-3 h-3 mr-1" />
-                                    Xem tất cả sự kiện
-                                  </Button>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {/* Dự án đã ứng tuyển/đã làm */}
-                      {profileFullInfo.jobsApplied.length > 0 && (
-                        <div className="mt-6">
-                          <h3 className="font-bold text-white mb-2 text-lg">Dự án đã ứng tuyển/đã làm</h3>
-                          <ul className="space-y-4">
-                            {profileFullInfo.jobsApplied.map(job => (
-                              <li key={job.id} className="bg-gradient-to-br from-gray-900/70 to-gray-800/80 rounded-xl border border-white/10 shadow p-6 flex flex-col gap-2">
-                                <div className="flex justify-between items-center mb-2">
-                                  <span className="text-xl font-bold text-blue-400 truncate">{job.title}</span>
-                                  <span className="text-xs px-3 py-1 rounded bg-blue-700/30 text-blue-300 font-medium">{job.status}</span>
-                                </div>
-
-                                {Array.isArray(job.milestones) && job.milestones.length > 0 && (
-                                  <div className="mt-2">
-                                    <h4 className="text-xs font-medium text-gray-400 mb-1">Milestones:</h4>
-                                    <ul className="space-y-1">
-                                      {job.milestones.map((milestone, idx) => (
-                                        <li key={idx} className="flex justify-between items-center text-xs text-gray-300">
-                                          <span>Cột mốc {milestone.index !== undefined ? milestone.index + 1 : idx + 1}: {milestone.amount ? milestone.amount / 100_000_000 : 0} APT</span>
-                                          <span className="ml-2 truncate">{milestone.status || '-'}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                                {/* Milestone Details Buttons */}
-                                {job.milestone_states && Object.keys(job.milestone_states).length > 0 && (
-                                  <div className="mt-2">
-                                    <h4 className="text-xs font-medium text-blue-300 mb-1">Chi tiết cột mốc:</h4>
-                                    <div className="space-y-2">
-                                      {Object.entries(job.milestone_states).map(([index, state]: [string, any]) => {
-                                        const milestoneIndex = Number(index);
-                                        return (
-                                          <div key={index} className="flex flex-wrap gap-1">
-                                            {state.submission_cid && (
-                                              <div className="flex flex-col gap-1">
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
                                                   className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 text-xs"
-                                                  onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.submission_cid, 'submission')}
-                                                >
-                                                  <Eye className="w-3 h-3 mr-1" />
-                                                  Nộp {milestoneIndex + 1}
-                                                </Button>
-                                                <div className="text-xs text-gray-500">
-                                                  CID: {decodeCID(state.submission_cid).slice(0, 10)}...
-                                                </div>
-                                              </div>
-                                            )}
-                                            {state.acceptance_cid && (
-                                              <div className="flex flex-col gap-1">
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30 text-xs"
                                                   onClick={() => handleViewMilestoneDetails(job.id, milestoneIndex, state.acceptance_cid, 'acceptance')}
                                                 >
                                                   <Eye className="w-3 h-3 mr-1" />
@@ -1242,7 +1136,7 @@ const Jobs = () => {
                           <Badge className={statusObj.color}>{statusObj.label}</Badge>
                           {job.active && !job.completed && !job.job_expired && (
                             <Button
-                              className="ml-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-semibold shadow"
+                              className="ml-auto bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 px-4 py-2 rounded-full text-sm font-semibold shadow"
                               onClick={() => handleApplyToJob(job)}
                             >
                               Ứng tuyển
@@ -1255,7 +1149,7 @@ const Jobs = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 border-purple-400/30 text-xs w-full"
+                            className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 text-xs w-full"
                             onClick={() => handleViewJobEvents(job.id)}
                           >
                             <Eye className="w-3 h-3 mr-1" />
@@ -1286,7 +1180,7 @@ const Jobs = () => {
                   setSearchTerm('');
                 }}
                 variant="outline"
-                className="group relative z-10 cursor-pointer overflow-hidden rounded-full  font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10"
+                className="group relative z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
               >
                 <span className="relative inline-flex overflow-hidden font-primary text-base">
                   <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
@@ -1380,7 +1274,7 @@ const Jobs = () => {
             <div className="flex gap-3">
               <Button
                 onClick={handleSendApplication}
-                className="group relative z-10 w-full cursor-pointer overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white font-semibold py-3 px-8 transition-all duration-300 shadow"
+                className="group relative z-10 w-full cursor-pointer overflow-hidden rounded-full bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30 font-semibold py-3 px-8 transition-all duration-300 shadow"
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
                 <span className="relative inline-flex overflow-hidden font-primary text-base">
@@ -1397,7 +1291,7 @@ const Jobs = () => {
                   variant="outline"
                   onClick={handleWithdrawApply}
                   disabled={withdrawing}
-                  className="group relative w-full z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10"
+                  className="group relative w-full z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                 >
                   {withdrawing ? 'Đang rút...' : 'Rút ứng tuyển'}
                 </Button>
@@ -1405,7 +1299,7 @@ const Jobs = () => {
               <Button
                 variant="outline"
                 onClick={() => setApplyDialogOpen(false)}
-                className="group relative w-full z-10 cursor-pointer overflow-hidden rounded-full  font-semibold py-3 px-8 transition-all duration-300 shadow border-white/20 text-white hover:bg-white/10"
+                className="group relative w-full z-10 cursor-pointer overflow-hidden rounded-full font-semibold py-3 px-8 transition-all duration-300 shadow bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
               >
                 <span className="relative inline-flex overflow-hidden font-primary text-base">
                   <div className="translate-y-0 skew-y-0 transition duration-500 group-hover:translate-y-[-160%] group-hover:skew-y-12">
@@ -1807,4 +1701,3 @@ const Jobs = () => {
 };
 
 export default Jobs;
-

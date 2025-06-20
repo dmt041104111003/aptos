@@ -917,7 +917,7 @@ const Dashboard = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30"
+                            className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                             onClick={() => handleOpenAcceptDialog(job.id, milestoneIndex)}
                           >
                             Chấp nhận
@@ -925,7 +925,7 @@ const Dashboard = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="bg-red-600/20 text-red-400 hover:bg-red-600/30 border-red-400/30"
+                            className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                             onClick={() => handleOpenRejectDialog(job.id, milestoneIndex)}
                           >
                             Từ chối
@@ -979,7 +979,7 @@ const Dashboard = () => {
                         {canRemoveInactiveWorker && (
                           <Button
                             size="sm"
-                            className="bg-red-700/80 text-red-300 font-bold hover:bg-red-600/80 w-fit"
+                            className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                             onClick={async () => {
                               try {
                                 if (!account || accountType !== 'aptos' || !window.aptos) {
@@ -1027,7 +1027,7 @@ const Dashboard = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30 border-green-400/30"
+                                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                                   onClick={() => handleViewMilestoneDetails(job.id, idx, milestoneData.acceptance_cid, 'acceptance')}
                                 >
                                   <Eye className="w-3 h-3 mr-1" />
@@ -1069,7 +1069,7 @@ const Dashboard = () => {
                 <>
                   <Button
                     size="sm"
-                    className="bg-yellow-700/80 text-yellow-300 font-bold hover:bg-yellow-600/80"
+                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                     onClick={() => handleRequestWithdraw(job.id)}
                   >
                     Rút ứng tuyển
@@ -1078,7 +1078,7 @@ const Dashboard = () => {
                   {job.active && !job.approved && (Date.now() / 1000 > job.application_deadline) && (
                     <Button
                       size="sm"
-                      className="bg-orange-700/80 text-orange-200 font-bold hover:bg-orange-600/80"
+                      className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                       onClick={async () => {
                         try {
                           if (!account || accountType !== 'aptos' || !window.aptos) {
@@ -1104,14 +1104,14 @@ const Dashboard = () => {
                   )}
                   <Button
                     size="sm"
-                    className="bg-green-900/80 text-green-300 font-bold hover:bg-green-700/80"
+                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                     onClick={() => handleApproveCancelJob(job.id, true)}
                   >
                     Duyệt hủy dự án
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-red-900/80 text-red-300 font-bold hover:bg-red-700/80"
+                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                     onClick={() => handleApproveCancelJob(job.id, false)}
                   >
                     Từ chối hủy
@@ -1123,7 +1123,7 @@ const Dashboard = () => {
                 <>
                   <Button
                     size="sm"
-                    className="bg-green-700/80 text-green-300 font-bold hover:bg-green-600/80"
+                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                     onClick={() => handleApproveWithdraw(job.id, true)}
                 
                   >
@@ -1131,7 +1131,7 @@ const Dashboard = () => {
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-red-700/80 text-red-300 font-bold hover:bg-red-600/80"
+                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                     onClick={() => handleApproveWithdraw(job.id, false)}
                     
                   >
@@ -1144,14 +1144,14 @@ const Dashboard = () => {
                 <>
                   <Button
                     size="sm"
-                    className="bg-green-600/20 text-green-400 hover:bg-green-600/30 font-semibold"
+                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                     onClick={() => handleApproveWorker(job.id, job.worker)}
                   >
                     Duyệt ứng viên
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-red-600/20 text-red-400 hover:bg-red-600/30 font-semibold"
+                    className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                     onClick={() => handleOpenReopenDialog(job.id)}
                   >
                     Từ chối ứng viên
@@ -1162,7 +1162,7 @@ const Dashboard = () => {
               {isPoster && (
                 <Button
                   size="sm"
-                  className="bg-orange-700/80 text-yellow-300 font-bold hover:bg-orange-600/80"
+                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                   onClick={() => handleRequestCancelJob(job.id)}
                 >
                   Gửi yêu cầu hủy
@@ -1174,7 +1174,7 @@ const Dashboard = () => {
                   {(isPoster || isWorker) && (
                     <Button
                       size="sm"
-                      className="bg-blue-700/80 text-blue-200 font-bold hover:bg-blue-600/80"
+                      className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                       disabled={
                         (isPoster && job.unlock_confirm_poster) ||
                         (isWorker && job.unlock_confirm_worker)
@@ -1219,8 +1219,8 @@ const Dashboard = () => {
               {canCancel && (
                 <Button 
                   size="sm" 
-                  variant="destructive"
-                  className="bg-red-600/20 text-red-400 hover:bg-red-600/30"
+                  variant="outline"
+                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                   onClick={() => handleCancelJob(job.id)}
                 >
                   <X className="w-4 h-4 mr-2" />
@@ -1230,7 +1230,7 @@ const Dashboard = () => {
               {canComplete && (
                 <Button 
                   size="sm" 
-                  className="bg-green-600/20 text-green-400 hover:bg-green-600/30"
+                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                   onClick={() => handleCompleteJob(job.id)}
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
@@ -1241,7 +1241,7 @@ const Dashboard = () => {
                 <Button 
                   size="sm" 
                   variant="outline" 
-                  className="bg-orange-600/20 text-orange-400 hover:bg-orange-600/30"
+                  className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                   onClick={() => handleExpireJob(job.id)}
                 >
                   <Clock className="w-4 h-4 mr-2" />
@@ -1407,7 +1407,7 @@ const Dashboard = () => {
                 id="file"
                 type="file"
                 onChange={handleFileChange}
-                className="bg-gray-800 border-gray-600 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                className="bg-gray-800 border-gray-600 text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 file:border file:border-blue-400/30"
               />
               {selectedFile && (
                 <div className="text-sm text-gray-400">
@@ -1420,14 +1420,14 @@ const Dashboard = () => {
               <Button
                 variant="outline"
                 onClick={() => setMilestoneDialogOpen(false)}
-                className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
               >
                 Hủy
               </Button>
               <Button
                 onClick={handleSubmitMilestoneAction}
                 disabled={isSubmitting}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
               >
                 {isSubmitting ? (
                   <div className="flex items-center gap-2">
@@ -1614,6 +1614,60 @@ const Dashboard = () => {
                 <p>Không có thông tin chi tiết</p>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reopen Dialog */}
+      <Dialog open={reopenDialogOpen} onOpenChange={setReopenDialogOpen}>
+        <DialogContent className="bg-gray-900 border border-white/10 text-white max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-white">
+              Mở lại job
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Nhập số ngày gia hạn cho job
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="deadline" className="text-white">Số ngày gia hạn</Label>
+              <Input
+                id="deadline"
+                type="number"
+                min="1"
+                max="365"
+                placeholder="7"
+                value={reopenDeadlineDays}
+                onChange={(e) => setReopenDeadlineDays(Number(e.target.value))}
+                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setReopenDialogOpen(false)}
+                className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleConfirmReopen}
+                disabled={isSubmitting}
+                className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Đang xử lý...
+                  </div>
+                ) : (
+                  'Xác nhận'
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

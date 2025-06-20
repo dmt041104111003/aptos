@@ -223,7 +223,7 @@ const PostJob = () => {
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleSkillAdd())}
                     className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.skills ? 'border-red-500/50' : ''}`}
                   />
-                  <Button type="button" onClick={handleSkillAdd} variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                  <Button type="button" onClick={handleSkillAdd} variant="outline" className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30">
                     <Plus className="w-4 h-4 text-blue-400" />
                   </Button>
                 </div>
@@ -234,7 +234,7 @@ const PostJob = () => {
                       <button
                         type="button"
                         onClick={() => handleSkillRemove(skill)}
-                        className="text-blue-300 hover:text-red-400"
+                        className="text-blue-300 hover:text-blue-400"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -312,7 +312,7 @@ const PostJob = () => {
                         toast.error('Vui lòng nhập số tiền và thời gian hợp lệ cho cột mốc.');
                       }
                     }}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                   >
                     <Plus className="w-4 h-4" /> Thêm cột mốc
                   </Button>
@@ -344,7 +344,7 @@ const PostJob = () => {
                     >
                       {TIME_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
                     </select>
-                    <Button type="button" variant="destructive" size="sm" onClick={() => removeMilestone(idx)}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => removeMilestone(idx)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30">
                       Xóa
                     </Button>
                   </div>
@@ -354,12 +354,12 @@ const PostJob = () => {
               {/* Submit Button */}
               <Button 
                 type="submit" 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
                     Đang xử lý...
                   </div>
                 ) : (

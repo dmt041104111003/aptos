@@ -1,4 +1,4 @@
-@import url("https://fonts.cdnfonts.com/css/general-sans");
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -7,8 +7,8 @@
 body {
   width: 100dvw;
   overflow-x: hidden;
-  background-color: #dfdff0;
-  font-family: 'Be Vietnam Pro';
+  background-color: #000000; /* Reverted to black background */
+  font-family: 'Be Vietnam Pro', sans-serif; /* Unified font */
 }
 
 @layer base {
@@ -43,166 +43,154 @@ body {
     @apply border border-white/20;
   }
 
-  .nav-hover-btn {
-    position: relative;
-    margin-left: 2.5rem;
-    font-family: "general", sans-serif;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    color: rgb(239 246 255);
-    cursor: pointer;
-  }
-
-  .nav-hover-btn::after {
-    content: '';
-    position: absolute;
-    bottom: -0.125rem;
-    left: 0;
-    height: 2px;
-    width: 100%;
-    background-color: rgb(38 38 38);
-    transform-origin: bottom right;
-    transform: scaleX(0);
-    transition: transform 0.3s cubic-bezier(0.65, 0.05, 0.36, 1);
-  }
-
-  .nav-hover-btn:hover::after {
-    transform-origin: bottom left;
-    transform: scaleX(1);
-  }
-
-  .dark .nav-hover-btn::after {
-    background-color: white;
-  }
-
-  .floating-nav {
-    @apply bg-black rounded-lg border;
-  }
-
-  .absolute-center {
-    @apply absolute top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%];
-  }
-
-  .flex-center {
-    @apply flex justify-center items-center;
-  }
-
-  .mask-clip-path {
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-  }
-
-  .special-font b {
-    font-family: 'Be Vietnam Pro', sans-serif;
-    font-weight: 900;
-    font-feature-settings: "ss01" on;
-  }
-
+  /* ... other original utilities ... */
+  
   .hero-heading {
-    @apply uppercase font-zentry font-black text-5xl sm:right-10 sm:text-7xl md:text-9xl lg:text-[12rem];
+    /* Use 'font-sans' which is now 'Be Vietnam Pro' */
+    @apply uppercase font-sans font-black text-5xl sm:right-10 sm:text-7xl md:text-9xl lg:text-[12rem];
   }
 
   .about-subtext {
-    @apply absolute bottom-[-80dvh] left-1/2 w-full max-w-96 -translate-x-1/2 text-center font-circular-web text-lg md:max-w-[34rem];
+    /* Use 'font-sans' which is now 'Be Vietnam Pro' */
+    @apply absolute bottom-[-80dvh] left-1/2 w-full max-w-96 -translate-x-1/2 text-center font-sans text-lg md:max-w-[34rem];
   }
+}
+.nav-hover-btn {
+  position: relative;
+  margin-left: 2.5rem;
+  font-family: "general", sans-serif;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: rgb(239 246 255);
+  cursor: pointer;
+}
 
-  .about-image {
-    @apply absolute left-1/2 top-0 z-20 h-[60vh] w-96 origin-center -translate-x-1/2 overflow-hidden rounded-3xl md:w-[30vw];
-  }
+.nav-hover-btn::after {
+  content: '';
+  position: absolute;
+  bottom: -0.125rem;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background-color: rgb(38 38 38);
+  transform-origin: bottom right;
+  transform: scaleX(0);
+  transition: transform 0.3s cubic-bezier(0.65, 0.05, 0.36, 1);
+}
 
-  .animated-title {
-    @apply flex flex-col gap-1 text-7xl uppercase leading-[.8] text-white sm:px-32 md:text-[6rem];
-  }
+.nav-hover-btn:hover::after {
+  transform-origin: bottom left;
+  transform: scaleX(1);
+}
 
-  .animated-word {
-    @apply special-font font-primary font-black opacity-0;
-    transform: translate3d(10px, 51px, -60px) rotateY(60deg) rotateX(-40deg);
-    transform-origin: 50% 50% -150px !important;
-    will-change: opacity, transform;
-  }
+.dark .nav-hover-btn::after {
+  background-color: white;
+}
 
-  .bento-tilt_1 {
-    @apply relative border-hsla col-span-2 overflow-hidden rounded-md transition-transform duration-300 ease-out;
-  }
+.floating-nav {
+  @apply bg-black rounded-lg border;
+}
 
-  .bento-tilt_2 {
-    @apply relative col-span-1 row-span-1 overflow-hidden rounded-md transition-transform duration-300 ease-out;
-  }
+.absolute-center {
+  @apply absolute top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%];
+}
 
-  .bento-title {
-    @apply uppercase md:text-6xl text-4xl font-black font-primary;
-    
-  }
+.flex-center {
+  @apply flex justify-center items-center;
+}
 
-  .story-img-container {
-    @apply relative md:h-dvh h-[90vh] w-full;
-    filter: url("#flt_tag");
-  }
+.mask-clip-path {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}
 
-  .story-img-mask {
-    @apply absolute left-0 top-0 size-full overflow-hidden md:left-[20%] md:top-[-10%] md:size-4/5;
-    clip-path: polygon(4% 0, 83% 21%, 100% 73%, 0% 100%);
-  }
+.special-font b {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-weight: 900;
+  font-feature-settings: "ss01" on;
+}
 
-  .story-img-content {
-    @apply absolute w-full md:h-dvh h-[50dvh] opacity-100 left-10 top-16 md:left-0 md:top-10 lg:left-[-300px] lg:top-[-100px];
-    transform: translate3d(0, 0, 0) rotateX(0) rotateY(0) rotateZ(0) scale(1);
-  }
+.hero-heading {
+  @apply uppercase font-zentry font-black text-5xl sm:right-10 sm:text-7xl md:text-9xl lg:text-[12rem];
+}
 
-  .gallery-img-container {
-    @apply size-64 overflow-hidden bg-violet-300;
-  }
+.about-subtext {
+  @apply absolute bottom-[-80dvh] left-1/2 w-full max-w-96 -translate-x-1/2 text-center font-circular-web text-lg md:max-w-[34rem];
+}
 
-  .gallery-img {
-    @apply size-full bg-cover;
-  }
+.about-image {
+  @apply absolute left-1/2 top-0 z-20 h-[60vh] w-96 origin-center -translate-x-1/2 overflow-hidden rounded-3xl md:w-[30vw];
+}
 
-  .gallery-img-4 {
-    @apply sm:size-80 md:h-96 md:w-[25rem] rounded-lg;
-  }
+.animated-title {
+  @apply flex flex-col gap-1 text-7xl uppercase leading-[.8] text-white sm:px-32 md:text-[6rem];
+}
 
-  .sword-man-clip-path {
-    clip-path: polygon(16% 0, 89% 15%, 75% 100%, 0 97%);
-  }
+.animated-word {
+  @apply special-font font-primary font-black opacity-0;
+  transform: translate3d(10px, 51px, -60px) rotateY(60deg) rotateX(-40deg);
+  transform-origin: 50% 50% -150px !important;
+  will-change: opacity, transform;
+}
 
-  .contact-clip-path-1 {
-    clip-path: polygon(25% 0%, 74% 0, 69% 64%, 34% 73%);
-  }
-
-  .contact-clip-path-2 {
-    clip-path: polygon(29% 15%, 85% 30%, 50% 100%, 10% 64%);
-  }
+.bento-tilt_1 {
+  @apply relative border-hsla col-span-2 overflow-hidden rounded-md transition-transform duration-300 ease-out;
+}
+.bento-tilt_2 {
+  @apply relative border-hsla overflow-hidden rounded-md transition-transform duration-300 ease-out;
+}
+.bento-title {
+  @apply special-font absolute left-3 top-3 z-10 font-robert-medium text-lg capitalize text-blue-100;
+}
+.story-img-container {
+  @apply relative col-span-2 h-[80dvh] w-full;
+}
+.story-img-mask {
+  @apply absolute left-0 top-0 h-full w-full overflow-hidden;
+}
+.story-img-content {
+  @apply absolute left-0 top-0 h-full w-full object-cover object-center;
+}
+.gallery-img-container {
+  @apply relative h-[50dvh] overflow-hidden rounded-md border-hsla;
+}
+.gallery-img {
+  @apply absolute left-0 top-0 h-full w-full object-cover object-center;
+}
+.gallery-img-4 {
+  @apply relative col-span-2 h-full overflow-hidden rounded-md border-hsla;
+}
+.sword-man-clip-path {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%);
+}
+.contact-clip-path-1 {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 20% 100%);
+}
+.contact-clip-path-2 {
+  clip-path: polygon(0 0, 80% 0, 100% 100%, 0% 100%);
 }
 
 .indicator-line {
-  @apply h-1 w-px rounded-full bg-white transition-all duration-200 ease-in-out;
+  @apply h-full w-1 origin-top bg-white/20;
 }
-
 .indicator-line.active {
-  animation: indicator-line 0.5s ease infinite;
-  animation-delay: calc(var(--animation-order) * 0.1s);
+  animation: indicator-line 1s cubic-bezier(0.65, 0.05, 0.36, 1) forwards;
+  @apply bg-yellow-300;
 }
 
 @keyframes indicator-line {
-  0% {
-    height: 4px;
-    transform: translateY(-0px);
+  from {
+    transform: scaleY(0);
   }
-  50% {
-    height: 16px;
-    transform: translateY(-4px);
-  }
-  100% {
-    height: 4px;
-    transform: translateY(-0px);
+  to {
+    transform: scaleY(1);
   }
 }
 
-/* From Uiverse.io by G4b413l */
-/* https://uiverse.io/G4b413l/tidy-walrus-92 */
+/* ================== */
 .three-body {
   --uib-size: 35px;
   --uib-speed: 0.8s;
-  --uib-color: #5d3fd3;
+  --uib-color: #ffffff;
   position: relative;
   display: inline-block;
   height: var(--uib-size);
@@ -217,13 +205,15 @@ body {
 }
 
 .three-body__dot:after {
-  content: "";
+  content: '';
   position: absolute;
   height: 0%;
   width: 100%;
   padding-bottom: 100%;
   background-color: var(--uib-color);
   border-radius: 50%;
+  opacity: 0.5;
+  animation: wobble1 var(--uib-speed) infinite ease-in-out;
 }
 
 .three-body__dot:nth-child(1) {
@@ -236,8 +226,8 @@ body {
 .three-body__dot:nth-child(1)::after {
   bottom: 0;
   left: 0;
-  animation: wobble1 var(--uib-speed) infinite ease-in-out;
-  animation-delay: calc(var(--uib-speed) * -0.3);
+  animation-delay: calc(var(--uib-speed) * -0.6);
+  transform-origin: 50% 0%;
 }
 
 .three-body__dot:nth-child(2) {
@@ -250,8 +240,8 @@ body {
 .three-body__dot:nth-child(2)::after {
   bottom: 0;
   left: 0;
-  animation: wobble1 var(--uib-speed) infinite calc(var(--uib-speed) * -0.15)
-    ease-in-out;
+  animation-delay: calc(var(--uib-speed) * -0.3);
+  transform-origin: 50% 0%;
 }
 
 .three-body__dot:nth-child(3) {
@@ -263,14 +253,12 @@ body {
 .three-body__dot:nth-child(3)::after {
   top: 0;
   left: 0;
-  animation: wobble2 var(--uib-speed) infinite ease-in-out;
 }
 
 @keyframes spin78236 {
   0% {
     transform: rotate(0deg);
   }
-
   100% {
     transform: rotate(360deg);
   }
@@ -282,10 +270,9 @@ body {
     transform: translateY(0%) scale(1);
     opacity: 1;
   }
-
   50% {
     transform: translateY(-66%) scale(0.65);
-    opacity: 0.8;
+    opacity: 1;
   }
 }
 
@@ -295,30 +282,27 @@ body {
     transform: translateY(0%) scale(1);
     opacity: 1;
   }
-
   50% {
     transform: translateY(66%) scale(0.65);
-    opacity: 0.8;
+    opacity: 1;
   }
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
 ::-webkit-scrollbar {
-  display: none;
+  width: 0px;
 }
-/* Hide scrollbar for IE, Edge and Firefox */
 html {
-  scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
 }
-
-/* Hide spin buttons for number inputs */
+/* For Firefox */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
+/* For Firefox */
 input[type="number"] {
-  -moz-appearance: textfield; /* Firefox */
+  -moz-appearance: textfield;
 }

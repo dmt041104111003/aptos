@@ -53,32 +53,25 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				sidebar: {
-					DEFAULT: 'hsl(var(--sidebar-background))',
-					foreground: 'hsl(var(--sidebar-foreground))',
-					primary: 'hsl(var(--sidebar-primary))',
-					'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-					accent: 'hsl(var(--sidebar-accent))',
-					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-					border: 'hsl(var(--sidebar-border))',
-					ring: 'hsl(var(--sidebar-ring))'
+				'blue-theme': {
+					'50': 'rgba(59, 130, 246, 0.05)',
+					'100': 'rgba(59, 130, 246, 0.1)',
+					'200': 'rgba(59, 130, 246, 0.2)',
+					'300': 'rgba(59, 130, 246, 0.3)',
+					'400': 'rgba(59, 130, 246, 0.4)',
+					'500': 'rgba(59, 130, 246, 0.5)',
+					'600': 'rgba(59, 130, 246, 0.6)',
+					'700': 'rgba(59, 130, 246, 0.7)',
+					'800': 'rgba(59, 130, 246, 0.8)',
+					'900': 'rgba(59, 130, 246, 0.9)',
+					'950': 'rgba(59, 130, 246, 0.95)',
 				},
-			'vn-primary': '#1E40AF',     // Deep Professional Blue
-			'vn-secondary': '#EA580C',   // Warm Corporate Orange  
-			'vn-accent': '#059669',      // Success Green
-			'vn-dark': '#374151',        // Professional Dark
-			'vn-light': '#F8FAFC',       // Clean Light
-			'vn-gold': '#D97706',        // Vietnamese Gold
-			'vn-red': '#DC2626',         // Vietnamese Red
-			'vn-navy': '#1E3A8A',        // Navy Blue
-			'vn-emerald': '#10B981',     // Emerald Green
-			web3: {
-				primary: '#1E40AF',
-				secondary: '#EA580C',
-				tertiary: '#059669',
-				dark: '#374151',
-				light: '#F8FAFC',
-			}
+				'btn-blue': {
+					bg: 'rgba(59, 130, 246, 0.2)',
+					text: 'rgb(96, 165, 250)',
+					hover: 'rgba(59, 130, 246, 0.3)',
+					border: 'rgba(96, 165, 250, 0.3)',
+				}
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -86,10 +79,10 @@ export default {
 				sm: 'calc(var(--radius) - 4px)'
 			},
 			fontFamily: {
-				sans: ['Be Vietnam Pro', 'system-ui', 'sans-serif'],
-				heading: ['Be Vietnam Pro', 'system-ui', 'sans-serif'],
-				primary: ['Be Vietnam Pro', 'system-ui', 'sans-serif'],
-				secondary: ['Be Vietnam Pro', 'system-ui', 'sans-serif'],
+				sans: ['Be Vietnam Pro', 'Inter', 'system-ui', 'sans-serif'],
+				heading: ['Be Vietnam Pro', 'Inter', 'system-ui', 'sans-serif'],
+				primary: ['Be Vietnam Pro', 'Inter', 'system-ui', 'sans-serif'],
+				secondary: ['Be Vietnam Pro', 'Inter', 'system-ui', 'sans-serif'],
 				'circular-web': ['circular-web', 'sans-serif'],
 				general: ['general', 'sans-serif'],
 				'robert-medium': ['robert-medium', 'sans-serif'],
@@ -98,28 +91,12 @@ export default {
 			},
 			keyframes: {
 				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+					from: { height: '0' },
+					to: { height: 'var(--radix-accordion-content-height)' }
 				},
 				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
-				},
-				'slide-in-right': {
-					'0%': { transform: 'translateX(100%)' },
-					'100%': { transform: 'translateX(0)' }
-				},
-				'slide-out-right': {
-					'0%': { transform: 'translateX(0)' },
-					'100%': { transform: 'translateX(100%)' }
+					from: { height: 'var(--radix-accordion-content-height)' },
+					to: { height: '0' }
 				},
 				'fade-in': {
 					'0%': {
@@ -131,18 +108,9 @@ export default {
 						transform: 'translateY(0)'
 					}
 				},
-				'float': {
-					'0%, 100%': { transform: 'translateY(0px)' },
-					'50%': { transform: 'translateY(-20px)' },
-				},
 				'pulse-glow': {
-					'0%, 100%': { boxShadow: '0 0 20px rgba(30, 64, 175, 0.3)' },
-					'50%': { boxShadow: '0 0 40px rgba(30, 64, 175, 0.6)' },
-				},
-				'gradient-shift': {
-					'0%': { backgroundPosition: '0% 50%' },
-					'50%': { backgroundPosition: '100% 50%' },
-					'100%': { backgroundPosition: '0% 50%' },
+					'0%, 100%': { boxShadow: '0 0 20px rgba(59, 130, 246, 0.3)' },
+					'50%': { boxShadow: '0 0 40px rgba(59, 130, 246, 0.6)' },
 				},
 				'slide-up': {
 					from: {
@@ -168,34 +136,51 @@ export default {
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'slide-in-right': 'slide-in-right 0.3s ease-out',
-				'slide-out-right': 'slide-out-right 0.3s ease-out',
 				'fade-in': 'fade-in 0.3s ease-out',
-				'float': 'float 6s ease-in-out infinite',
 				'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
-				'gradient-shift': 'gradient-shift 3s ease infinite',
 				'slide-up': 'slide-up 0.6s ease-out',
 				'scale-in': 'scale-in 0.5s ease-out',
 			},
 			backgroundImage: {
-				'vn-gradient': 'linear-gradient(135deg, #1E40AF 0%, #EA580C 100%)',
-				'vn-gradient-animated': 'linear-gradient(-45deg, #1E40AF, #EA580C, #059669, #D97706)',
-				'vn-professional': 'linear-gradient(135deg, #1E40AF 0%, #374151 100%)',
-				'vn-success': 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
-				'web3-gradient': 'linear-gradient(135deg, #1E40AF 0%, #EA580C 100%)',
-				'web3-gradient-animated': 'linear-gradient(-45deg, #1E40AF, #EA580C, #059669, #D97706)',
+				'blue-gradient': 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(96, 165, 250, 0.3) 100%)',
 			},
 			boxShadow: {
-				'vn': '0 4px 14px 0 rgba(30, 64, 175, 0.25)',
-				'vn-lg': '0 10px 25px 0 rgba(30, 64, 175, 0.15)',
-				'vn-orange': '0 4px 14px 0 rgba(234, 88, 12, 0.25)',
-				'web3': '0 4px 14px 0 rgba(30, 64, 175, 0.25)',
-				'web3-lg': '0 10px 25px 0 rgba(30, 64, 175, 0.15)',
-				'glow': '0 0 20px rgba(30, 64, 175, 0.3)',
-				'glow-lg': '0 0 40px rgba(30, 64, 175, 0.4)',
-				'corporate': '0 8px 32px 0 rgba(0, 0, 0, 0.08)',
+				'blue-glow': '0 0 20px rgba(59, 130, 246, 0.3)',
+				'blue-glow-lg': '0 0 40px rgba(59, 130, 246, 0.4)',
 			}
 		}
 	},
-	plugins: [tailwindcssAnimate],
+	plugins: [
+		tailwindcssAnimate,
+		function({ addUtilities }: any) {
+			const newUtilities = {
+				'.btn-blue-theme': {
+					'background-color': 'rgba(59, 130, 246, 0.2)',
+					'color': 'rgb(96, 165, 250)',
+					'border': '1px solid rgba(96, 165, 250, 0.3)',
+					'transition': 'all 0.2s ease-in-out',
+					'&:hover': {
+						'background-color': 'rgba(59, 130, 246, 0.3)',
+						'border-color': 'rgba(96, 165, 250, 0.5)',
+					},
+					'&:focus': {
+						'outline': 'none',
+						'ring': '2px',
+						'ring-color': 'rgba(96, 165, 250, 0.3)',
+					},
+				},
+				'.btn-blue-theme-outline': {
+					'background-color': 'transparent',
+					'color': 'rgb(96, 165, 250)',
+					'border': '1px solid rgba(96, 165, 250, 0.3)',
+					'transition': 'all 0.2s ease-in-out',
+					'&:hover': {
+						'background-color': 'rgba(59, 130, 246, 0.1)',
+						'border-color': 'rgba(96, 165, 250, 0.5)',
+					},
+				},
+			}
+			addUtilities(newUtilities)
+		}
+	],
 } satisfies Config;

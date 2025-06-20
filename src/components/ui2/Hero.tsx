@@ -1,165 +1,57 @@
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
-import { ScrollTrigger } from "gsap/all";
-import { TiLocationArrow } from "react-icons/ti";
-import { useEffect, useRef, useState } from "react";
-
+import { motion } from "framer-motion";
 import Button from "./Button";
-import VideoPreview from "./VideoPreview";
-
-gsap.registerPlugin(ScrollTrigger);
+import { MoveRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Hero = () => {
-  const [currentIndex, setCurrentIndex] = useState(1);
-  const [hasClicked, setHasClicked] = useState(false);
-
-  const [loading, setLoading] = useState(true);
-  const [loadedVideos, setLoadedVideos] = useState(0);
-
-  const totalVideos = 4;
-  const nextVdRef = useRef(null);
-
-  const handleVideoLoad = () => {
-    setLoadedVideos((prev) => prev + 1);
-  };
-
-  useEffect(() => {
-    if (loadedVideos === totalVideos - 1) {
-      setLoading(false);
-    }
-  }, [loadedVideos]);
-
-  const handleMiniVdClick = () => {
-    setHasClicked(true);
-
-    setCurrentIndex((prevIndex) => (prevIndex % totalVideos) + 1);
-  };
-
-  useGSAP(
-    () => {
-      if (hasClicked) {
-        gsap.set("#next-video", { visibility: "visible" });
-        gsap.to("#next-video", {
-          transformOrigin: "center center",
-          scale: 1,
-          width: "100%",
-          height: "100%",
-          duration: 1,
-          ease: "power1.inOut",
-          onStart: () => nextVdRef.current.play(),
-        });
-        gsap.from("#current-video", {
-          transformOrigin: "center center",
-          scale: 0,
-          duration: 1.5,
-          ease: "power1.inOut",
-        });
-      }
-    },
-    {
-      dependencies: [currentIndex],
-      revertOnUpdate: true,
-    }
-  );
-
-  useGSAP(() => {
-    gsap.set("#video-frame", {
-      clipPath: "polygon(14% 0, 72% 0, 88% 90%, 0 95%)",
-      borderRadius: "0% 0% 40% 10%",
-    });
-    gsap.from("#video-frame", {
-      clipPath: "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)",
-      borderRadius: "0% 0% 0% 0%",
-      ease: "power1.inOut",
-      scrollTrigger: {
-        trigger: "#video-frame",
-        start: "center center",
-        end: "bottom center",
-        scrub: true,
-      },
-    });
-  });
-
-  const getVideoSrc = (index) => `videos/hero-${index}.mp4`;
-
   return (
-    <div className="relative h-dvh w-screen overflow-x-hidden">
-      
+    <div className="relative h-screen w-full overflow-hidden">
+      {/* Background Video */}
+      <video
+        src="/videos/hero-1.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute top-0 left-0 w-full h-full object-cover z-0"
+      />
+      {/* Overlay */}
+      <div className="absolute top-0 left-0 w-full h-full bg-black/60 bg-gradient-to-t from-black/80 to-transparent z-10" />
 
-      <div
-        id="video-frame"
-        className="relative z-10 h-dvh w-screen overflow-hidden rounded-lg bg-blue-75"
-      >
-        <div>
-          <div className="mask-clip-path absolute-center absolute z-50 size-64 cursor-pointer overflow-hidden rounded-lg">
-            <VideoPreview>
-              <div
-                onClick={handleMiniVdClick}
-                className="origin-center scale-50 opacity-0 transition-all duration-500 ease-in hover:scale-100 hover:opacity-100"
-              >
-                <video
-                  ref={nextVdRef}
-                  src={getVideoSrc((currentIndex % totalVideos) + 1)}
-                  loop
-                  muted
-                  id="current-video"
-                  className="size-64 origin-center scale-150 object-cover object-center"
-                  onLoadedData={handleVideoLoad}
+      {/* Content */}
+      <div className="relative z-20 flex flex-col items-center justify-center h-full text-center text-white px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="max-w-4xl"
+        >
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 font-sans leading-tight">
+            <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-purple-500 bg-clip-text text-transparent">
+              Tái định nghĩa
+            </span>{" "}
+            công việc <br /> Freelance trên{" "}
+            <span className="text-white">Web3</span>
+          </h1>
+          <p className="text-lg md:text-xl text-gray-300 max-w-2xl mx-auto mb-10 font-sans">
+            Nền tảng phi tập trung đầu tiên tại Việt Nam, kết nối các freelancer tài năng với những dự án toàn cầu. An toàn, minh bạch và hiệu quả.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link to="/jobs">
+                <Button
+                title="Khám phá dự án"
+                containerClass="w-full sm:w-auto"
                 />
-              </div>
-            </VideoPreview>
+            </Link>
+            <Link to="/post-job">
+                <button className="group relative w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-full font-semibold text-white bg-white/10 border border-white/20 hover:bg-white/20 transition-all duration-300">
+                <span>Đăng dự án</span>
+                <MoveRight className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
+                </button>
+            </Link>
           </div>
-
-          <video
-            ref={nextVdRef}
-            src={getVideoSrc(currentIndex)}
-            loop
-            muted
-            id="next-video"
-            className="absolute-center invisible absolute z-20 size-64 object-cover object-center"
-            onLoadedData={handleVideoLoad}
-          />
-          <video
-            src={getVideoSrc(
-              currentIndex === totalVideos - 1 ? 1 : currentIndex
-            )}
-            autoPlay
-            loop
-            muted
-            className="absolute left-0 top-0 size-full object-cover object-center"
-            onLoadedData={handleVideoLoad}
-          />
-        </div>
-{/* 
-        <h1 className="special-font hero-heading absolute bottom-5 right-5 z-40 text-blue-75">
-          FREELANCER
-        </h1> */}
-
-        <div className="absolute left-0 top-0 z-40 size-full">
-          <div className="mt-24 px-5 sm:px-10">
-            <h1 className="special-font hero-heading text-blue-100">
-            APT<b><span>-</span>UTC</b>
-            </h1>
-
-            <p className="mb-5 max-w-64 font-robert-regular text-blue-100">
-              Nền tảng freelancing Web3 <br /> Cho Freelancer Việt Nam
-            </p>
-
-            <Button
-              id="watch-trailer"
-              title="Xem dự án"
-              leftIcon={<TiLocationArrow />}
-              rightIcon={null}
-              containerClass="bg-yellow-300 flex-center gap-1"
-              onClick={() => {}}
-            />
-          </div>
-        </div>
+        </motion.div>
       </div>
-
-      {/* <h1 className="special-font hero-heading absolute bottom-5 right-5 text-black">
-        FREELANCER
-      </h1> */}
     </div>
   );
 };

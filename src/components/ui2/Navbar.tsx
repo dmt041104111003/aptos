@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useWallet } from '@/context/WalletContext';
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,7 @@ import {
   MessageSquare,
   BarChart3
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const navigation = [
   { name: 'Trang chủ', href: '/', icon: Home },
@@ -66,9 +67,13 @@ const Navbar = () => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
+  const isActive = (path: string) => {
+    return location.pathname === path;
+  };
+
   return (
     <motion.header 
-      className={`sticky top-0 z-50 transition-all duration-300 font-primary
+      className={`sticky top-0 z-50 transition-all duration-300 font-sans
         bg-gradient-to-br from-gray-950/90 to-gray-900/80 border-b border-white/10 shadow-xl backdrop-blur
         group-hover:bg-gradient-to-br group-hover:from-[#4a0e69] group-hover:to-[#2e0050]
       `}
@@ -86,13 +91,13 @@ const Navbar = () => {
             whileTap={{ scale: 0.97 }}
           >
             <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center group-hover:shadow-lg transition-shadow duration-300">
-              <span className="text-white font-bold text-lg">AU</span>
+              <span className="text-white font-bold text-lg font-sans">AU</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-semibold text-white group-hover:text-blue-400 transition-colors duration-200">
+              <span className="text-xl font-semibold text-white group-hover:text-blue-400 transition-colors duration-200 font-sans">
                 APT-UTC
               </span>
-              <span className="text-xs text-white/50 -mt-0.5">Aptos - UTC</span>
+              <span className="text-xs text-white/50 -mt-0.5 font-sans">Aptos - UTC</span>
           </div>
           </motion.div>
 
@@ -109,7 +114,7 @@ const Navbar = () => {
                   <Button
                     variant={location.pathname === item.href ? 'default' : 'ghost'}
                     onClick={() => navigate(item.href)}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 font-sans ${
                       location.pathname === item.href
                         ? 'bg-blue-500 text-white shadow'
                         : 'text-blue-200 hover:bg-blue-500/10 hover:text-white'
@@ -128,7 +133,7 @@ const Navbar = () => {
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button 
                     onClick={connectWallet}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-full flex items-center space-x-2 transition-colors duration-200"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-full flex items-center space-x-2 transition-colors duration-200 font-sans"
                   >
                     <Wallet className="w-4 h-4" />
                     <span>Kết nối ví</span>
@@ -144,27 +149,27 @@ const Navbar = () => {
                           className="relative h-10 w-10 rounded-full border-2 border-blue-200 hover:border-blue-400 transition-colors duration-200"
                         >
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-semibold text-sm">
+                            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-semibold text-sm font-sans">
                               {account ? account.slice(2, 4).toUpperCase() : 'U'}
                             </AvatarFallback>
                           </Avatar>
                         </Button>
                       </motion.div>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64 p-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-xl shadow-xl border border-white/10" align="end">
+                    <DropdownMenuContent className="w-64 p-3 bg-gradient-to-br from-gray-900/90 to-gray-800/90 rounded-xl shadow-xl border border-white/10 font-sans" align="end">
                       <div className="px-3 py-2 border-b border-gray-100">
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-semibold">
+                            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-semibold font-sans">
                               {account ? account.slice(2, 4).toUpperCase() : 'U'}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium text-sm text-blue-200">{formatAddress(account)}</div>
+                            <div className="font-medium text-sm text-blue-200 font-sans">{formatAddress(account)}</div>
                             {accountType === 'aptos' ? (
-                              <div className="text-xs text-blue-400">Mạng: {aptosNetwork}</div>
+                              <div className="text-xs text-blue-400 font-sans">Mạng: {aptosNetwork}</div>
                             ) : (
-                              <div className="text-xs text-blue-400">Connected</div>
+                              <div className="text-xs text-blue-400 font-sans">Connected</div>
                             )}
                           </div>
                         </div>
@@ -172,7 +177,7 @@ const Navbar = () => {
 
                       <DropdownMenuItem 
                         onClick={() => navigate('/settings')} 
-                        className="py-2 px-3 rounded-md hover:bg-blue-500/10 text-blue-200 hover:text-white cursor-pointer"
+                        className="py-2 px-3 rounded-md hover:bg-blue-500/10 text-blue-200 hover:text-white cursor-pointer font-sans"
                       >
                         <Settings className="mr-3 h-4 w-4 text-gray-500" />
                         <span>Định danh</span>
@@ -180,7 +185,7 @@ const Navbar = () => {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={handleLogout} 
-                        className="py-2 px-3 rounded-md hover:bg-red-500/10 text-red-400 hover:text-white cursor-pointer"
+                        className="py-2 px-3 rounded-md hover:bg-red-500/10 text-red-400 hover:text-white cursor-pointer font-sans"
                       >
                         <LogOut className="mr-3 h-4 w-4" />
                         <span>Đăng xuất</span>
@@ -212,7 +217,7 @@ const Navbar = () => {
         {/* Mobile menu */}
         {isMobileMenuOpen && (
           <motion.div 
-            className="lg:hidden bg-gradient-to-br from-gray-900/90 to-gray-800/90 border-t border-white/10 shadow-xl"
+            className="lg:hidden bg-gradient-to-br from-gray-900/90 to-gray-800/90 border-t border-white/10 shadow-xl font-sans"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -227,7 +232,7 @@ const Navbar = () => {
                     navigate(item.href);
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full justify-start flex items-center space-x-3 px-4 py-2 rounded-xl text-sm font-medium ${
+                  className={`w-full justify-start flex items-center space-x-3 px-4 py-2 rounded-xl text-sm font-medium font-sans ${
                     location.pathname === item.href
                       ? 'bg-blue-500 text-white shadow'
                       : 'text-blue-200 hover:bg-blue-500/10'
@@ -243,7 +248,7 @@ const Navbar = () => {
                     connectWallet();
                     setIsMobileMenuOpen(false);
                   }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center justify-center space-x-2"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center justify-center space-x-2 font-sans"
                 >
                   <Wallet className="w-4 h-4" />
                   <span>Kết nối ví</span>
@@ -252,16 +257,16 @@ const Navbar = () => {
                 <div className="border-t border-gray-100 mt-4 pt-4">
                   <div className="flex items-center space-x-3 px-4 py-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-sm font-semibold">
+                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-sm font-semibold font-sans">
                         {account ? account.slice(2, 4).toUpperCase() : 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <div className="text-sm font-medium text-blue-200">{formatAddress(account)}</div>
+                      <div className="text-sm font-medium text-blue-200 font-sans">{formatAddress(account)}</div>
                       {accountType === 'aptos' ? (
-                        <div className="text-xs text-blue-400">Mạng: {aptosNetwork}</div>
+                        <div className="text-xs text-blue-400 font-sans">Mạng: {aptosNetwork}</div>
                       ) : (
-                        <div className="text-xs text-blue-400">Connected</div>
+                        <div className="text-xs text-blue-400 font-sans">Connected</div>
                       )}
                     </div>
                   </div>
@@ -272,7 +277,7 @@ const Navbar = () => {
                       setIsMobileMenuOpen(false);
                     }}
                     variant="ghost"
-                    className="w-full justify-start flex items-center space-x-3 px-4 py-2 text-blue-200 hover:text-white hover:bg-blue-500/10 rounded-xl"
+                    className="w-full justify-start flex items-center space-x-3 px-4 py-2 text-blue-200 hover:text-white hover:bg-blue-500/10 rounded-xl font-sans"
                   >
                     <Settings className="w-5 h-5" />
                     <span>Định danh</span>
@@ -283,7 +288,7 @@ const Navbar = () => {
                       setIsMobileMenuOpen(false);
                     }}
                     variant="ghost"
-                    className="w-full justify-start flex items-center space-x-3 px-4 py-2 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl"
+                    className="w-full justify-start flex items-center space-x-3 px-4 py-2 text-red-400 hover:text-white hover:bg-red-500/10 rounded-xl font-sans"
                   >
                     <LogOut className="w-5 h-5" />
                     <span>Đăng xuất</span>
