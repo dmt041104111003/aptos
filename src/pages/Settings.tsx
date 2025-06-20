@@ -14,7 +14,7 @@ interface ProfileDataFromChain {
   created_at: number;
 }
 
-const MODULE_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
+const MODULE_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
 const MODULE_NAME = "web3_profiles_v29";
 const RESOURCE_NAME = "Profiles";
 

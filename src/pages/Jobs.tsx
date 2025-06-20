@@ -22,13 +22,14 @@ import {
   Info,
   AlertCircle,
   Eye,
-  Download
+  Download,
+  XCircle
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { aptos, fetchProfileDetails, decodeCID, fetchMilestoneDetails, getMilestoneCIDs } from '@/utils/aptosUtils';
 declare global { interface Window { ethereum?: any } }
-const MODULE_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
-const JOBS_CONTRACT_ADDRESS = "0x1e76fb2bf0294126ee928c0c2348b428c174fdff2b9cec59df719396ca393f72";
+const MODULE_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
+const JOBS_CONTRACT_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
 const PROFILE_MODULE_NAME = "web3_profiles_v29";
 
@@ -83,10 +84,21 @@ const EVENT_TYPES = [
   "JobPostedEvent",
   "WorkerAppliedEvent",
   "WorkerApprovedEvent",
+  "MilestoneSubmittedEvent",
+  "MilestoneAcceptedEvent",
   "MilestoneRejectedEvent",
   "JobCanceledEvent",
   "JobCompletedEvent",
-  "JobExpiredEvent"
+  "JobExpiredEvent",
+  "FundFlowEvent",
+  "WorkerStakeRefundedEvent",
+  "WithdrawRequestedEvent",
+  "WithdrawApprovedEvent",
+  "WithdrawDeniedEvent",
+  "CancelRequestedEvent",
+  "CancelApprovedEvent",
+  "CancelDeniedEvent",
+  "JobUnlockConfirmedEvent"
 ];
 
 async function fetchJobEvents(jobId: string) {
@@ -100,16 +112,48 @@ async function fetchJobEvents(jobId: string) {
     allEvents.push(...filtered.map(e => ({ ...e, type: eventType })));
   }
   // Sắp xếp theo thời gian
-  allEvents.sort((a, b) =>
-    Number(
-      (b.data.apply_time || b.data.approve_time || b.data.submit_time || b.data.accept_time || b.data.reject_time || b.data.cancel_time || b.data.complete_time || b.data.expire_time || b.data.start_time || 0)
-    ) -
-    Number(
-      (a.data.apply_time || a.data.approve_time || a.data.submit_time || a.data.accept_time || a.data.reject_time || a.data.cancel_time || a.data.complete_time || a.data.expire_time || a.data.start_time || 0)
-    )
-  );
+  allEvents.sort((a, b) => {
+    const getTime = (data: any) => Number(
+      data.time || 
+      data.apply_time || 
+      data.approve_time || 
+      data.submit_time || 
+      data.accept_time || 
+      data.reject_time || 
+      data.cancel_time || 
+      data.complete_time || 
+      data.expire_time || 
+      data.start_time || 
+      0
+    );
+    return getTime(b.data) - getTime(a.data);
+  });
   return allEvents;
 }
+
+const getEventDisplayName = (eventType: string) => {
+  const names = {
+    "JobPostedEvent": "Dự án đã được đăng",
+    "WorkerAppliedEvent": "Ứng viên đã ứng tuyển",
+    "WorkerApprovedEvent": "Ứng viên đã được duyệt",
+    "MilestoneSubmittedEvent": "Cột mốc đã được nộp",
+    "MilestoneAcceptedEvent": "Cột mốc đã được chấp nhận",
+    "MilestoneRejectedEvent": "Cột mốc đã bị từ chối",
+    "JobCanceledEvent": "Dự án đã bị hủy",
+    "JobCompletedEvent": "Dự án đã hoàn thành",
+    "JobExpiredEvent": "Dự án đã hết hạn",
+    "FundFlowEvent": "Giao dịch chuyển tiền",
+    "WorkerStakeRefundedEvent": "Hoàn tiền cược cho Worker",
+    "WithdrawRequestedEvent": "Worker yêu cầu rút ứng tuyển",
+    "WithdrawApprovedEvent": "Poster đã chấp nhận rút ứng tuyển",
+    "WithdrawDeniedEvent": "Poster đã từ chối rút ứng tuyển",
+    "CancelRequestedEvent": "Poster yêu cầu hủy dự án",
+    "CancelApprovedEvent": "Worker đã chấp nhận hủy dự án",
+    "CancelDeniedEvent": "Worker đã từ chối hủy dự án",
+    "JobUnlockConfirmedEvent": "Xác nhận mở khóa dự án"
+  };
+  return names[eventType] || eventType;
+};
 
 const Jobs = () => {
   const [jobs, setJobs] = useState<JobPost[]>([]);
@@ -1573,12 +1617,18 @@ const Jobs = () => {
               <div className="space-y-4">
                 {jobEventsDetails.map((event, index) => (
                   <div key={index} className="bg-gray-800/50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold text-white mb-2">{event.type}</h3>
+                    <h3 className="text-lg font-semibold text-white mb-2">{getEventDisplayName(event.type)}</h3>
                     <div className="space-y-2 text-sm">
                       <div>
                         <span className="text-gray-400">Job ID:</span>
                         <span className="text-white ml-2">{event.data.job_id}</span>
                       </div>
+                      {event.data.time && (
+                        <div>
+                          <span className="text-gray-400">Thời gian:</span>
+                          <span className="text-white ml-2">{formatTimestamp(event.data.time)}</span>
+                        </div>
+                      )}
                       {event.data.start_time && (
                         <div>
                           <span className="text-gray-400">Thời gian đăng dự án:</span>
@@ -1602,6 +1652,58 @@ const Jobs = () => {
                         <div>
                           <span className="text-gray-400">Người làm:</span>
                           <span className="text-white ml-2 font-mono text-xs">{event.data.worker}</span>
+                        </div>
+                      )}
+                       {event.data.to && (
+                        <div>
+                          <span className="text-gray-400">Đến địa chỉ:</span>
+                          <span className="text-white ml-2 font-mono text-xs">{event.data.to}</span>
+                        </div>
+                      )}
+                      {event.data.amount && (
+                        <div>
+                          <span className="text-gray-400">Số tiền:</span>
+                          <span className="text-white ml-2">{Number(event.data.amount) / 100_000_000} APT</span>
+                        </div>
+                      )}
+                      {event.data.worker_amount && (
+                        <div>
+                          <span className="text-gray-400">Worker nhận:</span>
+                          <span className="text-white ml-2">{Number(event.data.worker_amount) / 100_000_000} APT</span>
+                        </div>
+                      )}
+                      {event.data.poster_amount && (
+                        <div>
+                          <span className="text-gray-400">Poster nhận:</span>
+                          <span className="text-white ml-2">{Number(event.data.poster_amount) / 100_000_000} APT</span>
+                        </div>
+                      )}
+                      {event.data.escrow_amount && (
+                        <div>
+                          <span className="text-gray-400">Escrow nhận:</span>
+                          <span className="text-white ml-2">{Number(event.data.escrow_amount) / 100_000_000} APT</span>
+                        </div>
+                      )}
+                      {event.data.reason && (
+                        <div>
+                          <span className="text-gray-400">Lý do:</span>
+                          <span className="text-white ml-2">{event.data.reason === '1' ? 'Worker tự rút' : event.data.reason === '2' ? 'Poster từ chối' : 'Mở lại job'}</span>
+                        </div>
+                      )}
+                      {event.data.poster_confirmed !== undefined && (
+                        <div>
+                          <span className="text-gray-400">Poster xác nhận:</span>
+                          <span className="text-white ml-2 inline-flex items-center">
+                            {event.data.poster_confirmed ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                          </span>
+                        </div>
+                      )}
+                      {event.data.worker_confirmed !== undefined && (
+                        <div>
+                          <span className="text-gray-400">Worker xác nhận:</span>
+                          <span className="text-white ml-2 inline-flex items-center">
+                            {event.data.worker_confirmed ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                          </span>
                         </div>
                       )}
                       {event.data.milestone !== undefined && (

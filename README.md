@@ -1,74 +1,29 @@
 APT - UTC: Decentralized Talent Marketplace on Aptos
 ====================================================
 
-Introduction
------------
-APT - UTC is a decentralized marketplace designed to connect Web3 freelancers with clients. It features full transaction event tracking for transparency and includes built-in dispute resolution mechanisms.
+## Project Overview
+PT - UTC is a next-generation decentralized freelance platform built on the Aptos blockchain. It empowers clients and freelancers to collaborate transparently, securely, and efficiently, leveraging smart contracts for milestone-based payments, escrow, and trustless interactions. The platform is designed for the future of work in the Web3 era, with a focus on security, automation, and community-driven growth.
 
-Key Features
----------------
-- Connect Aptos wallet for decentralized identity verification (on-chain DID)
-- Build and update personal profiles, stored on IPFS
-- Paginated on-chain event history of profile updates
-- Transfer profile ownership to another wallet
-- AI-powered fake job prevention
-- Decentralized messaging system with toxicity detection
-- On-chain reputation system with reviews, scoring, and skill verification
-- Detailed reputation score calculation display
-- Post projects, search for freelancers, and verify profiles directly from the blockchain
-- Transparent and secure payments via Move smart contracts
-- Project management with pagination and detailed status
-- Transaction history storage
-- Unified refresh button on Dashboard, MyProfile, and Messages
+## Key Features
+- **Decentralized Job Posting:** Clients can post jobs with detailed requirements, milestones, and deadlines. All job data is stored on-chain and/or IPFS for transparency and immutability.
+- **Milestone Management:** Each job is divided into milestones with individual deadlines and escrowed payments, ensuring fair progress tracking and risk mitigation for both parties.
+- **Escrow & Staking:** Funds for milestones are locked in a secure on-chain escrow. Workers must stake tokens to apply, aligning incentives and reducing spam applications.
+- **Application & Approval Flow:** Workers apply by staking tokens. Clients review and approve candidates. Unsuccessful or expired applications allow workers to withdraw their stake.
+- **Automated Fund Distribution:** Upon milestone completion and approval, funds are automatically released to the worker. In case of disputes or inactivity, the contract enforces fair fund splits and refunds.
+- **Timeout & Dispute Handling:** If a milestone deadline passes without action, the contract allows for timeout claims, worker removal, or job reopening, all governed by transparent rules.
+- **Event-Driven Frontend:** The React dashboard provides real-time job status, milestone actions, and event history, ensuring a seamless user experience.
+- **IPFS Integration:** All job and milestone details are stored on IPFS for decentralized, censorship-resistant access.
 
-Technologies
------------------
-- Frontend: Nextjs, Tailwind CSS, Context API
-- Wallet/Auth: Aptos Wallet Adapter (Petra)
-- State Management: React Context, Custom Hooks
-- Blockchain: Aptos Move, Aptos SDK, Aptos REST API
-- Storage: IPFS (Pinata)
-- AI: Hugging Face Inference API (for detecting toxicity in messages)
-- Source Code Management: Git/GitHub
+## DeFi Vision & Future Integration
+This project is designed with DeFi principles at its core:
+- **Escrow Yield Generation:** Funds locked in job escrow can be deployed into DeFi protocols to earn yield while jobs are in progress. This creates new revenue streams for the platform and its users.
+- **Staking Rewards:** Worker stake pools can be used for liquidity mining or yield farming, rewarding active participants and further aligning incentives.
+- **Fee Sharing & Platform Sustainability:** A portion of the yield or transaction fees can be distributed to platform stakeholders, fund development, or incentivize community governance.
+- **Programmable Money Flows:** All fund movements are governed by smart contracts, enabling future integrations with lending, insurance, or reputation-based DeFi modules.
 
-Tasks (major)
------------------
-- Connect Petra wallet for decentralized identity verification (on-chain DID)
-- Maintain paginated on-chain event history of profile updates
-- Transfer profile ownership to another wallet
-- Decentralized messaging system with integrated toxicity detection
-- On-chain reputation system with reviews, scoring, and skill verification
-- Post projects, search for freelancers, and verify profiles directly from the blockchain
-- Transparent and secure payments via Move smart contracts
-- Full tracking of all historical data, project activities, and reputation events
+## Why Aptos?
+- High throughput, low latency, and Move smart contract safety make Aptos the ideal foundation for a scalable, secure, and user-friendly Web3 job marketplace.
 
-In Progress
------------------
-- Dispute resolution module is currently under development, aiming to enable fair and transparent conflict handling between parties
-- Freelancers can launch micro-DAOs and issue personal tokens to raise funds, with smart contracts managing capital, milestones, and revenue sharing
-- Users contribute to an insurance pool for protection against scams or unfair job cancellations, governed by a DAO and funded via staking yields
-- Platform fees are automatically distributed to the DAO treasury, stakers, and active contributors through smart vaults, promoting sustainable value sharing
+---
 
-Local Installation and Setup
--------------------------------
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Start development server:
-   ```bash
-   npm run dev
-   ```
-3. Develop Move smart contracts:
-   ```bash
-   aptos move compile
-   aptos move test
-   ```
-
-Contact and Additional Information
--------------------------
-- Smart contracts: `contracts/` directory (Move/Aptos)
-
-Copyright and Intellectual Property
----------------------------
-All ideas, designs, source code, and technical solutions are exclusively owned by APT - UTC. Any copying, reuse, or redistribution in any form is strictly prohibited without written consent from APT - UTC.
+**Get started, contribute, or reach out to join the future of decentralized work!**
