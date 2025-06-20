@@ -14,18 +14,26 @@ import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { Briefcase, Plus, X, Rocket } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 
-const JOBS_MODULE_ADDRESS = "0x5de1dd560f3136745d46807f1b3e599077966a3b1d87047faef143a71c39d511";
+const JOBS_MODULE_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
 const JOBS_MODULE_NAME = "job_marketplace_v29";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
 const aptos = new Aptos(config);
 
+const TIME_UNITS = [
+  { label: 'giây', value: 'seconds', multiplier: 1 },
+  { label: 'phút', value: 'minutes', multiplier: 60 },
+  { label: 'giờ', value: 'hours', multiplier: 3600 },
+  { label: 'ngày', value: 'days', multiplier: 86400 },
+];
+
 interface FormState {
   title: string;
   description: string;
   skills: string[];
-  milestones: { amount: number; duration: number }[];
-  applicationDeadlineDays: number;
+  milestones: { amount: number; duration: number; durationUnit: string }[];
+  applicationDeadlineValue: number;
+  applicationDeadlineUnit: string;
 }
 
 const PostJob = () => {
@@ -36,13 +44,15 @@ const PostJob = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newMilestoneAmount, setNewMilestoneAmount] = useState<string>('');
   const [newMilestoneDuration, setNewMilestoneDuration] = useState<string>('');
+  const [newMilestoneUnit, setNewMilestoneUnit] = useState<string>('days');
   
   const [form, setForm] = useState<FormState>({
     title: '',
     description: '',
     skills: [],
     milestones: [],
-    applicationDeadlineDays: 7,
+    applicationDeadlineValue: 7,
+    applicationDeadlineUnit: 'days',
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -51,7 +61,7 @@ const PostJob = () => {
     const { name, value } = e.target;
     setForm(prev => ({
       ...prev,
-      [name]: name === 'applicationDeadlineDays' ? Number(value) : value
+      [name]: name === 'applicationDeadlineValue' ? Number(value) : value
     }));
   };
 
@@ -69,30 +79,12 @@ const PostJob = () => {
     }));
   };
 
-  // const handleAddMilestone = () => {
-  //   const amount = Number(newMilestoneAmount);
-  //   if (amount > 0) {
-  //     setForm(prev => ({
-  //       ...prev,
-  //       milestones: [...prev.milestones, { amount, duration: 0 }]
-  //     }));
-  //     setNewMilestoneAmount('');
-  //   } else {
-  //     toast.error('Vui lòng nhập số tiền hợp lệ cho cột mốc.');
-  //   }
-  // };
-
-  // const handleRemoveMilestone = (indexToRemove: number) => {
-  //   setForm(prev => ({
-  //     ...prev,
-  //     milestones: prev.milestones.filter((_, index) => index !== indexToRemove)
-  //   }));
-  // };
-
   const updateMilestone = (idx: number, field: 'amount' | 'duration', value: number) => {
     setForm(prev => ({
       ...prev,
-      milestones: prev.milestones.map((ms, i) => i === idx ? { ...ms, [field]: value } : ms)
+      milestones: prev.milestones.map((ms, i) =>
+        i === idx ? { ...ms, [field]: value, durationUnit: ms.durationUnit || 'days' } : ms
+      )
     }));
   };
 
@@ -109,8 +101,13 @@ const PostJob = () => {
     if (!form.description.trim()) newErrors.description = 'Vui lòng nhập mô tả công việc';
     if (!form.skills.length) newErrors.skills = 'Vui lòng nhập ít nhất 1 kỹ năng';
     if (!form.milestones.length) newErrors.milestones = 'Vui lòng thêm ít nhất 1 cột mốc';
-    if (!form.applicationDeadlineDays || form.applicationDeadlineDays <= 0) newErrors.applicationDeadlineDays = 'Vui lòng nhập thời hạn nộp đơn hợp lệ';
+    if (!form.applicationDeadlineValue || form.applicationDeadlineValue <= 0) newErrors.applicationDeadlineValue = 'Vui lòng nhập thời hạn nộp đơn hợp lệ';
     return newErrors;
+  };
+
+  const getUnitMultiplier = (unit: string) => {
+    const found = TIME_UNITS.find(u => u.value === unit);
+    return found ? found.multiplier : 1;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,7 +139,8 @@ const PostJob = () => {
       
       const cid = await uploadJSONToIPFS(jobData);
       const milestoneAmounts = form.milestones.map(ms => ms.amount);
-      const milestoneDurations = form.milestones.map(ms => ms.duration * 24 * 60 * 60); 
+      const milestoneDurations = form.milestones.map(ms => ms.duration * getUnitMultiplier(ms.durationUnit));
+      const applicationDeadlineSecs = form.applicationDeadlineValue * getUnitMultiplier(form.applicationDeadlineUnit);
       const txnPayload = {
         type: "entry_function_payload",
         function: `${JOBS_MODULE_ADDRESS}::${JOBS_MODULE_NAME}::post_job`,
@@ -151,7 +149,7 @@ const PostJob = () => {
           Array.from(new TextEncoder().encode(form.title)), 
           cid, 
           milestoneAmounts.map(m => m * 100_000_000), 
-          Math.floor(Date.now() / 1000) + form.applicationDeadlineDays * 24 * 60 * 60, 
+          Math.floor(Date.now() / 1000) + applicationDeadlineSecs, 
           form.skills.map(skill => Array.from(new TextEncoder().encode(skill))),
           milestoneDurations, 
         ]
@@ -248,17 +246,27 @@ const PostJob = () => {
 
               {/* Application Deadline */}
               <div className="space-y-2">
-                <Label htmlFor="applicationDeadlineDays" className="text-white">Thời hạn nộp đơn (ngày)</Label>
-                <Input
-                  id="applicationDeadlineDays"
-                  name="applicationDeadlineDays"
-                  type="number"
-                  value={form.applicationDeadlineDays}
-                  onChange={handleInputChange}
-                  placeholder="Ví dụ: 7 (trong 7 ngày)"
-                  className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 ${errors.applicationDeadlineDays ? 'border-red-500/50' : ''}`}
-                />
-                {errors.applicationDeadlineDays && <p className="text-red-400 text-sm">{errors.applicationDeadlineDays}</p>}
+                <Label htmlFor="applicationDeadlineValue" className="text-white">Thời hạn nộp đơn</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="applicationDeadlineValue"
+                    name="applicationDeadlineValue"
+                    type="number"
+                    value={form.applicationDeadlineValue}
+                    onChange={e => setForm(prev => ({ ...prev, applicationDeadlineValue: Number(e.target.value) }))}
+                    placeholder="Ví dụ: 7"
+                    className={`bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50 w-32 ${errors.applicationDeadlineValue ? 'border-red-500/50' : ''}`}
+                    min={1}
+                  />
+                  <select
+                    value={form.applicationDeadlineUnit}
+                    onChange={e => setForm(prev => ({ ...prev, applicationDeadlineUnit: e.target.value }))}
+                    className="bg-gray-900 text-white border border-white/20 rounded px-2 py-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                  >
+                    {TIME_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                  </select>
+                </div>
+                {errors.applicationDeadlineValue && <p className="text-red-400 text-sm">{errors.applicationDeadlineValue}</p>}
               </div>
 
               {/* Milestones Section */}
@@ -277,9 +285,16 @@ const PostJob = () => {
                     type="number"
                     value={newMilestoneDuration}
                     onChange={e => setNewMilestoneDuration(e.target.value)}
-                    placeholder="Thời gian (ngày)"
-                    className="w-40 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50"
+                    placeholder="Thời gian"
+                    className="w-32 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50"
                   />
+                  <select
+                    value={newMilestoneUnit}
+                    onChange={e => setNewMilestoneUnit(e.target.value)}
+                    className="bg-gray-900 text-white border border-white/20 rounded px-2 py-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                  >
+                    {TIME_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                  </select>
                   <Button
                     type="button"
                     onClick={() => {
@@ -288,10 +303,11 @@ const PostJob = () => {
                       if (amount > 0 && duration > 0) {
                         setForm(prev => ({
                           ...prev,
-                          milestones: [...prev.milestones, { amount, duration }],
+                          milestones: [...prev.milestones, { amount, duration, durationUnit: newMilestoneUnit }],
                         }));
                         setNewMilestoneAmount('');
                         setNewMilestoneDuration('');
+                        setNewMilestoneUnit('days');
                       } else {
                         toast.error('Vui lòng nhập số tiền và thời gian hợp lệ cho cột mốc.');
                       }
@@ -315,9 +331,19 @@ const PostJob = () => {
                       type="number"
                       value={ms.duration}
                       onChange={e => updateMilestone(idx, 'duration', Number(e.target.value))}
-                      placeholder="Thời gian (ngày)"
-                      className="w-40 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50"
+                      placeholder="Thời gian"
+                      className="w-32 bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50"
                     />
+                    <select
+                      value={ms.durationUnit}
+                      onChange={e => setForm(prev => ({
+                        ...prev,
+                        milestones: prev.milestones.map((m, i) => i === idx ? { ...m, durationUnit: e.target.value } : m)
+                      }))}
+                      className="bg-gray-900 text-white border border-white/20 rounded px-2 py-2 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                    >
+                      {TIME_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                    </select>
                     <Button type="button" variant="destructive" size="sm" onClick={() => removeMilestone(idx)}>
                       Xóa
                     </Button>

@@ -86,7 +86,7 @@ type MilestoneData = {
   rejection_cid?: any;
 };
 
-const JOBS_CONTRACT_ADDRESS = "0x5de1dd560f3136745d46807f1b3e599077966a3b1d87047faef143a71c39d511";
+const JOBS_CONTRACT_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
 
 const TABS = [
@@ -108,7 +108,7 @@ const getJobStatus = (job: JobPost) => {
   });
   
   if (job.completed) return { label: 'Đã hoàn thành', color: 'bg-blue-700/30 text-blue-300', key: 'completed' };
-  if (job.job_expired) return { label: 'Đã hủy', color: 'bg-red-700/30 text-red-300', key: 'canceled' };
+  if (job.job_expired) return { label: 'Đã đóng', color: 'bg-gray-400/20 text-gray-400', key: 'closed' };
   if (job.locked) return { label: 'Đã khóa', color: 'bg-gray-700/30 text-gray-300', key: 'locked' };
   if (job.active && job.worker) return { label: 'Đang thực hiện', color: 'bg-green-700/30 text-green-300', key: 'in-progress' };
   if (job.active && !job.worker) return { label: 'Đang tuyển', color: 'bg-yellow-700/30 text-yellow-300', key: 'in-progress' };
@@ -141,6 +141,11 @@ const Dashboard = () => {
   const [loadingMilestoneDetails, setLoadingMilestoneDetails] = useState(false);
   const [selectedMilestoneCid, setSelectedMilestoneCid] = useState<string>('');
   const [selectedMilestoneType, setSelectedMilestoneType] = useState<'submission' | 'acceptance' | 'rejection'>('submission');
+
+  // Reopen dialog states
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+  const [reopenJobId, setReopenJobId] = useState<string>('');
+  const [reopenDeadlineDays, setReopenDeadlineDays] = useState<number>(7);
 
   const heroRef = useRef(null);
   const statsRef = useRef(null);
@@ -774,6 +779,41 @@ const Dashboard = () => {
     return null;
   }
 
+  const handleOpenReopenDialog = (jobId: string) => {
+    setReopenJobId(jobId);
+    setReopenDeadlineDays(7);
+    setReopenDialogOpen(true);
+  };
+
+  const handleConfirmReopen = async () => {
+    if (!account || accountType !== 'aptos' || !window.aptos) {
+      toast.error('Vui lòng kết nối ví Aptos để thực hiện.');
+      return;
+    }
+    if (reopenDeadlineDays <= 0) {
+      toast.error('Vui lòng nhập số ngày gia hạn hợp lệ.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const deadlineInSeconds = reopenDeadlineDays * 24 * 60 * 60;
+      const transaction = await window.aptos.signAndSubmitTransaction({
+        type: "entry_function_payload",
+        function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::reopen_applications`,
+        type_arguments: [],
+        arguments: [reopenJobId, deadlineInSeconds.toString()]
+      });
+      await aptos.waitForTransaction({ transactionHash: transaction.hash });
+      toast.success('Đã mở lại job với deadline mới!');
+      setReopenDialogOpen(false);
+      loadUserJobs();
+    } catch (error: any) {
+      toast.error(`Mở lại job thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const renderJobCard = (job: JobPost & { title?: string; description?: string }, type: string) => {
     const userAddress = account?.toLowerCase();
     const isPoster = job.poster.toLowerCase() === userAddress;
@@ -826,10 +866,10 @@ const Dashboard = () => {
                 <Clock className="inline w-4 h-4 text-orange-400 mr-1" />
                 Deadline ứng tuyển: {job.application_deadline ? new Date(job.application_deadline * 1000).toLocaleString() : '-'}
               </div>
-              <div>
+              {/* <div>
                 <DollarSign className="w-5 h-5 inline mr-1 text-green-400" />
                 Escrowed: {job.escrowed_amount ? job.escrowed_amount / 100_000_000 : 0} APT
-              </div>
+              </div> */}
               <div>
                 <span className="text-xs text-gray-400">Số lần bị từ chối: {job.rejected_count || 0}</span>
               </div>
@@ -923,8 +963,7 @@ const Dashboard = () => {
                     if (Array.isArray(job.duration_per_milestone) && job.duration_per_milestone[idx]) {
                       durationDays = `${Math.round(job.duration_per_milestone[idx] / (24 * 60 * 60))} ngày`;
                     }
-                    
-                    const canSubmit = isWorker && job.active && !job.completed && job.current_milestone === idx && !milestoneData?.submitted && !job.locked;
+                    const canRemoveInactiveWorker = isPoster && job.active && job.worker && job.approved && idx === job.current_milestone && !milestoneData?.submitted && job.milestone_deadlines && job.milestone_deadlines[idx] && (Date.now() / 1000 > job.milestone_deadlines[idx]);
                     return (
                       <li key={idx} className="flex flex-col gap-1 mb-2">
                         <div className="flex justify-between items-center text-xs text-gray-300">
@@ -936,7 +975,34 @@ const Dashboard = () => {
                           </span>
                           <span className="ml-2 truncate">{milestoneStatus}</span>
                         </div>
-                        
+                        {/* Button xóa worker do quá hạn milestone */}
+                        {canRemoveInactiveWorker && (
+                          <Button
+                            size="sm"
+                            className="bg-red-700/80 text-red-300 font-bold hover:bg-red-600/80 w-fit"
+                            onClick={async () => {
+                              try {
+                                if (!account || accountType !== 'aptos' || !window.aptos) {
+                                  toast.error('Vui lòng kết nối ví Aptos để thực hiện.');
+                                  return;
+                                }
+                                const tx = await window.aptos.signAndSubmitTransaction({
+                                  type: 'entry_function_payload',
+                                  function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::poster_remove_inactive_worker`,
+                                  type_arguments: [],
+                                  arguments: [job.id]
+                                });
+                                await aptos.waitForTransaction({ transactionHash: tx.hash });
+                                toast.success('Đã xóa worker do quá hạn nộp milestone!');
+                                loadUserJobs();
+                              } catch (error: any) {
+                                toast.error(`Xóa worker thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+                              }
+                            }}
+                          >
+                            Xóa worker do quá hạn
+                          </Button>
+                        )}
                         {/* Milestone Details Buttons */}
                         {milestoneData && (
                           <div className="flex gap-2 mt-1 flex-wrap">
@@ -990,19 +1056,6 @@ const Dashboard = () => {
                             )}
                           </div>
                         )}
-                        
-                        {/* {canSubmit && (
-                          <div className="flex gap-2 mt-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border-blue-400/30"
-                              onClick={() => handleOpenSubmitDialog(job.id, idx)}
-                            >
-                              Nộp cột mốc
-                            </Button>
-                          </div>
-                        )} */}
                       </li>
                     );
                   })}
@@ -1018,15 +1071,41 @@ const Dashboard = () => {
                     size="sm"
                     className="bg-yellow-700/80 text-yellow-300 font-bold hover:bg-yellow-600/80"
                     onClick={() => handleRequestWithdraw(job.id)}
-                  
                   >
                     Rút ứng tuyển
                   </Button>
+                  {/* Bổ sung nút rút ứng tuyển khi hết hạn */}
+                  {job.active && !job.approved && (Date.now() / 1000 > job.application_deadline) && (
+                    <Button
+                      size="sm"
+                      className="bg-orange-700/80 text-orange-200 font-bold hover:bg-orange-600/80"
+                      onClick={async () => {
+                        try {
+                          if (!account || accountType !== 'aptos' || !window.aptos) {
+                            toast.error('Vui lòng kết nối ví Aptos để rút ứng tuyển.');
+                            return;
+                          }
+                          const tx = await window.aptos.signAndSubmitTransaction({
+                            type: 'entry_function_payload',
+                            function: `${JOBS_CONTRACT_ADDRESS}::${JOBS_MARKETPLACE_MODULE_NAME}::worker_withdraw_apply`,
+                            type_arguments: [],
+                            arguments: [job.id]
+                          });
+                          await aptos.waitForTransaction({ transactionHash: tx.hash });
+                          toast.success('Bạn đã rút ứng tuyển do hết hạn, stake đã được hoàn lại!');
+                          loadUserJobs();
+                        } catch (error: any) {
+                          toast.error(`Rút ứng tuyển thất bại: ${error.message || 'Đã xảy ra lỗi không xác định.'}`);
+                        }
+                      }}
+                    >
+                      Rút ứng tuyển (hết hạn)
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     className="bg-green-900/80 text-green-300 font-bold hover:bg-green-700/80"
                     onClick={() => handleApproveCancelJob(job.id, true)}
-              
                   >
                     Duyệt hủy dự án
                   </Button>
@@ -1034,7 +1113,6 @@ const Dashboard = () => {
                     size="sm"
                     className="bg-red-900/80 text-red-300 font-bold hover:bg-red-700/80"
                     onClick={() => handleApproveCancelJob(job.id, false)}
-                 
                   >
                     Từ chối hủy
                   </Button>
@@ -1074,7 +1152,7 @@ const Dashboard = () => {
                   <Button
                     size="sm"
                     className="bg-red-600/20 text-red-400 hover:bg-red-600/30 font-semibold"
-                    onClick={() => handleRejectWorker(job.id)}
+                    onClick={() => handleOpenReopenDialog(job.id)}
                   >
                     Từ chối ứng viên
                   </Button>
@@ -1539,6 +1617,7 @@ const Dashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 };
