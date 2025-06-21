@@ -23,7 +23,9 @@ import {
   Send,
   Eye,
   Download,
-  XCircle
+  XCircle,
+  Copy,
+  RefreshCw
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { useWallet } from '../context/WalletContext';
@@ -151,6 +153,16 @@ const Dashboard = () => {
   const statsRef = useRef(null);
   const heroInView = useInView(heroRef, { once: true });
   const statsInView = useInView(statsRef, { once: true });
+
+  const handleCopy = (text: string, label: string = 'Địa chỉ') => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(`${label} đã được sao chép vào clipboard!`);
+    }).catch(err => {
+      toast.error('Không thể sao chép.');
+      console.error('Could not copy text: ', err);
+    });
+  };
 
   useEffect(() => {
     loadUserJobs();
@@ -843,12 +855,18 @@ const Dashboard = () => {
               {job.title ? job.title : `Job ID: ${job.id}`}
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-gray-300 font-medium truncate">
-                Người đăng: {job.poster ? `${job.poster.slice(0, 6)}...${job.poster.slice(-4)}` : ''}
-              </span>
-              <span className="text-sm text-green-400 font-medium truncate ml-4">
-                Người làm: {job.worker ? `${job.worker.slice(0, 6)}...${job.worker.slice(-4)}` : <span className="text-gray-500">Chưa có</span>}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-300 font-medium truncate">
+                  Người đăng: {job.poster ? `${job.poster.slice(0, 6)}...${job.poster.slice(-4)}` : ''}
+                </span>
+                {job.poster && <Copy size={14} className="cursor-pointer hover:text-white flex-shrink-0" onClick={(e) => { e.stopPropagation(); handleCopy(job.poster, 'Địa chỉ người đăng'); }} />}
+              </div>
+              <div className="flex items-center gap-2 ml-4">
+                <span className="text-sm text-green-400 font-medium truncate">
+                  Người làm: {job.worker ? `${job.worker.slice(0, 6)}...${job.worker.slice(-4)}` : <span className="text-gray-500">Chưa có</span>}
+                </span>
+                {job.worker && <Copy size={14} className="cursor-pointer hover:text-white flex-shrink-0" onClick={(e) => { e.stopPropagation(); handleCopy(job.worker, 'Địa chỉ người làm'); }} />}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-between">
@@ -1274,9 +1292,21 @@ const Dashboard = () => {
             transition={{ duration: 0.8 }}
             className="text-center mb-12"
           >
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">
-              Bảng điều khiển của bạn
-            </h1>
+            <div className="flex items-center justify-center gap-4">
+              <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-400 via-violet-400 to-purple-400 bg-clip-text text-transparent">
+                Bảng điều khiển của bạn
+              </h1>
+              <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={loadUserJobs}
+                  disabled={loading}
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-12 w-12 rounded-xl flex-shrink-0 mb-6"
+                  aria-label="Tải lại danh sách dự án"
+                >
+                  <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
               Quản lý các dự án của bạn và theo dõi tiến độ.
             </p>

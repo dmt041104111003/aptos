@@ -23,7 +23,8 @@ import {
   AlertCircle,
   Eye,
   Download,
-  XCircle
+  XCircle,
+  Copy
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { aptos, fetchProfileDetails, decodeCID, fetchMilestoneDetails, getMilestoneCIDs } from '@/utils/aptosUtils';
@@ -274,6 +275,16 @@ const Jobs = () => {
     jobsApplied: any[];
     historyResult: any[];
   } | null>(null);
+
+  const handleCopy = (text: string, label: string = 'Địa chỉ') => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(`${label} đã được sao chép vào clipboard!`);
+    }).catch(err => {
+      toast.error('Không thể sao chép.');
+      console.error('Could not copy text: ', err);
+    });
+  };
 
   const getJobStatus = (job) => {
     if (job.status === 'Đã hoàn thành') return { label: 'Đã hoàn thành', key: 'completed', color: 'bg-blue-700/30 text-blue-300' };
@@ -882,7 +893,10 @@ const Jobs = () => {
                         <img src={profileFullInfo.profile.profilePic} alt="avatar" className="w-12 h-12 rounded-full border border-blue-400" />
                         <div>
                           <div className="font-bold text-lg text-white">{profileFullInfo.profile.name}</div>
-                          <div className="text-xs text-gray-400 break-all font-medium">{profileAddress}</div>
+                          <div className="text-xs text-gray-400 break-all font-medium flex items-center gap-2">
+                            <span>{profileAddress}</span>
+                            <Copy size={12} className="cursor-pointer hover:text-white" onClick={() => handleCopy(profileAddress, 'Địa chỉ ví')} />
+                          </div>
                           <div className="text-xs text-gray-400 break-all font-medium">DID: {profileFullInfo.profile.did}</div>
                         </div>
                       </div>
@@ -901,12 +915,12 @@ const Jobs = () => {
                                     '-'
                                   }
                                 </div>
-                                {item.data.user && <div className="text-xs text-gray-400">Người dùng: {item.data.user}</div>}
+                                {item.data.user && <div className="text-xs text-gray-400 flex items-center gap-1"><span>Người dùng: {item.data.user}</span><Copy size={12} className="cursor-pointer hover:text-white" onClick={() => handleCopy(item.data.user, 'Địa chỉ người dùng')} /></div>}
                                 {item.data.cid && <div className="text-xs text-gray-400">CID mới: {item.data.cid}</div>}
                                 {item.data.cccd && <div className="text-xs text-gray-400">CCCD: {item.data.cccd}</div>}
                                 {item.data.did && <div className="text-xs text-gray-400">DID: {item.data.did}</div>}
-                                {item.data.from && <div className="text-xs text-gray-400">Từ: {item.data.from}</div>}
-                                {item.data.to && <div className="text-xs text-gray-400">Đến: {item.data.to}</div>}
+                                {item.data.from && <div className="text-xs text-gray-400 flex items-center gap-1"><span>Từ: {item.data.from}</span><Copy size={12} className="cursor-pointer hover:text-white" onClick={() => handleCopy(item.data.from, 'Địa chỉ ví')} /></div>}
+                                {item.data.to && <div className="text-xs text-gray-400 flex items-center gap-1"><span>Đến: {item.data.to}</span><Copy size={12} className="cursor-pointer hover:text-white" onClick={() => handleCopy(item.data.to, 'Địa chỉ ví')} /></div>}
                               </li>
                             ))}
                           </ul>
@@ -1083,6 +1097,7 @@ const Jobs = () => {
                           <span className="text-sm text-gray-300 font-medium truncate">
                             Người đăng: {job.poster ? `${job.poster.slice(0, 6)}...${job.poster.slice(-4)}` : ''}
                           </span>
+                          {job.poster && <Copy size={14} className="cursor-pointer hover:text-white flex-shrink-0" onClick={(e) => { e.stopPropagation(); handleCopy(job.poster, 'Địa chỉ người đăng'); }} />}
                         </div>
                       </CardHeader>
                       <CardContent className="flex-1 flex flex-col justify-between">
@@ -1214,9 +1229,12 @@ const Jobs = () => {
                 </div>
               )}
               <div className="space-y-2 text-sm text-gray-300">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span>Người đăng:</span>
-                  <span>{selectedJob?.poster ? `${selectedJob.poster.slice(0, 6)}...${selectedJob.poster.slice(-4)}` : '-'}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs">{selectedJob?.poster ? `${selectedJob.poster.slice(0, 6)}...${selectedJob.poster.slice(-4)}` : '-'}</span>
+                    {selectedJob?.poster && <Copy size={14} className="cursor-pointer hover:text-white" onClick={() => handleCopy(selectedJob.poster, 'Địa chỉ người đăng')} />}
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span>Escrowed:</span>
@@ -1537,21 +1555,30 @@ const Jobs = () => {
                         </div>
                       )}
                       {event.data.poster && (
-                        <div>
+                        <div className="flex justify-between items-center">
                           <span className="text-gray-400">Người đăng:</span>
-                          <span className="text-white ml-2 font-mono text-xs">{event.data.poster}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-mono text-xs">{event.data.poster}</span>
+                            <Copy size={12} className="cursor-pointer hover:text-white" onClick={() => handleCopy(event.data.poster, 'Địa chỉ người đăng')} />
+                          </div>
                         </div>
                       )}
                       {event.data.worker && (
-                        <div>
+                        <div className="flex justify-between items-center">
                           <span className="text-gray-400">Người làm:</span>
-                          <span className="text-white ml-2 font-mono text-xs">{event.data.worker}</span>
+                           <div className="flex items-center gap-2">
+                            <span className="text-white font-mono text-xs">{event.data.worker}</span>
+                            <Copy size={12} className="cursor-pointer hover:text-white" onClick={() => handleCopy(event.data.worker, 'Địa chỉ người làm')} />
+                          </div>
                         </div>
                       )}
                        {event.data.to && (
-                        <div>
+                        <div className="flex justify-between items-center">
                           <span className="text-gray-400">Đến địa chỉ:</span>
-                          <span className="text-white ml-2 font-mono text-xs">{event.data.to}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-mono text-xs">{event.data.to}</span>
+                            <Copy size={12} className="cursor-pointer hover:text-white" onClick={() => handleCopy(event.data.to, 'Địa chỉ ví')} />
+                          </div>
                         </div>
                       )}
                       {event.data.amount && (

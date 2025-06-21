@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useWallet } from '@/context/WalletContext';
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,6 +26,14 @@ import {
   BarChart3
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { db } from '@/lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+} from 'firebase/firestore';
 
 const navigation = [
   { name: 'Trang chủ', href: '/', icon: Home },
@@ -40,6 +49,7 @@ const Navbar = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const prevAptosNetwork = useRef<string | null>(null);
 
   useEffect(() => {
@@ -58,6 +68,58 @@ const Navbar = () => {
     prevAptosNetwork.current = aptosNetwork;
   }, [aptosNetwork]);
 
+  // Listen for unread messages
+  useEffect(() => {
+    if (!account) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', account)
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      let count = 0;
+      querySnapshot.forEach((doc) => {
+        const conversation = doc.data();
+        const lastMessage = conversation.lastMessage;
+        
+        // Check if the last message is from someone else and recent (within last 24 hours)
+        // AND the user hasn't viewed the messages page since the last message
+        if (lastMessage && 
+            lastMessage.senderId !== account && 
+            lastMessage.timestamp) {
+          const messageTime = lastMessage.timestamp.toDate();
+          const now = new Date();
+          const hoursDiff = (now.getTime() - messageTime.getTime()) / (1000 * 60 * 60);
+          
+          // Check if user has viewed messages since this message was sent
+          const lastViewed = localStorage.getItem(`messages_viewed_${account}`);
+          const lastViewedTime = lastViewed ? new Date(lastViewed).getTime() : 0;
+          const messageTimeMs = messageTime.getTime();
+          
+          // Consider messages from last 24 hours as "new" AND not viewed since
+          if (hoursDiff <= 24 && messageTimeMs > lastViewedTime) {
+            count++;
+          }
+        }
+      });
+      setUnreadCount(count);
+    });
+
+    return () => unsubscribe();
+  }, [account]);
+
+  // Mark messages as read when visiting Messages page
+  useEffect(() => {
+    if (account && location.pathname === '/messages') {
+      // Store the current time as last viewed time
+      localStorage.setItem(`messages_viewed_${account}`, new Date().toISOString());
+    }
+  }, [account, location.pathname]);
+
   const handleLogout = () => {
     disconnectWallet();
     navigate('/');
@@ -69,6 +131,42 @@ const Navbar = () => {
 
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+
+  const renderNavItem = (item: any) => {
+    const isMessages = item.href === '/messages';
+    
+    return (
+      <motion.div 
+        key={item.name} 
+        whileHover={{ scale: 1.05 }} 
+        whileTap={{ scale: 0.95 }}
+        className="relative"
+      >
+        <Button
+          variant={location.pathname === item.href ? 'default' : 'ghost'}
+          onClick={() => navigate(item.href)}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 font-sans ${
+            location.pathname === item.href
+              ? 'bg-blue-500 text-white shadow'
+              : 'text-blue-200 hover:bg-blue-500/10 hover:text-white'
+          }`}
+        >
+          <div className="relative">
+            <item.icon className="w-4 h-4" />
+            {isMessages && unreadCount > 0 && (
+              <Badge 
+                className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold p-0 flex items-center justify-center border-2 border-gray-900"
+                variant="destructive"
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Badge>
+            )}
+          </div>
+          <span>{item.name}</span>
+        </Button>
+      </motion.div>
+    );
   };
 
   return (
@@ -105,26 +203,7 @@ const Navbar = () => {
           <div className="flex items-center space-x-6">
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center space-x-2">
-              {navigation.map((item) => (
-                <motion.div 
-                  key={item.name} 
-                  whileHover={{ scale: 1.05 }} 
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Button
-                    variant={location.pathname === item.href ? 'default' : 'ghost'}
-                    onClick={() => navigate(item.href)}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 font-sans ${
-                      location.pathname === item.href
-                        ? 'bg-blue-500 text-white shadow'
-                        : 'text-blue-200 hover:bg-blue-500/10 hover:text-white'
-                    }`}
-                  >
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.name}</span>
-                  </Button>
-                </motion.div>
-              ))}
+              {navigation.map(renderNavItem)}
             </nav>
 
             {/* Desktop User Menu */}
@@ -224,24 +303,38 @@ const Navbar = () => {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
             <div className="px-4 pt-4 pb-6 space-y-2">
-              {navigation.map((item) => (
-                <Button
-                  key={item.name}
-                  variant={location.pathname === item.href ? 'default' : 'ghost'}
-                  onClick={() => {
-                    navigate(item.href);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`w-full justify-start flex items-center space-x-3 px-4 py-2 rounded-xl text-sm font-medium font-sans ${
-                    location.pathname === item.href
-                      ? 'bg-blue-500 text-white shadow'
-                      : 'text-blue-200 hover:bg-blue-500/10'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.name}</span>
-                </Button>
-              ))}
+              {navigation.map((item) => {
+                const isMessages = item.href === '/messages';
+                
+                return (
+                  <Button
+                    key={item.name}
+                    variant={location.pathname === item.href ? 'default' : 'ghost'}
+                    onClick={() => {
+                      navigate(item.href);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full justify-start flex items-center space-x-3 px-4 py-2 rounded-xl text-sm font-medium font-sans relative ${
+                      location.pathname === item.href
+                        ? 'bg-blue-500 text-white shadow'
+                        : 'text-blue-200 hover:bg-blue-500/10'
+                    }`}
+                  >
+                    <div className="relative">
+                      <item.icon className="w-5 h-5" />
+                      {isMessages && unreadCount > 0 && (
+                        <Badge 
+                          className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold p-0 flex items-center justify-center border-2 border-gray-900"
+                          variant="destructive"
+                        >
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </Badge>
+                      )}
+                    </div>
+                    <span>{item.name}</span>
+                  </Button>
+                );
+              })}
               {!account ? (
                 <Button 
                   onClick={() => {
