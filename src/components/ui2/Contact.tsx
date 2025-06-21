@@ -1,24 +1,41 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, MessageSquare, Send } from 'lucide-react';
+import emailjs from 'emailjs-com';
 
 const Contact = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    message: '',
-  });
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const form = useRef<HTMLFormElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(formData);
-    alert('Cảm ơn bạn đã liên hệ! Chúng tôi sẽ sớm phản hồi.');
-    setFormData({ name: '', email: '', message: '' });
+    if (!form.current) return;
+
+    setIsSubmitting(true);
+    setStatusMessage('');
+
+    const serviceID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+    const templateID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+    const userID = import.meta.env.VITE_EMAILJS_USER_ID;
+
+    if (!serviceID || !templateID || !userID) {
+      setStatusMessage('Lỗi: Cấu hình EmailJS bị thiếu. Vui lòng kiểm tra lại biến môi trường.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    emailjs.sendForm(serviceID, templateID, form.current, userID)
+      .then((result) => {
+          console.log('SUCCESS!', result.status, result.text);
+          setStatusMessage('Cảm ơn bạn đã liên hệ! Bạn vui lòng check mail xác nhận nhé! Đã gửi!');
+          setIsSubmitting(false);
+          if (form.current) form.current.reset();
+      }, (error) => {
+          console.error('FAILED...', error);
+          setStatusMessage('Gửi tin nhắn thất bại. Vui lòng thử lại sau.');
+          setIsSubmitting(false);
+      });
   };
 
   const cardVariants = {
@@ -62,14 +79,12 @@ const Contact = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2">
             {/* Form Section */}
             <div className="p-8 md:p-12">
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form ref={form} onSubmit={handleSubmit} className="space-y-6">
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
                     name="name"
-                    value={formData.name}
-                    onChange={handleChange}
                     placeholder="Tên của bạn"
                     required
                     className="w-full bg-white/5 border-2 border-transparent focus:border-blue-500/50 rounded-lg py-3 pl-12 pr-4 text-white placeholder-gray-400 focus:outline-none transition-all"
@@ -80,8 +95,6 @@ const Contact = () => {
                   <input
                     type="email"
                     name="email"
-                    value={formData.email}
-                    onChange={handleChange}
                     placeholder="Email của bạn"
                     required
                     className="w-full bg-white/5 border-2 border-transparent focus:border-blue-500/50 rounded-lg py-3 pl-12 pr-4 text-white placeholder-gray-400 focus:outline-none transition-all"
@@ -91,8 +104,6 @@ const Contact = () => {
                   <MessageSquare className="absolute left-4 top-5 text-gray-400 w-5 h-5" />
                   <textarea
                     name="message"
-                    value={formData.message}
-                    onChange={handleChange}
                     placeholder="Nội dung tin nhắn..."
                     required
                     rows={5}
@@ -102,12 +113,18 @@ const Contact = () => {
                 <div>
                   <button
                     type="submit"
-                    className="w-full py-3.5 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-base hover:from-blue-500 hover:to-purple-500 transition-all duration-300 transform hover:scale-[1.02] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-base hover:from-blue-500 hover:to-purple-500 transition-all duration-300 transform hover:scale-[1.02] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Send className="w-5 h-5" />
-                    <span>Gửi tin nhắn</span>
+                    {isSubmitting ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
+                    <span>{isSubmitting ? 'Đang gửi...' : 'Gửi tin nhắn'}</span>
                   </button>
                 </div>
+                {statusMessage && <p className="text-center mt-4 text-sm text-white">{statusMessage}</p>}
               </form>
             </div>
             {/* Image Section */}
