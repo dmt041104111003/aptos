@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 import { aptos, fetchProfileDetails, decodeCID, fetchMilestoneDetails, getMilestoneCIDs } from '@/utils/aptosUtils';
-declare global { interface Window { ethereum?: any } }
+
 const MODULE_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
 const JOBS_CONTRACT_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
