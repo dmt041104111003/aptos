@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,7 @@ import Messages from "./pages/Messages";
 import Settings from "./pages/Settings";
 import { ProfileProvider } from './contexts/ProfileContext';
 import ScrollToTop from "./components/ScrollToTop";
+import Chatbox from './components/Chatbox';
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -35,6 +35,7 @@ const App = () => (
 
 
           </Routes>
+          <Chatbox />
         </BrowserRouter>
       </TooltipProvider>
     </WalletProvider>
