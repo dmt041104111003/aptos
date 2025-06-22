@@ -605,6 +605,112 @@ module job_work_board::job_marketplace_v29 {
             );
         }
     }
+    
+    public entry fun force_accept_milestone_by_worker(
+        worker: &signer,
+        job_id: u64,
+        milestone_index: u64,
+        acceptance_cid: vector<u8>
+    ) acquires Jobs, Events, MarketplaceCapability {
+        assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
+        assert!(is_valid_cid(&acceptance_cid), EINVALID_CID);
+
+        let worker_addr = signer::address_of(worker);
+        let jobs = borrow_global_mut<Jobs>(@job_work_board);
+        assert!(table::contains(&jobs.jobs, job_id), EJOB_NOT_FOUND);
+        let job = table::borrow_mut(&mut jobs.jobs, job_id);
+
+        assert!(job.active, ENOT_ACTIVE);
+        assert!(option::is_some(&job.worker), ENOT_WORKER);
+        assert!(*option::borrow(&job.worker) == worker_addr, ENOT_WORKER);
+
+        let milestone_deadline = *vector::borrow(&job.milestone_deadlines, milestone_index);
+        assert!(timestamp::now_seconds() >= milestone_deadline + 3 * 86400, ETIMING_TOO_EARLY);
+
+        let milestone_states = &mut job.milestone_states;
+        assert!(table::contains(milestone_states, milestone_index), EINVALID_MILESTONE);
+        let milestone_data = table::borrow_mut(milestone_states, milestone_index);
+        assert!(milestone_data.submitted, ENOT_SUBMITTED);
+        assert!(!milestone_data.accepted, EALREADY_ACCEPTED);
+
+        let milestone_amount = *vector::borrow(&job.milestones, milestone_index);
+        assert!(milestone_amount > 0, EINVALID_AMOUNT);
+
+        let escrowed_amount = job.escrowed_amount;
+        let paid_amount = 0u64;
+        let i = 0;
+        while (i < milestone_index) {
+            paid_amount = paid_amount + *vector::borrow(&job.milestones, i);
+            i = i + 1;
+        };
+
+        let remaining_amount = escrowed_amount - paid_amount;
+        let bonus = remaining_amount / 10;
+        let system_fee = remaining_amount / 10;
+        let return_to_poster = remaining_amount - bonus - system_fee;
+
+        let marketplace_cap = borrow_global<MarketplaceCapability>(@job_work_board);
+        let module_signer = account::create_signer_with_capability(&marketplace_cap.cap);
+
+        coin::transfer<AptosCoin>(&module_signer, worker_addr, milestone_amount + bonus + job.worker_stake);
+
+        coin::transfer<AptosCoin>(&module_signer, marketplace_cap.escrow_address, system_fee);
+
+        coin::transfer<AptosCoin>(&module_signer, job.poster, return_to_poster);
+
+        job.escrowed_amount = 0;
+        milestone_data.accepted = true;
+        milestone_data.acceptance_cid = acceptance_cid;
+
+        job.worker = option::none();
+        job.approved = false;
+        job.approve_time = option::none();
+        job.rejected_count = 0;
+        job.last_reject_time = option::none();
+        job.current_milestone = 0;
+        job.worker_stake = 0;
+        job.withdraw_request = option::none();
+
+        let j = 0;
+        let total_milestone = vector::length(&job.milestones);
+        while (j < total_milestone) {
+            if (table::contains(milestone_states, j)) {
+                let m = table::borrow_mut(milestone_states, j);
+                m.submitted = false;
+                m.accepted = false;
+                m.submit_time = 0;
+                m.reject_count = 0;
+                m.submission_cid = vector::empty<u8>();
+                m.acceptance_cid = vector::empty<u8>();
+                m.rejection_cid = vector::empty<u8>();
+            };
+            j = j + 1;
+        };
+
+        if (exists<Events>(@job_work_board)) {
+            let events = borrow_global_mut<Events>(@job_work_board);
+            event::emit_event(
+                &mut events.accept_event,
+                MilestoneAcceptedEvent {
+                    job_id,
+                    milestone: milestone_index,
+                    accept_time: timestamp::now_seconds(),
+                    acceptance_cid,
+                }
+            );
+            event::emit_event(
+                &mut events.fund_flow_event,
+                FundFlowEvent {
+                    job_id,
+                    to: worker_addr,
+                    amount: milestone_amount + bonus,
+                    time: timestamp::now_seconds()
+                }
+            );
+        }
+
+        
+    }
 
     public entry fun reject_milestone(
         poster: &signer,
@@ -1324,4 +1430,5 @@ module job_work_board::job_marketplace_v29 {
             );
         };
     }
+    
 }
