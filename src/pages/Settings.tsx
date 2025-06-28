@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import Navbar from "@/components/ui2/Navbar";
-import { Delete, Plus, Save, Upload, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
+import { Delete, Plus, Save, Upload, CheckCircle2, AlertCircle, ArrowRight, Shield } from "lucide-react";
 import { useWallet } from "../context/WalletContext";
 import { uploadJSONToIPFS, uploadFileToIPFS } from "@/utils/pinata";
 import { useProfile } from '../contexts/ProfileContext';
 import { Aptos, AptosConfig, Network, ClientConfig } from "@aptos-labs/ts-sdk";
+import FaceVerificationDialog from "@/components/FaceVerificationDialog";
+import FaceVerificationSection from "@/components/FaceVerificationSection";
 
 interface ProfileDataFromChain {
   cid: string;
@@ -38,6 +40,11 @@ export default function Settings() {
   const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
   const [skills, setSkills] = useState<string[]>([]);
   const [cccdInput, setCccdInput] = useState(savedProfile.cccd ? savedProfile.cccd.toString() : "");
+
+  // Face verification states
+  const [showFaceVerification, setShowFaceVerification] = useState(false);
+  const [isFaceVerified, setIsFaceVerified] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'register' | 'update' | null>(null);
 
   useEffect(() => {
     setProfile(savedProfile);
@@ -121,6 +128,25 @@ export default function Settings() {
       return;
     }
 
+    // Check if face verification is required
+    if (!isProfileExistInState && !isFaceVerified) {
+      setPendingAction('register');
+      setShowFaceVerification(true);
+      return;
+    }
+
+    // If updating profile and not verified recently, require verification
+    if (isProfileExistInState && !isFaceVerified) {
+      setPendingAction('update');
+      setShowFaceVerification(true);
+      return;
+    }
+
+    // Proceed with profile save
+    await saveProfile();
+  };
+
+  const saveProfile = async () => {
     setUploading(true);
     setStatus({ type: null, message: '' });
 
@@ -166,6 +192,10 @@ export default function Settings() {
         message: isProfileExistInState ? 'Hồ sơ đã được cập nhật thành công!' : 'Hồ sơ đã được đăng ký thành công!' 
       });
 
+      // Reset face verification after successful save
+      setIsFaceVerified(false);
+      setPendingAction(null);
+
     } catch (error: any) {
       console.error('Error saving profile:', error);
       setStatus({ 
@@ -174,6 +204,16 @@ export default function Settings() {
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleFaceVerificationSuccess = () => {
+    setIsFaceVerified(true);
+    setShowFaceVerification(false);
+    
+    // Auto-save profile after successful verification
+    if (pendingAction) {
+      saveProfile();
     }
   };
 
@@ -244,6 +284,7 @@ export default function Settings() {
                   className="hidden"
                   onChange={handleImageChange}
                   disabled={uploading}
+                  aria-label="Upload profile picture"
                 />
               </div>
             </div>
@@ -253,7 +294,16 @@ export default function Settings() {
               <form onSubmit={handleSubmit} className="w-full space-y-8">
                 {/* Basic Info Section */}
                 <div className="bg-gradient-to-br from-gray-900/60 to-gray-800/60 border border-white/10 rounded-2xl p-8">
-                  <h2 className="text-lg font-semibold mb-4 font-heading text-white">Thông tin cơ bản</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold font-heading text-white">Thông tin cơ bản</h2>
+                  </div>
+                  
+                  {/* Face Verification Section */}
+                  <FaceVerificationSection
+                    isFaceVerified={isFaceVerified}
+                    onStartVerification={() => setShowFaceVerification(true)}
+                  />
+                  
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-white mb-1 font-primary">
@@ -437,6 +487,14 @@ export default function Settings() {
           </div>
         </div>
       </section>
+      {showFaceVerification && (
+        <FaceVerificationDialog
+          isOpen={showFaceVerification}
+          onClose={() => setShowFaceVerification(false)}
+          onVerificationSuccess={handleFaceVerificationSuccess}
+          userId={account || ''}
+        />
+      )}
     </div>
   );
 }
