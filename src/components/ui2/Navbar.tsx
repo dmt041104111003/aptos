@@ -23,7 +23,7 @@ import {
   Wallet,
   Home,
   MessageSquare,
-  BarChart3
+  BarChart3,Vote
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { db } from '@/lib/firebase';
@@ -41,6 +41,7 @@ const navigation = [
   { name: 'Đăng dự án', href: '/post-job', icon: Users },
   { name: 'Bảng điều khiển', href: '/dashboard', icon: BarChart3 },
   { name: 'Tin nhắn', href: '/messages', icon: MessageSquare },
+  { name: 'DAO', href: '/daos', icon: Vote },
 ];
 
 const Navbar = () => {
@@ -261,6 +262,13 @@ const Navbar = () => {
                         <Settings className="mr-3 h-4 w-4 text-gray-500" />
                         <span>Định danh</span>
                       </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => navigate('/profile/' + account)} 
+                        className="py-2 px-3 rounded-md hover:bg-blue-500/10 text-blue-200 hover:text-white cursor-pointer font-sans"
+                      >
+                        <User className="mr-3 h-4 w-4 text-gray-500" />
+                        <span>Hồ sơ cá nhân</span>
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={handleLogout} 
@@ -269,6 +277,7 @@ const Navbar = () => {
                         <LogOut className="mr-3 h-4 w-4" />
                         <span>Đăng xuất</span>
                       </DropdownMenuItem>
+                      
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

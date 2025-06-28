@@ -13,6 +13,9 @@ import Settings from "./pages/Settings";
 import { ProfileProvider } from './contexts/ProfileContext';
 import ScrollToTop from "./components/ScrollToTop";
 import Chatbox from './components/Chatbox';
+import Profile from "./pages/Profile";
+import DaoPage from "./pages/DAO";
+import DaoDetailPage from "./pages/DaoDetail";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -30,8 +33,10 @@ const App = () => (
             <Route path="/post-job" element={<PostJob />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/messages" element={<Messages />} />
-    
             <Route path="/settings" element={<Settings />} />
+            <Route path="/profile/:address" element={<Profile />} />
+            <Route path="/daos" element={<DaoPage />} />
+            <Route path="/dao/:id" element={<DaoDetailPage />} />
 
 
           </Routes>

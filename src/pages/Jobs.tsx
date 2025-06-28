@@ -1091,7 +1091,10 @@ const Jobs = () => {
                     <Card className="min-h-[340px] flex flex-col justify-between group cursor-pointer hover:border-blue-500/50 transition-all duration-300 rounded-xl shadow-lg bg-gradient-to-br from-gray-900/70 to-gray-800/80 border border-white/10 p-6">
                       <CardHeader className="mb-2">
                         <CardTitle className="text-2xl font-bold text-blue-400 mb-1 truncate">
-                          {job?.title ? job.title : `Job ID: ${job.id}`}
+                      
+                            <span>{job?.title ? job.title : `Job ID: ${job.id}`} </span>
+                            <div className='text-sm text-grey-800 my-1'>Job ID: {job.id}</div>
+                          
                         </CardTitle>
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-gray-300 font-medium truncate">
