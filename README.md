@@ -9,24 +9,79 @@
 
 ## Project Overview
 
-APT-UTC is a next-generation decentralized freelance platform built on the Aptos blockchain. It empowers clients and freelancers to collaborate transparently, securely, and efficiently, leveraging smart contracts for milestone-based payments, escrow, and trustless interactions. The platform is designed for the future of work in the Web3 era, with a focus on security, automation, and community-driven growth.
+APT-UTC is a next-generation decentralized freelance platform built on the Aptos blockchain, now enhanced with advanced AI-powered face anti-spoofing verification. The platform ensures that all users are real people, not bots or deepfakes, by leveraging state-of-the-art facial recognition and anti-spoofing models that can be retrained with new data for continuous improvement.
+
+**Key strengths:**
+- **AI Face Anti-Spoofing Verification:** Prevents fake profiles and deepfakes using deep learning (PyTorch, dlib, OpenCV) and allows retraining the model with new data to adapt to evolving threats.
+- **On-Chain Security & Transparency:** All job, milestone, and transaction data is stored directly on-chain, ensuring immutability and eliminating third-party risks.
+- **Fully Automated, Trustless Workflow:** Escrow, milestone management, fund distribution, and dispute resolution are all governed by smart contracts, removing the need for intermediaries.
+- **Modern Web3 Experience:** Combines identity verification, real-time chat, decentralized file storage (IPFS), and seamless Aptos wallet integration for a frictionless user journey.
+
+## Unique Project Highlights
+
+- **AI-Powered Face Verification:**
+  - Uses deep learning to distinguish real faces from spoofed or deepfake images.
+  - Supports **retraining the AI model** with new datasets for improved accuracy and adaptability.
+  - Integrates OCR to extract and match identity information from official documents.
+- **Comprehensive On-Chain Data Management:**
+  - Not just NFTs—every job, milestone, escrow, and event state is stored directly on the Aptos blockchain.
+  - All actions (job posting, applying, submitting, accepting, withdrawing, canceling, etc.) are on-chain transactions, not just message signing.
+- **Security & Transparency:**
+  - Data is tamper-proof and not reliant on centralized servers.
+  - Escrow, fund splitting, and dispute handling are fully automated and transparent.
+- **DeFi-Ready Architecture:**
+  - Escrowed funds can be deployed into DeFi protocols to generate yield and share profits with stakeholders.
+- **Modern User Experience:**
+  - Real-time chat, notifications, profile management, Aptos wallet integration, and decentralized file storage.
+
+> **APT-UTC is more than a freelance platform—it's a secure, AI-driven identity verification and anti-fraud solution for the Web3 community, powered by blockchain and advanced machine learning.**
 
 ## Key Features
 
-### Core Functionality
-- **Decentralized Job Posting:** Clients can post jobs with detailed requirements, milestones, and deadlines. All job data is stored on-chain and/or IPFS for transparency and immutability.
-- **Milestone Management:** Each job is divided into milestones with individual deadlines and escrowed payments, ensuring fair progress tracking and risk mitigation for both parties.
-- **Escrow & Staking:** Funds for milestones are locked in a secure on-chain escrow. Workers must stake tokens to apply, aligning incentives and reducing spam applications.
-- **Application & Approval Flow:** Workers apply by staking tokens. Clients review and approve candidates. Unsuccessful or expired applications allow workers to withdraw their stake.
-- **Automated Fund Distribution:** Upon milestone completion and approval, funds are automatically released to the worker. In case of disputes or inactivity, the contract enforces fair fund splits and refunds.
-- **Timeout & Dispute Handling:** If a milestone deadline passes without action, the contract allows for timeout claims, worker removal, or job reopening, all governed by transparent rules.
+- **AI-Powered Face Verification:**
+  - Advanced anti-spoofing (deepfake/fake prevention) using PyTorch, dlib, OpenCV.
+  - Retrainable model for continuous improvement and adaptability.
+  - OCR extraction and face matching with ID documents.
+- **On-Chain Job & Milestone Management:**
+  - All job, milestone, escrow, and event data is stored directly on the Aptos blockchain.
+  - Every action (job posting, applying, submitting, accepting, withdrawing, canceling, etc.) is an on-chain transaction.
+- **Trustless, Automated Escrow:**
+  - Smart contracts handle all fund flows, milestone approvals, and dispute resolution—no intermediaries needed.
+- **Real-Time Communication:**
+  - Integrated chat, notifications, and user presence for seamless collaboration.
+- **DeFi-Ready:**
+  - Escrowed funds can generate yield via DeFi protocols, with profit sharing for stakeholders.
+- **Modern Web3 UX:**
+  - Decentralized identity, Aptos wallet integration, IPFS file storage, and a responsive, user-friendly interface.
 
-### Real-time Communication
-- **Live Chat System:** Built with Firebase Firestore for real-time messaging between clients and workers
-- **Message Status Tracking:** Sent, delivered, and read status indicators
-- **User Presence:** Real-time online/offline status with last seen timestamps
-- **Message Recall:** Users can recall their own messages with confirmation dialogs
-- **Conversation Management:** Hide conversations without deleting data
+## Visual Overview
+
+<p align="center">
+  <img src="public/logo/logo.png" alt="APT-UTC Logo" width="120"/>
+</p>
+
+<p align="center">
+  <img src="public/videos/feature-1.mp4" alt="Face Verification Demo" width="400"/>
+</p>
+
+*Above: Project logo and a demo of AI-powered face verification in action.*
+
+---
+
+## Links
+
+- [Project Homepage](https://github.com/your-org/aptos)  
+- [Aptos Documentation](https://aptos.dev/)
+- [Move Language](https://move-language.github.io/move/)
+- [PyTorch](https://pytorch.org/)
+- [OpenCV](https://opencv.org/)
+- [dlib](http://dlib.net/)
+- [Flask](https://flask.palletsprojects.com/)
+- [Docker](https://www.docker.com/)
+- [Firebase](https://firebase.google.com/docs)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Pinata (IPFS)](https://www.pinata.cloud/)
+- [Petra Wallet](https://petra.app/)
 
 ## Technology Stack
 
@@ -68,31 +123,37 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
 ## Project Structure
 
 ```
-src/
-├── components/          # Reusable UI components
-│   ├── ui/             # Shadcn/ui components
-│   └── ui2/            # Custom components
-├── pages/              # Page components
-│   ├── Dashboard.tsx   # Main dashboard
-│   ├── Jobs.tsx        # Job marketplace
-│   ├── Messages.tsx    # Real-time chat
-│   ├── PostJob.tsx     # Job creation
-│   └── Settings.tsx    # User settings
-├── context/            # React contexts
-│   ├── WalletContext.tsx    # Aptos wallet management
-│   └── ProfileContext.tsx   # User profile data
-├── hooks/              # Custom React hooks
-├── utils/              # Utility functions
-│   ├── aptosUtils.ts   # Aptos blockchain utilities
-│   ├── ipfs.ts         # IPFS integration
-│   └── pinata.ts       # Pinata API utilities
-├── lib/                # Library configurations
-│   └── firebase.ts     # Firebase configuration
-└── contracts/          # Move smart contracts
-    └── job/
-        └── sources/
-            ├── job.move              # Job marketplace contract
-            └── Web3WorkProfiles.move # User profiles contract
+aptos/
+├── public/                  # Static assets (logo, videos, etc.)
+├── src/                     # Frontend source code (React, TypeScript)
+│   ├── components/          # Reusable UI components
+│   ├── pages/               # Page components (Dashboard, Jobs, Messages, etc.)
+│   ├── context/             # React contexts (Wallet, Profile)
+│   ├── hooks/               # Custom React hooks
+│   ├── utils/               # Utility functions (Aptos, IPFS, face verification, etc.)
+│   ├── lib/                 # Library configurations (Firebase, etc.)
+│   └── contracts/           # Move smart contracts
+│       └── job/
+│           └── sources/
+│               ├── job.move              # Job marketplace contract
+│               └── Web3WorkProfiles.move # User profiles contract
+│
+├── Face/                    # AI Face Verification backend (Python)
+│   └── Face_to_Fake_Real/
+│       ├── Code/            # Python source code (Flask API, training, inference)
+│       │   ├── apiCall_Fake_Real.py     # Flask API for face verification
+│       │   ├── train_main.py, train.py  # Model training scripts
+│       │   ├── test.py, anti_spoof_predict.py # Inference scripts
+│       │   ├── requirements.txt         # Python dependencies
+│       │   ├── Dockerfile               # Docker build file
+│       │   └── ...                      # Other supporting scripts
+│       ├── resources/       # Pretrained models, detection configs
+│       │   ├── anti_spoof_models/       # Anti-spoofing model weights (.pth)
+│       │   └── detection_model/         # Face detection models (Caffe, prototxt)
+│       └── saved_logs/      # Training logs (optional)
+│
+├── package.json, vite.config.ts, ...    # Frontend config files
+└── README.md                            # Project documentation
 ```
 
 ## Getting Started
@@ -111,87 +172,4 @@ src/
    ```
 
 2. **Install dependencies**
-   ```bash
-   npm install
    ```
-
-3. **Set up environment variables**
-   Create a `.env` file in the root directory:
-   ```env
-   # Firebase Configuration
-   VITE_FIREBASE_API_KEY=your_firebase_api_key
-   VITE_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
-   VITE_FIREBASE_PROJECT_ID=your_firebase_project_id
-   VITE_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
-   VITE_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
-   VITE_FIREBASE_APP_ID=your_firebase_app_id
-
-   # EmailJS Configuration
-   VITE_EMAILJS_SERVICE_ID=your_emailjs_service_id
-   VITE_EMAILJS_TEMPLATE_ID=your_emailjs_template_id
-   VITE_EMAILJS_USER_ID=your_emailjs_user_id
-
-   # Groq AI Configuration
-   VITE_GROQ_API_KEY=your_groq_api_key
-
-   # Pinata Configuration
-   VITE_PINATA_JWT=your_pinata_jwt
-   ```
-
-4. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-5. **Build for production**
-   ```bash
-   npm run build
-   ```
-
-## Smart Contracts
-
-### Job Marketplace Contract
-- **Address:** `0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea`
-- **Module:** `job_marketplace_v29`
-- **Features:** Job posting, milestone management, escrow, dispute resolution
-
-### Web3 Profiles Contract
-- **Address:** `0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea`
-- **Module:** `web3_profiles_v29`
-- **Features:** Decentralized identity (DID), user profiles, reputation system
-
-## DeFi Vision & Future Integration
-
-This project is designed with DeFi principles at its core:
-
-- **Escrow Yield Generation:** Funds locked in job escrow can be deployed into DeFi protocols to earn yield while jobs are in progress
-- **Staking Rewards:** Worker stake pools can be used for liquidity mining or yield farming
-- **Fee Sharing & Platform Sustainability:** A portion of the yield or transaction fees can be distributed to platform stakeholders
-- **Programmable Money Flows:** All fund movements are governed by smart contracts, enabling future integrations with lending, insurance, or reputation-based DeFi modules
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🔗 Links
-
-- [Aptos Documentation](https://aptos.dev/)
-- [Move Language](https://move-language.github.io/move/)
-- [Firebase Documentation](https://firebase.google.com/docs)
-- [Tailwind CSS](https://tailwindcss.com/)
-
-## Support
-
-For support, email daomanhtung4102003@gmail.com.
-
----
-
-**Get started, contribute, or reach out to join the future of decentralized work!** 
