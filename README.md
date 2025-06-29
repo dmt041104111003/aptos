@@ -22,9 +22,12 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
 ## Unique Project Highlights
 
 - **AI-Powered Face Verification:**
-  - Uses deep learning to distinguish real faces from spoofed or deepfake images.
-  - Supports **retraining the AI model** with new datasets for improved accuracy and adaptability.
-  - Integrates OCR to extract and match identity information from official documents.
+  - **MiniFASNet Architecture:** Uses lightweight neural networks with SE (Squeeze-and-Excitation) modules and depth-wise separable convolutions for efficient anti-spoofing detection
+  - **Multi-Model Ensemble:** Combines MiniFASNetV1 and MiniFASNetV2 variants for robust classification of real vs fake faces
+  - **Face Recognition Pipeline:** Leverages dlib for face detection and generates 128-dimensional face embeddings for identity matching
+  - **OCR Document Processing:** Tesseract-based text extraction with Vietnamese language support for ID card information extraction
+  - **Real-time Anti-Spoofing:** Classifies faces as real or fake using pre-trained models (2.7_80x80_MiniFASNetV2.pth, 4_0_0_80x80_MiniFASNetV1SE.pth)
+  - **Retrainable Models:** PyTorch-based architecture allows continuous model improvement with new datasets to adapt to evolving threats
 - **Decentralized Autonomous Organization (DAO):**
   - **Community Governance:** Users can propose and vote on platform improvements, fee structures, and policy changes.
   - **Transparent Voting:** All proposals and votes are recorded on-chain with immutable history.
@@ -52,9 +55,12 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
 ## Key Features
 
 - **AI-Powered Face Verification:**
-  - Advanced anti-spoofing (deepfake/fake prevention) using PyTorch, dlib, OpenCV.
-  - Retrainable model for continuous improvement and adaptability.
-  - OCR extraction and face matching with ID documents.
+  - **MiniFASNet Anti-Spoofing:** Lightweight neural network architecture with SE modules and depth-wise convolutions
+  - **Multi-Model Ensemble:** Combines MiniFASNetV1 and MiniFASNetV2 for robust anti-spoofing detection
+  - **Face Recognition Pipeline:** dlib-based face detection and 128-dimensional face encoding
+  - **OCR Integration:** Tesseract-based text extraction from ID cards with Vietnamese language support
+  - **Real-time Verification:** Face matching with distance threshold (≤0.65) and anti-spoofing classification
+  - **Retrainable Architecture:** PyTorch-based models can be retrained with new datasets for continuous improvement
 - **DAO Governance System:**
   - **Proposal Creation:** Users can submit proposals for platform improvements.
   - **Voting Mechanism:** Weighted voting based on trust score and activity.
@@ -125,17 +131,37 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
 
 ### Web3 & Blockchain
 - **Aptos SDK** - Official Aptos TypeScript SDK
-- **Move Smart Contracts** - Custom job marketplace contracts
+- **Move Smart Contracts** - Custom job marketplace, DAO governance, and profile contracts
 - **IPFS Integration** - Decentralized file storage via Pinata
 - **Petra Wallet** - Aptos wallet integration
 
-### Backend & Database
+### Database
 - **Firebase Firestore** - Real-time NoSQL database
 - **Firebase Authentication** - User authentication
-- **Express.js** - API server (for email services)
 
-### AI & External Services
-- **Groq SDK** - AI assistant integration
+
+### AI & Machine Learning (Face Verification)
+- **PyTorch 1.13.1** - Deep learning framework for anti-spoofing models
+- **MiniFASNet** - Lightweight anti-spoofing neural network architecture
+  - MiniFASNetV1 & MiniFASNetV2 variants
+  - SE (Squeeze-and-Excitation) modules for attention mechanisms
+  - Depth-wise separable convolutions for efficiency
+- **Face Recognition 1.3.0** - Face detection and encoding using dlib
+- **OpenCV 4.11.0** - Computer vision and image processing
+- **dlib 19.24.1** - Face detection and landmark extraction
+- **Tesseract OCR** - Optical Character Recognition for ID card text extraction
+- **Flask 3.1.1** - Python web framework for AI API
+- **Anti-Spoofing Models**:
+  - 2.7_80x80_MiniFASNetV2.pth (1.8MB)
+  - 4_0_0_80x80_MiniFASNetV1SE.pth (1.8MB)
+- **Face Verification Pipeline**:
+  - Face detection using dlib
+  - Face encoding with 128-dimensional embeddings
+  - Anti-spoofing classification (real vs fake)
+  - OCR text extraction from ID cards
+  - Face matching with distance threshold (≤0.65)
+
+### External Services
 - **EmailJS** - Email contact form service
 - **Pinata** - IPFS file upload and management
 
@@ -143,6 +169,7 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
 - **ESLint** - Code linting and formatting
 - **PostCSS** - CSS processing
 - **Autoprefixer** - CSS vendor prefixing
+- **Docker** - Containerization for AI services
 
 ## Project Structure
 
