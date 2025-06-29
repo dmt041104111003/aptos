@@ -29,8 +29,8 @@ import {
 import Navbar from '@/components/ui2/Navbar';
 import { aptos, fetchProfileDetails, decodeCID, fetchMilestoneDetails, getMilestoneCIDs } from '@/utils/aptosUtils';
 
-const MODULE_ADDRESS = "0x496087ca0e9e97ac4edb6e554ab6eca842cdaebd6648cb2ac8f057b3411e8d39";
-const JOBS_CONTRACT_ADDRESS = "0x496087ca0e9e97ac4edb6e554ab6eca842cdaebd6648cb2ac8f057b3411e8d39";
+const MODULE_ADDRESS = "0x89adff5f04a2fb054a9d4765f54bb87465c9b0212e8f19326e6df4c5150bbcaf";
+const JOBS_CONTRACT_ADDRESS = "0x89adff5f04a2fb054a9d4765f54bb87465c9b0212e8f19326e6df4c5150bbcaf";
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
 const PROFILE_MODULE_NAME = "web3_profiles_v29";
 

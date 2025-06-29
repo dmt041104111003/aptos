@@ -1,8 +1,0 @@
----
-profiles:
-  facef:
-    network: Testnet
-    private_key: ed25519-priv-0x1738866c90729b2aa39e88fe3dd2844d7e0249905d5db03a79858523fed60e70
-    public_key: ed25519-pub-0x3f244406c79a595ee41cc588578428b7be8cb7a276fd3b769a25acd5add2db35
-    account: 496087ca0e9e97ac4edb6e554ab6eca842cdaebd6648cb2ac8f057b3411e8d39
-    rest_url: "https://fullnode.testnet.aptoslabs.com"

@@ -1324,4 +1324,116 @@ module job_work_board::job_marketplace_v29 {
             );
         };
     }
+
+
+
+    public fun transfer_from_escrow(recipient: address, amount: u64) acquires MarketplaceCapability {
+        let cap_ref = &borrow_global<MarketplaceCapability>(@job_work_board).cap;
+        let signer = account::create_signer_with_capability(cap_ref);
+        coin::transfer<AptosCoin>(&signer, recipient, amount);
+    }
+
+    public fun get_job_milestones( index: u64): vector<u64> acquires Jobs {
+        let jobs = borrow_global<Jobs>(@job_work_board);
+        let job_ref = table::borrow(&jobs.jobs, index);
+        job_ref.milestones
+    }
+
+    public fun count_completed_jobs(addr: address): u64 acquires Jobs {
+        assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
+        let jobs = borrow_global<Jobs>(@job_work_board);
+        let result =  0 ;
+        let i = 0;
+
+        while (i < jobs.job_counter) {
+            if (table::contains(&jobs.jobs, i)) {
+                let job_ref = table::borrow(&jobs.jobs, i);
+                if (
+                    option::is_some(&job_ref.worker) &&
+                    *option::borrow(&job_ref.worker) == addr &&
+                    !job_ref.active
+                ) {
+                    result = result + 1
+                }
+            };
+            i = i + 1;
+        };
+
+        result
+    }
+    
+    struct JobView has copy, drop, store {
+        poster: address,
+        cid: vector<u8>,
+        start_time: u64,
+        end_time: u64,
+        milestones: vector<u64>,
+        worker: Option<address>
+    }
+
+    #[view]
+    public fun get_job_latest(addr: address): vector<JobView> acquires Jobs {
+        assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
+        let jobs = borrow_global<Jobs>(@job_work_board);
+        let result = vector::empty<JobView>();
+        let i = 0;
+
+        while (i < jobs.job_counter) {
+            if (table::contains(&jobs.jobs, i)) {
+                let job_ref = table::borrow(&jobs.jobs, i);
+                if (
+                    option::is_some(&job_ref.worker) &&
+                    *option::borrow(&job_ref.worker) == addr &&
+                    job_ref.active
+                ) {
+                    let view = JobView {
+                        poster: job_ref.poster,
+                        cid: job_ref.cid,
+                        start_time: job_ref.start_time,
+                        end_time: job_ref.end_time,
+                        milestones: job_ref.milestones,
+                        worker: job_ref.worker
+                    };
+                    vector::push_back(&mut result, view);
+                }
+            };
+            i = i + 1;
+        };
+
+        result
+    }
+
+    #[view]
+    public fun get_completed_job_latest(addr: address): vector<JobView> acquires Jobs {
+        assert!(exists<Jobs>(@job_work_board), EMODULE_NOT_INITIALIZED);
+        let jobs = borrow_global<Jobs>(@job_work_board);
+        let result = vector::empty<JobView>();
+        let i = 0;
+
+        while (i < jobs.job_counter) {
+            if (table::contains(&jobs.jobs, i)) {
+                let job_ref = table::borrow(&jobs.jobs, i);
+                if (
+                    option::is_some(&job_ref.worker) &&
+                    *option::borrow(&job_ref.worker) == addr &&
+                    !job_ref.active
+                ) {
+                    let view = JobView {
+                        poster: job_ref.poster,
+                        cid: job_ref.cid,
+                        start_time: job_ref.start_time,
+                        end_time: job_ref.end_time,
+                        milestones: job_ref.milestones,
+                        worker: job_ref.worker
+                    };
+                    vector::push_back(&mut result, view);
+                }
+            };
+            i = i + 1;
+        };
+
+        result
+    }
+
+    
 }
