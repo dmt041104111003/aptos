@@ -14,9 +14,16 @@ interface ProfileDataFromChain {
   did: string;
   name: string;
   created_at: number;
+  face_verified?: boolean;
+  distance?: number;
+  is_real?: boolean;
+  embedding_card?: string;
+  embedding_webcam?: string;
+  processing_time?: number;
+  verify_message?: string;
 }
 
-const MODULE_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
+const MODULE_ADDRESS = "0x496087ca0e9e97ac4edb6e554ab6eca842cdaebd6648cb2ac8f057b3411e8d39";
 const MODULE_NAME = "web3_profiles_v29";
 const RESOURCE_NAME = "Profiles";
 
@@ -27,7 +34,7 @@ const aptos = new Aptos(config);
 export default function Settings() {
   const { account, accountType } = useWallet();
   const { profile: savedProfile, updateProfile } = useProfile();
-  const [profile, setProfile] = useState(savedProfile);
+  const [profile, setProfile] = useState<ProfileDataFromChain>(savedProfile);
   const [newSkill, setNewSkill] = useState("");
   const [imagePreview, setImagePreview] = useState(savedProfile.profilePic);
   const [uploading, setUploading] = useState(false);
@@ -45,6 +52,10 @@ export default function Settings() {
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [isFaceVerified, setIsFaceVerified] = useState(false);
   const [pendingAction, setPendingAction] = useState<'register' | 'update' | null>(null);
+
+  // Thêm state để lưu tạm thông tin OCR
+  const [pendingOcrFields, setPendingOcrFields] = useState<{ name?: string; cccd?: string } | null>(null);
+  const [pendingOcrText, setPendingOcrText] = useState<string | null>(null);
 
   useEffect(() => {
     setProfile(savedProfile);
@@ -207,10 +218,20 @@ export default function Settings() {
     }
   };
 
+  // Nhận dữ liệu từ OCR, chỉ lưu tạm, không tự động điền
+  const handleOcrExtract = (fields: { name?: string; cccd?: string }, ocrText?: string) => {
+    setPendingOcrFields(fields);
+    if (ocrText) setPendingOcrText(ocrText);
+  };
+
+  // Khi xác minh thành công, mới tự động điền
   const handleFaceVerificationSuccess = () => {
     setIsFaceVerified(true);
     setShowFaceVerification(false);
-    
+    if (pendingOcrFields) {
+      if (pendingOcrFields.name) setProfile(prev => ({ ...prev, name: pendingOcrFields.name }));
+      if (pendingOcrFields.cccd) setCccdInput(pendingOcrFields.cccd);
+    }
     // Auto-save profile after successful verification
     if (pendingAction) {
       saveProfile();
@@ -392,6 +413,35 @@ export default function Settings() {
                   </div>
                 </div>
 
+                {/* Face Verification Results Section */}
+                {isProfileExistInState && (
+                  <div className="bg-gray-900/60 border border-blue-400/20 rounded-2xl p-6 mt-6">
+                    <h3 className="text-lg font-semibold text-blue-400 mb-4">Kết quả xác thực khuôn mặt</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Trạng thái xác thực</label>
+                        <input value={profile.face_verified ? "Đã xác thực" : "Chưa xác thực"} readOnly placeholder="Trạng thái xác thực" className="w-full px-3 py-2 rounded bg-gray-800/60 border border-blue-400/20 text-white" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Khoảng cách khuôn mặt</label>
+                        <input value={profile.distance ? (profile.distance / 1e6).toFixed(6) : ''} readOnly placeholder="Khoảng cách khuôn mặt" className="w-full px-3 py-2 rounded bg-gray-800/60 border border-blue-400/20 text-white" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Anti-spoofing (is_real)</label>
+                        <input value={profile.is_real ? "Thật" : "Giả"} readOnly placeholder="Anti-spoofing" className="w-full px-3 py-2 rounded bg-gray-800/60 border border-blue-400/20 text-white" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Thời gian xử lý (ms)</label>
+                        <input value={profile.processing_time || ''} readOnly placeholder="Thời gian xử lý (ms)" className="w-full px-3 py-2 rounded bg-gray-800/60 border border-blue-400/20 text-white" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-400 mb-1">Thông điệp xác minh</label>
+                        <input value={profile.verify_message || ''} readOnly placeholder="Thông điệp xác minh" className="w-full px-3 py-2 rounded bg-gray-800/60 border border-blue-400/20 text-white" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Submit Button */}
                 <div className="flex justify-end">
                   <button
@@ -493,7 +543,23 @@ export default function Settings() {
           onClose={() => setShowFaceVerification(false)}
           onVerificationSuccess={handleFaceVerificationSuccess}
           userId={account || ''}
+          onOcrExtract={(fields) => handleOcrExtract(fields, fields.ocrText)}
         />
+      )}
+      {pendingOcrText && (
+        <div className="mt-4 mx-auto max-w-xl bg-gray-900/80 border border-blue-400/30 rounded-lg p-4 text-left text-sm text-blue-200 shadow-inner">
+          <div className="mb-2 font-semibold text-blue-400 flex items-center gap-2">
+            <span className="material-icons text-base align-middle">article</span>
+            Văn bản trích xuất từ CCCD:
+          </div>
+          <pre className="whitespace-pre-wrap break-words select-all text-blue-100 bg-transparent p-0 m-0">{pendingOcrText}</pre>
+          <button
+            className="mt-2 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-all"
+            onClick={() => {navigator.clipboard.writeText(pendingOcrText || '')}}
+          >
+            Sao chép
+          </button>
+        </div>
       )}
     </div>
   );
