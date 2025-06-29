@@ -571,6 +571,14 @@ const Messages = () => {
     }
   };
 
+  if (!currentUserId) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div>Vui lòng đăng nhập ví để sử dụng tính năng nhắn tin.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white">
       <Navbar />
@@ -614,6 +622,12 @@ const Messages = () => {
                       </Button>
                    </div>
                 </div>
+                {/* Hiển thị thông báo nếu không có conversation */}
+                {conversations.length === 0 && !isLoading && (
+                  <div className="text-center text-gray-400 py-8">
+                    Bạn chưa có cuộc trò chuyện nào. Hãy bắt đầu chat với ai đó!
+                  </div>
+                )}
                 {/* Conversation List */}
                 <div className="overflow-y-auto h-full">
                   {isLoading ? <div className="p-4 text-center text-gray-400">Đang tải cuộc trò chuyện...</div> : 
@@ -638,7 +652,7 @@ const Messages = () => {
                           }`}>
                             <AvatarImage src={participant?.avatar} />
                             <AvatarFallback className="bg-gradient-to-br from-blue-600 to-violet-700 text-white font-semibold">
-                              {participant?.name.slice(0, 2).toUpperCase()}
+                              {(participant?.name || '').slice(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                         </div>
@@ -687,7 +701,7 @@ const Messages = () => {
                         }`}>
                           <AvatarImage src={activeParticipant?.avatar} />
                           <AvatarFallback className="bg-gradient-to-br from-blue-600 to-violet-700 text-white font-semibold">
-                            {activeParticipant?.name.slice(0, 2).toUpperCase()}
+                            {(activeParticipant?.name || '').slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       </div>
