@@ -20,7 +20,10 @@ module did_addr_profile::web3_profiles_v29 {
     const EINVALID_SIGNER_FOR_INIT: u64 = 8;
     const ECANNOT_CHANGE_DID: u64 = 9;
     const EINVALID_CCCD: u64 = 10;
-     const MAX_TRUST_SCORE: u64 = 100;
+    const EFACE_NOT_VERIFIED: u64 = 11;
+    const EFACE_NOT_REAL: u64 = 12;
+    const EFACE_DISTANCE_TOO_LARGE: u64 = 13;
+    const MAX_TRUST_SCORE: u64 = 100;
 
     const REGISTRATION_FEE: u64 = 1000;
     const UPDATE_FEE: u64 = 100;
@@ -31,14 +34,12 @@ module did_addr_profile::web3_profiles_v29 {
         cid: String,
         name: String,
         created_at: u64,
-        email: String,
-        phone: String,
-        _skills: vector<String>,
-        bio: String,
-        tax_ID : String,
-        introduction: String,
-        trust_score: u64,
-        location: String
+        face_verified: bool,
+        distance: u64, 
+        is_real: bool,
+        processing_time: u64, // ms
+        verify_message: String,
+        trust_score: u64
     }
 
     struct Profiles has key {
@@ -57,14 +58,12 @@ module did_addr_profile::web3_profiles_v29 {
         cid: String,
         name: String,
         created_at: u64,
-        email: String,
-        phone: String,
-        _skills: vector<String>,
-        bio: String,
-        tax_ID: String,
-        introduction: String,
-        trust_score: u64,
-        location: String
+        face_verified: bool,
+        distance: u64,
+        is_real: bool,
+        processing_time: u64,
+        verify_message: String,
+        trust_score: u64
     }
 
     struct ProfileUpdatedV29 has drop, store {
@@ -74,14 +73,12 @@ module did_addr_profile::web3_profiles_v29 {
         cid: String,
         name: String,
         updated_at: u64,
-        email: String,
-        phone: String,
-        _skills: vector<String>,
-        bio: String,
-        tax_ID: String,
-        introduction: String,
-        trust_score: u64,
-        location: String
+        face_verified: bool,
+        distance: u64,
+        is_real: bool,
+        processing_time: u64,
+        verify_message: String,
+        trust_score: u64
     }
 
     fun is_valid_cccd(cccd: &String): bool {
@@ -109,26 +106,20 @@ module did_addr_profile::web3_profiles_v29 {
         cccd: String,
         cid: String,
         name: String,
-        email: String,
-        phone: String,
-        _skills: vector<String>,
-        bio: String,
-        tax_ID: String,
-        introduction: String,
-        location: String
+        face_verified: bool,
+        distance: u64, // scaled by 1e6
+        is_real: bool,
+        processing_time: u64,
+        verify_message: String
     ) acquires Profiles, Events {
         let sender = signer::address_of(account);
         assert!(exists<Profiles>(@did_addr_profile), EMODULE_NOT_INITIALIZED);
         assert!(!has_profile(sender), EPROFILE_ALREADY_REGISTERED);
         assert!(is_valid_cccd(&cccd), EINVALID_CCCD);
+        assert!(face_verified, EFACE_NOT_VERIFIED);
+        assert!(is_real, EFACE_NOT_REAL);
 
         let profiles = borrow_global_mut<Profiles>(@did_addr_profile);
-
-        let tax_id_final = if (is_empty(&tax_ID)) {
-            string::utf8(b"None")
-        } else {
-            tax_ID
-        };
         let created_at = timestamp::now_seconds();
         let profile = ProfileData {
             did,
@@ -136,14 +127,12 @@ module did_addr_profile::web3_profiles_v29 {
             cid,
             name,
             created_at,
-            email,
-            phone,
-            _skills,
-            bio,
-            tax_ID: tax_id_final,
-            introduction,
-            trust_score: MAX_TRUST_SCORE,
-            location
+            face_verified,
+            distance,
+            is_real,
+            processing_time,
+            verify_message,
+            trust_score: MAX_TRUST_SCORE
         };
         table::add(&mut profiles.profiles, sender, profile);
 
@@ -158,14 +147,12 @@ module did_addr_profile::web3_profiles_v29 {
                 cid,
                 name,
                 created_at,
-                email,
-                phone,
-                _skills,
-                bio,
-                tax_ID: tax_id_final,
-                introduction,
-                trust_score: MAX_TRUST_SCORE,
-                location
+                face_verified,
+                distance,
+                is_real,
+                processing_time,
+                verify_message,
+                trust_score: MAX_TRUST_SCORE
             }
         );
     }
@@ -174,13 +161,11 @@ module did_addr_profile::web3_profiles_v29 {
         account: &signer,
         cid: String,
         name: String,
-        email: String,
-        phone: String,
-        _skills: vector<String>,
-        bio: String,
-        tax_ID: String,
-        introduction: String,
-        location: String
+        face_verified: bool,
+        distance: u64,
+        is_real: bool,
+        processing_time: u64,
+        verify_message: String
     ) acquires Profiles, Events {
         let sender = signer::address_of(account);
         assert!(exists<Profiles>(@did_addr_profile), EMODULE_NOT_INITIALIZED);
@@ -193,13 +178,11 @@ module did_addr_profile::web3_profiles_v29 {
         let old_trust_score = profile.trust_score;
         profile.cid = cid;
         profile.name = name;
-        profile.email = email;
-        profile.phone = phone;
-        profile._skills = _skills;
-        profile.bio = bio;
-        profile.tax_ID = tax_ID;
-        profile.introduction = introduction;
-        profile.location = location;
+        profile.face_verified = face_verified;
+        profile.distance = distance;
+        profile.is_real = is_real;
+        profile.processing_time = processing_time;
+        profile.verify_message = verify_message;
 
         assert!(exists<Events>(@did_addr_profile), EMODULE_NOT_INITIALIZED);
         let events = borrow_global_mut<Events>(@did_addr_profile);
@@ -212,14 +195,12 @@ module did_addr_profile::web3_profiles_v29 {
                 cid: cid,
                 name: name,
                 updated_at: timestamp::now_seconds(),
-                email: email,
-                phone: phone,
-                _skills: _skills,
-                bio: bio,
-                tax_ID: tax_ID,
-                introduction: introduction,
-                trust_score: old_trust_score,
-                location: location
+                face_verified,
+                distance,
+                is_real,
+                processing_time,
+                verify_message,
+                trust_score: old_trust_score
             }
         );
     }
@@ -290,8 +271,6 @@ module did_addr_profile::web3_profiles_v29 {
             init_events(account);
         };
     }
-
-
 
     #[view]
     public fun get_profile_by_address(addr: address): ProfileData acquires Profiles {

@@ -29,8 +29,8 @@ import {
 import Navbar from '@/components/ui2/Navbar';
 import { aptos, fetchProfileDetails, decodeCID, fetchMilestoneDetails, getMilestoneCIDs } from '@/utils/aptosUtils';
 
-const MODULE_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
-const JOBS_CONTRACT_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
+const MODULE_ADDRESS = "0x89adff5f04a2fb054a9d4765f54bb87465c9b0212e8f19326e6df4c5150bbcaf";
+const JOBS_CONTRACT_ADDRESS = "0x89adff5f04a2fb054a9d4765f54bb87465c9b0212e8f19326e6df4c5150bbcaf";
 const JOBS_MARKETPLACE_MODULE_NAME = "job_marketplace_v29";
 const PROFILE_MODULE_NAME = "web3_profiles_v29";
 
@@ -1091,10 +1091,7 @@ const Jobs = () => {
                     <Card className="min-h-[340px] flex flex-col justify-between group cursor-pointer hover:border-blue-500/50 transition-all duration-300 rounded-xl shadow-lg bg-gradient-to-br from-gray-900/70 to-gray-800/80 border border-white/10 p-6">
                       <CardHeader className="mb-2">
                         <CardTitle className="text-2xl font-bold text-blue-400 mb-1 truncate">
-                      
-                            <span>{job?.title ? job.title : `Job ID: ${job.id}`} </span>
-                            <div className='text-sm text-grey-800 my-1'>Job ID: {job.id}</div>
-                          
+                          {job?.title ? job.title : `Job ID: ${job.id}`}
                         </CardTitle>
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-gray-300 font-medium truncate">

@@ -71,18 +71,20 @@ export default function FaceVerificationSection({
         </div>
 
         <div className="ml-4">
-          <button
-            type="button"
-            onClick={onStartVerification}
-            className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
-              isFaceVerified
-                ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30 border border-green-400/30'
-                : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-400/30 hover:scale-105'
-            }`}
-          >
-            <Camera className="w-4 h-4" />
-            {isFaceVerified ? 'Xác minh lại' : 'Bắt đầu xác minh'}
-          </button>
+          {!isFaceVerified && (
+            <button
+              type="button"
+              onClick={onStartVerification}
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
+                isFaceVerified
+                  ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30 border border-green-400/30'
+                  : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-400/30 hover:scale-105'
+              }`}
+            >
+              <Camera className="w-4 h-4" />
+              {isFaceVerified ? 'Xác minh lại' : 'Bắt đầu xác minh'}
+            </button>
+          )}
         </div>
       </div>
     </div>

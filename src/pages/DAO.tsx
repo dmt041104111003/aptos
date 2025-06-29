@@ -32,7 +32,7 @@ export default function DAOPage() {
   const navigate = useNavigate();
 
   const DAO_MODULE = {
-    address: "ace43838f2177534b89771250d889882114415bbc187c3892752569a9831bba0",
+    address: "0x89adff5f04a2fb054a9d4765f54bb87465c9b0212e8f19326e6df4c5150bbcaf",
     name: "dao_vote",
   };
 

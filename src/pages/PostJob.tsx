@@ -14,7 +14,7 @@ import { Aptos, AptosConfig, Network } from "@aptos-labs/ts-sdk";
 import { Briefcase, Plus, X, Rocket } from 'lucide-react';
 import Navbar from '@/components/ui2/Navbar';
 
-const JOBS_MODULE_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
+const JOBS_MODULE_ADDRESS = "0x89adff5f04a2fb054a9d4765f54bb87465c9b0212e8f19326e6df4c5150bbcaf";
 const JOBS_MODULE_NAME = "job_marketplace_v29";
 
 const config = new AptosConfig({ network: Network.TESTNET, clientConfig: { API_KEY: "AG-LA7UZDTNF2T1Y6H1DFA6CNSGVRQSRUKSA" } });
