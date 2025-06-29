@@ -16,13 +16,15 @@ interface FaceVerificationDialogProps {
   onClose: () => void;
   onVerificationSuccess: () => void;
   userId: string;
+  onOcrExtract?: (fields: { name?: string; cccd?: string; ocrText: string }) => void;
 }
 
 export default function FaceVerificationDialog({
   isOpen,
   onClose,
   onVerificationSuccess,
-  userId
+  userId,
+  onOcrExtract
 }: FaceVerificationDialogProps) {
   const [step, setStep] = useState<FaceVerificationStep>('upload');
   const [idCardFile, setIdCardFile] = useState<File | null>(null);
@@ -30,9 +32,13 @@ export default function FaceVerificationDialog({
   const [webcamImage, setWebcamImage] = useState<string | null>(null);
   const [isWebcamActive, setIsWebcamActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [resultDetails, setResultDetails] = useState<any>(null);
+  const [ocrText, setOcrText] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -43,8 +49,24 @@ export default function FaceVerificationDialog({
       setWebcamImage(null);
       setIsWebcamActive(false);
       setError(null);
+      setIsLoading(false);
+      setResultDetails(null);
+      setOcrText(null);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     }
   }, [isOpen]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle ID card upload
   const handleIdCardUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,6 +75,10 @@ export default function FaceVerificationDialog({
       setIdCardFile(file);
       setIdCardPreview(URL.createObjectURL(file));
       setError(null);
+      setStep('upload');
+      setWebcamImage(null);
+      setIsWebcamActive(false);
+      stopWebcam();
     }
   };
 
@@ -65,21 +91,80 @@ export default function FaceVerificationDialog({
 
     setStep('verifying');
     setError(null);
+    setIsLoading(true);
+
+    // Set timeout for upload
+    timeoutRef.current = setTimeout(() => {
+      setError('❌ Hệ thống phản hồi chậm. Vui lòng thử lại.');
+      setStep('upload');
+      setIsLoading(false);
+    }, 30000); // 30 seconds timeout
 
     try {
       const result = await uploadIdCard(idCardFile, userId);
       
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
       if (result.success) {
         toast.success('Ảnh căn cước đã được tải lên thành công');
         setStep('webcam');
+        setIsLoading(false);
         startWebcam();
+        setResultDetails(result.data);
+        setOcrText(result.ocr_text || (result.data && result.data.ocr_text) || null);
+        if (typeof onOcrExtract === 'function') {
+          // Ưu tiên lấy từ backend, nếu không có thì tự lọc lại từ ocrText
+          let name = result.data?.name;
+          let cccd = result.data?.cccd;
+          const ocrText = result.data?.ocr_text || result.ocr_text || '';
+          if (!cccd) {
+            const m = ocrText.match(/\b\d{12}\b/);
+            if (m) cccd = m[0];
+          }
+          if (!name) {
+            const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            let found = false;
+            for (let i = 0; i < lines.length; ++i) {
+              if (lines[i].toLowerCase().includes('họ và tên') || lines[i].toLowerCase().includes('full name')) {
+                for (let j = i+1; j < Math.min(i+3, lines.length); ++j) {
+                  const candidate = lines[j].replace(/[^A-ZÀ-Ỹ\s]/g, '').trim();
+                  if (candidate.split(/\s+/).length >= 2) {
+                    name = candidate;
+                    found = true;
+                    break;
+                  }
+                }
+                if (found) break;
+              }
+            }
+            if (!name) {
+              const candidates = lines.filter(l => /^[A-ZÀ-Ỹ\s]{5,}$/.test(l) && !/\d/.test(l) && l.split(/\s+/).length >= 2);
+              if (candidates.length > 0) name = candidates.reduce((a, b) => a.length > b.length ? a : b);
+            }
+          }
+          onOcrExtract({ name, cccd, ocrText });
+        }
       } else {
         setError(result.message || 'Lỗi khi tải ảnh căn cước');
         setStep('upload');
+        setIsLoading(false);
+        setResultDetails(result.data);
+        setOcrText(null);
       }
     } catch (error) {
-      setError('Lỗi kết nối đến server xác minh');
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      console.error('Upload ID card error:', error);
+      setError('Lỗi kết nối đến server xác minh. Vui lòng kiểm tra kết nối mạng.');
       setStep('upload');
+      setIsLoading(false);
+      setResultDetails(null);
+      setOcrText(null);
     }
   };
 
@@ -114,6 +199,8 @@ export default function FaceVerificationDialog({
   // Retake photo
   const retakePhoto = () => {
     setWebcamImage(null);
+    setStep('webcam');
+    startWebcam();
   };
 
   // Verify face
@@ -125,25 +212,51 @@ export default function FaceVerificationDialog({
 
     setStep('verifying');
     setError(null);
+    setIsLoading(true);
+
+    // Set timeout for verification
+    timeoutRef.current = setTimeout(() => {
+      setError('Hệ thống xác minh phản hồi chậm. Vui lòng thử lại.');
+      setStep('failed');
+      setIsLoading(false);
+    }, 30000); // 30 seconds timeout
 
     try {
       const webcamFile = base64ToFile(webcamImage);
       const result = await verifyWebcamImage(webcamFile, userId);
 
-      if (result.success && result.data?.isSame) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
+      console.log('Verification result:', result); // Debug log
+
+      if (result.success) {
         setStep('success');
-        toast.success('✅ Xác minh khuôn mặt thành công!');
+        setIsLoading(false);
+        toast.success('Xác minh khuôn mặt thành công!');
         setTimeout(() => {
           onVerificationSuccess();
           onClose();
         }, 2000);
+        setResultDetails(result.data);
       } else {
         setStep('failed');
-        setError(result.message || 'Khuôn mặt không khớp hoặc ảnh giả');
+        setIsLoading(false);
+        setError(result.message || 'Xác minh thất bại. Vui lòng thử lại.');
+        setResultDetails(result.data);
       }
     } catch (error) {
-      setError('❌ Lỗi khi xác minh khuôn mặt');
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      console.error('Face verification error:', error);
+      setError('Lỗi kết nối khi xác minh khuôn mặt. Vui lòng kiểm tra kết nối mạng.');
       setStep('failed');
+      setIsLoading(false);
+      setResultDetails(null);
     }
   };
 
@@ -160,8 +273,53 @@ export default function FaceVerificationDialog({
   useEffect(() => {
     return () => {
       stopWebcam();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     };
   }, []);
+
+  // Hàm tách thông tin từ ocrText
+  function extractFieldsFromOcr(ocrText: string): { name?: string; cccd?: string } {
+    let nameMatch = ocrText.match(/Họ và tên\s*[:\-]?\s*([A-ZÀ-ỸA-Z ]+)/i);
+    let cccdMatch = ocrText.match(/Số\s*(CMND|CCCD|ID|CMT)?\s*[:\-]?\s*(\d{9,12})/i);
+    let name = nameMatch ? nameMatch[1].trim() : undefined;
+    let cccd = cccdMatch ? cccdMatch[2] : undefined;
+    // Nếu không match, thử lấy dòng in hoa dài nhất làm tên
+    if (!name) {
+      const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const upperLines = lines.filter(l => l === l.toUpperCase() && l.length > 5);
+      if (upperLines.length > 0) name = upperLines[0];
+    }
+    return { name, cccd };
+  }
+
+  // Sau khi setOcrText, tự động extract và truyền về parent nếu có onOcrExtract
+  useEffect(() => {
+    if (ocrText && typeof onOcrExtract === 'function') {
+      const fields = extractFieldsFromOcr(ocrText);
+      onOcrExtract({ ...fields, ocrText: ocrText });
+    }
+    // eslint-disable-next-line
+  }, [ocrText]);
+
+  // Log debug khi có ocrText
+  useEffect(() => {
+    if (ocrText) {
+      console.log('[DEBUG][OCR CCCD]', ocrText);
+    }
+  }, [ocrText]);
+
+  // Hàm reset về bước upload khi thử ảnh khác
+  const handleTryAnotherIdCard = () => {
+    setStep('upload');
+    setIdCardFile(null);
+    setIdCardPreview(null);
+    setWebcamImage(null);
+    setIsWebcamActive(false);
+    setError(null);
+    stopWebcam();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -237,7 +395,7 @@ export default function FaceVerificationDialog({
                   </ul>
                 </div>
                 
-                <div className="border-2 border-dashed border-blue-400/50 rounded-xl p-8 text-center hover:border-blue-400/70 transition-colors">
+                <div className="text-center">
                   <input
                     type="file"
                     accept="image/*"
@@ -282,10 +440,15 @@ export default function FaceVerificationDialog({
 
                 <Button 
                   onClick={handleSubmitIdCard}
-                  disabled={!idCardFile}
-                  className="w-full py-3 text-lg font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!idCardFile || isLoading}
+                  className="w-full py-4 text-lg font-bold rounded-xl bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {!idCardFile ? 'Vui lòng chọn ảnh trước' : 'Tiếp tục → Bước 2'}
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Đang tải lên...
+                    </>
+                  ) : (!idCardFile ? 'Vui lòng chọn ảnh trước' : 'Tiếp tục → Bước 2')}
                 </Button>
               </CardContent>
             </Card>
@@ -304,7 +467,7 @@ export default function FaceVerificationDialog({
               </CardHeader>
               <CardContent className="space-y-6 p-6">
                 <div className="bg-blue-500/5 border border-blue-400/20 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-400 mb-2">📸 Hướng dẫn chụp ảnh:</h4>
+                  <h4 className="font-medium text-blue-400 mb-2">Hướng dẫn chụp ảnh:</h4>
                   <ul className="text-sm text-gray-300 space-y-1">
                     <li>• Đặt khuôn mặt vào khung hình</li>
                     <li>• Đảm bảo ánh sáng đủ sáng</li>
@@ -313,7 +476,7 @@ export default function FaceVerificationDialog({
                   </ul>
                 </div>
 
-                <div className="relative bg-black rounded-xl overflow-hidden">
+                <div className="text-center">
                   {!webcamImage ? (
                     <div className="relative">
                       <video
@@ -335,13 +498,13 @@ export default function FaceVerificationDialog({
                   <canvas ref={canvasRef} className="hidden" />
                 </div>
 
-                <div className="flex gap-4 justify-center">
+                <div className="flex justify-center gap-4">
                   {!webcamImage ? (
                     <Button 
                       onClick={capturePhoto} 
-                      className="px-8 py-3 text-lg font-medium bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
+                      className="px-10 py-4 text-lg font-bold rounded-xl bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 shadow-lg flex items-center gap-2 transition-all duration-200"
                     >
-                      <Camera className="w-5 h-5" />
+                      <Camera className="w-6 h-6" />
                       Chụp ảnh
                     </Button>
                   ) : (
@@ -349,17 +512,28 @@ export default function FaceVerificationDialog({
                       <Button 
                         variant="outline" 
                         onClick={retakePhoto}
-                        className="px-6 py-3 text-lg font-medium border-blue-400/30 text-blue-400 hover:bg-blue-400/10 flex items-center gap-2"
+                        disabled={isLoading}
+                        className="px-8 py-4 text-lg font-bold rounded-xl border-blue-400/50 text-blue-400 hover:bg-blue-400/10 shadow-md flex items-center gap-2 transition-all duration-200"
                       >
-                        <RotateCcw className="w-5 h-5" />
+                        <RotateCcw className="w-6 h-6" />
                         Chụp lại
                       </Button>
                       <Button 
                         onClick={verifyFace}
-                        className="px-8 py-3 text-lg font-medium bg-green-600 hover:bg-green-700 flex items-center gap-2"
+                        disabled={isLoading}
+                        className="px-10 py-4 text-lg font-bold rounded-xl bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800 shadow-lg flex items-center gap-2 transition-all duration-200"
                       >
-                        <CheckCircle className="w-5 h-5" />
-                        Xác minh ngay
+                        {isLoading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            Đang xác minh...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-6 h-6" />
+                            Xác minh ngay
+                          </>
+                        )}
                       </Button>
                     </>
                   )}
@@ -390,6 +564,9 @@ export default function FaceVerificationDialog({
                   <p className="text-gray-400">
                     Đang so sánh khuôn mặt với ảnh căn cước và kiểm tra tính xác thực
                   </p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Vui lòng đợi trong giây lát...
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -417,6 +594,21 @@ export default function FaceVerificationDialog({
                   <p className="text-sm text-gray-400 mt-2">
                     Bạn có thể tiếp tục đăng ký hoặc cập nhật hồ sơ.
                   </p>
+                  {resultDetails && (
+                    <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-gray-900/80 to-gray-800/80 shadow-inner text-xs text-white space-y-2">
+                      <div><b>Distance:</b> <span className="text-yellow-300">{resultDetails.distance}</span></div>
+                      <div><b>Anti-spoof:</b> <span className={resultDetails.is_real ? 'text-green-400' : 'text-red-400'}>{resultDetails.is_real ? 'Thật' : 'Giả'}</span></div>
+                      <div><b>Thời gian xử lý:</b> <span className="text-blue-300">{resultDetails.processing_time?.toFixed(3)}s</span></div>
+                      <details>
+                        <summary className="cursor-pointer text-blue-200">Embedding Card</summary>
+                        <div className="break-all text-gray-300">{JSON.stringify(resultDetails.embedding_card)}</div>
+                      </details>
+                      <details>
+                        <summary className="cursor-pointer text-blue-200">Embedding Webcam</summary>
+                        <div className="break-all text-gray-300">{JSON.stringify(resultDetails.embedding_webcam)}</div>
+                      </details>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -436,16 +628,29 @@ export default function FaceVerificationDialog({
                   <p className="text-gray-300 text-lg mb-4">
                     {error || 'Khuôn mặt không khớp hoặc ảnh giả. Vui lòng thử lại.'}
                   </p>
+                  {resultDetails && (
+                    <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-gray-900/80 to-gray-800/80 shadow-inner text-xs text-white space-y-2">
+                      <div><b>Distance:</b> <span className="text-yellow-300">{resultDetails.distance}</span></div>
+                      <div><b>Anti-spoof:</b> <span className={resultDetails.is_real ? 'text-green-400' : 'text-red-400'}>{resultDetails.is_real ? 'Thật' : 'Giả'}</span></div>
+                      <div><b>Thời gian xử lý:</b> <span className="text-blue-300">{resultDetails.processing_time?.toFixed(3)}s</span></div>
+                      <details>
+                        <summary className="cursor-pointer text-blue-200">Embedding Card</summary>
+                        <div className="break-all text-gray-300">{JSON.stringify(resultDetails.embedding_card)}</div>
+                      </details>
+                      <details>
+                        <summary className="cursor-pointer text-blue-200">Embedding Webcam</summary>
+                        <div className="break-all text-gray-300">{JSON.stringify(resultDetails.embedding_webcam)}</div>
+                      </details>
+                    </div>
+                  )}
                   <div className="space-y-3">
                     <Button 
-                      onClick={() => {
-                        setStep('webcam');
-                        setError(null);
-                        setWebcamImage(null);
-                      }}
-                      variant="outline"
-                      className="px-6 py-3 text-lg font-medium border-red-400/30 text-red-400 hover:bg-red-400/10"
+                      onClick={handleTryAnotherIdCard}
+                      variant="destructive"
+                      type="button"
+                      className="px-8 py-4 text-lg font-bold rounded-xl flex items-center gap-2"
                     >
+                      <RotateCcw className="w-6 h-6" />
                       Thử lại với ảnh khác
                     </Button>
                     <Button 
@@ -455,10 +660,13 @@ export default function FaceVerificationDialog({
                         setIdCardFile(null);
                         setIdCardPreview(null);
                         setWebcamImage(null);
+                        setIsLoading(false);
+                        setResultDetails(null);
                       }}
                       variant="outline"
-                      className="px-6 py-3 text-lg font-medium border-blue-400/30 text-blue-400 hover:bg-blue-400/10"
+                      className="px-8 py-4 text-lg font-bold rounded-xl border-blue-400/50 text-blue-400 hover:bg-blue-400/10 shadow-md transition-all duration-200"
                     >
+                      <Upload className="w-6 h-6" />
                       Thay đổi ảnh căn cước
                     </Button>
                   </div>

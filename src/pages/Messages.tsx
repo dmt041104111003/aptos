@@ -72,7 +72,7 @@ interface Message {
   recalledBy?: string;
 }
 
-const MODULE_ADDRESS = "0xabec4e453af5c908c5d7f0b7b59931dd204e2bc5807de364629b4e32eb5fafea";
+const MODULE_ADDRESS = "0x496087ca0e9e97ac4edb6e554ab6eca842cdaebd6648cb2ac8f057b3411e8d39";
 const PROFILE_MODULE_NAME = "web3_profiles_v29";
 
 const Messages = () => {

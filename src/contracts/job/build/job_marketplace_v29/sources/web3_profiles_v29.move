@@ -20,6 +20,9 @@ module did_addr_profile::web3_profiles_v29 {
     const EINVALID_SIGNER_FOR_INIT: u64 = 8;
     const ECANNOT_CHANGE_DID: u64 = 9;
     const EINVALID_CCCD: u64 = 10;
+    const EFACE_NOT_VERIFIED: u64 = 11;
+    const EFACE_NOT_REAL: u64 = 12;
+    const EFACE_DISTANCE_TOO_LARGE: u64 = 13;
 
     const REGISTRATION_FEE: u64 = 1000;
     const UPDATE_FEE: u64 = 100;
@@ -29,7 +32,12 @@ module did_addr_profile::web3_profiles_v29 {
         cccd: String,
         cid: String,
         name: String,
-        created_at: u64
+        created_at: u64,
+        face_verified: bool,
+        distance: u64, 
+        is_real: bool,
+        processing_time: u64, // ms
+        verify_message: String
     }
 
     struct Profiles has key {
@@ -78,12 +86,20 @@ module did_addr_profile::web3_profiles_v29 {
         did: String,
         cccd: String,
         cid: String,
-        name: String
+        name: String,
+        face_verified: bool,
+        distance: u64, // scaled by 1e6
+        is_real: bool,
+        processing_time: u64,
+        verify_message: String
     ) acquires Profiles, Events {
         let sender = signer::address_of(account);
         assert!(exists<Profiles>(@did_addr_profile), EMODULE_NOT_INITIALIZED);
         assert!(!has_profile(sender), EPROFILE_ALREADY_REGISTERED);
         assert!(is_valid_cccd(&cccd), EINVALID_CCCD);
+        assert!(face_verified, EFACE_NOT_VERIFIED);
+        assert!(is_real, EFACE_NOT_REAL);
+     //   assert!(distance <= 650000, EFACE_DISTANCE_TOO_LARGE);
 
         let profiles = borrow_global_mut<Profiles>(@did_addr_profile);
         let profile = ProfileData {
@@ -91,7 +107,12 @@ module did_addr_profile::web3_profiles_v29 {
             cccd,
             cid,
             name,
-            created_at: timestamp::now_seconds()
+            created_at: timestamp::now_seconds(),
+            face_verified,
+            distance,
+            is_real,
+            processing_time,
+            verify_message
         };
         table::add(&mut profiles.profiles, sender, profile);
 

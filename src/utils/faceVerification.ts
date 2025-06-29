@@ -1,11 +1,12 @@
 // Utility functions for face verification API calls
 
-const FACE_VERIFICATION_API = import.meta.env.VITE_FACE_API_URL || 'http://localhost:5000';
+const FACE_VERIFICATION_API = import.meta.env.VITE_FACE_API_URL || 'http://127.0.0.1:5000';
 
 export interface FaceVerificationResponse {
   success: boolean;
   message?: string;
   data?: any;
+  ocr_text?: string;
 }
 
 /**
@@ -26,13 +27,14 @@ export const uploadIdCard = async (idCardFile: File, userId: string): Promise<Fa
       return {
         success: true,
         message: data.message || 'ID card uploaded successfully',
-        data
+        data,
+        ocr_text: data.ocr_text || ''
       };
     } else {
-      const errorData = await response.json();
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
       return {
         success: false,
-        message: errorData.message || 'Failed to upload ID card'
+        message: errorData.message || `Failed to upload ID card (${response.status})`
       };
     }
   } catch (error) {
@@ -58,16 +60,26 @@ export const verifyWebcamImage = async (webcamFile: File, userId: string): Promi
     });
 
     if (response.ok) {
-      const isSame = await response.json();
+      const responseData = await response.json();
+      // Trả về đầy đủ các trường backend trả về
       return {
-        success: true,
-        message: isSame ? 'Face verification successful' : 'Face verification failed',
-        data: { isSame }
+        success: responseData.success,
+        message: responseData.message,
+        data: {
+          distance: responseData.distance,
+          is_real: responseData.is_real,
+          embedding_card: responseData.embedding_card,
+          embedding_webcam: responseData.embedding_webcam,
+          processing_time: responseData.processing_time,
+          verify_message: responseData.message,
+          face_verified: responseData.success,
+        }
       };
     } else {
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
       return {
         success: false,
-        message: 'Failed to verify webcam image'
+        message: errorData.message || `Failed to verify webcam image (${response.status})`
       };
     }
   } catch (error) {
