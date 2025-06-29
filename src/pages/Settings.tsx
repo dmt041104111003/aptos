@@ -334,9 +334,9 @@ export default function Settings() {
                           name="name"
                           value={profile.name}
                           onChange={handleChange}
-                          readOnly={isProfileExistInState}
-                          disabled={isProfileExistInState || uploading}
-                          className={`w-full px-3 py-2 border rounded-md mt-1 font-primary ${isProfileExistInState ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50'}`}
+                          readOnly
+                          disabled
+                          className="w-full px-3 py-2 border rounded-md mt-1 font-primary bg-gray-700/50 cursor-not-allowed text-gray-400"
                         />
                       </label>
                     </div>
@@ -351,9 +351,9 @@ export default function Settings() {
                             const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
                             setCccdInput(value);
                           }}
-                          readOnly={isProfileExistInState}
-                          disabled={isProfileExistInState}
-                          className={`w-full px-3 py-2 border rounded-md mt-1 font-primary ${isProfileExistInState ? 'bg-gray-700/50 cursor-not-allowed text-gray-400' : 'bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-blue-500/50'}`}
+                          readOnly
+                          disabled
+                          className="w-full px-3 py-2 border rounded-md mt-1 font-primary bg-gray-700/50 cursor-not-allowed text-gray-400"
                           placeholder="Nhập số CCCD của bạn"
                         />
                       </label>
