@@ -60,28 +60,12 @@ export default function Profile() {
           },
         });
         setProfile(profileDataFromChain as ProfileDataFromChain);
+        setTrustScore(profileDataFromChain.trust_score);
       } catch (err) {
         setProfile(null);
       }
     };
     fetchProfile();
-
-    // Fetch trust_score from contract
-    const fetchTrustScore = async () => {
-      if (!address) return;
-      try {
-        const result = await aptos.view({
-          payload: {
-            function: `${MODULE_ADDRESS}::${MODULE_NAME}::get_trust_score_by_address`,
-            functionArguments: [address],
-          },
-        });
-        setTrustScore(Number(result[0]));
-      } catch (err) {
-        setTrustScore(null);
-      }
-    };
-    fetchTrustScore();
   }, [address]);
 
   return (
