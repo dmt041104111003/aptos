@@ -49,6 +49,7 @@ export default function Settings() {
   const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
   const [skills, setSkills] = useState<string[]>([]);
   const [cccdInput, setCccdInput] = useState(savedProfile.cccd ? savedProfile.cccd.toString() : "");
+  const [cccdError, setCccdError] = useState<string>("");
 
   // Face verification states
   const [showFaceVerification, setShowFaceVerification] = useState(false);
@@ -148,6 +149,16 @@ export default function Settings() {
     e.preventDefault();
     if (accountType !== 'aptos' || !window.aptos || !account) {
       setStatus({ type: 'error', message: 'Vui lòng kết nối ví Aptos để lưu hồ sơ.' });
+      return;
+    }
+
+    // Validate CCCD - must be exactly 12 digits
+    if (cccdInput.length !== 12) {
+      setCccdError("Số CCCD phải có đúng 12 chữ số");
+      setStatus({ type: 'error', message: 'Số CCCD không hợp lệ. Vui lòng xác minh lại khuôn mặt để lấy thông tin chính xác.' });
+      // Tự động mở lại dialog xác minh khuôn mặt
+      setPendingAction('register');
+      setShowFaceVerification(true);
       return;
     }
 
@@ -258,6 +269,20 @@ export default function Settings() {
   const handleOcrExtract = (fields: { name?: string; cccd?: string }, ocrText?: string) => {
     setPendingOcrFields(fields);
     if (ocrText) setPendingOcrText(ocrText);
+    
+    // Validate CCCD from OCR if present
+    if (fields.cccd) {
+      const cccdValue = fields.cccd.replace(/[^0-9]/g, '');
+      if (cccdValue.length !== 12) {
+        setCccdError("Số CCCD từ OCR không hợp lệ (phải có đúng 12 chữ số)");
+        setStatus({ type: 'error', message: 'Số CCCD từ OCR không hợp lệ. Vui lòng xác minh lại khuôn mặt.' });
+        // Tự động mở lại dialog xác minh khuôn mặt
+        setPendingAction('register');
+        setShowFaceVerification(true);
+      } else {
+        setCccdError("");
+      }
+    }
   };
 
   // Khi xác minh thành công, cập nhật profile.face_verified = true
@@ -277,7 +302,16 @@ export default function Settings() {
     
     if (pendingOcrFields) {
       if (pendingOcrFields.name) setProfile(prev => ({ ...prev, name: pendingOcrFields.name }));
-      if (pendingOcrFields.cccd) setCccdInput(pendingOcrFields.cccd);
+      if (pendingOcrFields.cccd) {
+        const cccdValue = pendingOcrFields.cccd.replace(/[^0-9]/g, '');
+        setCccdInput(cccdValue);
+        // Validate CCCD length
+        if (cccdValue.length !== 12) {
+          setCccdError("Số CCCD từ OCR không hợp lệ (phải có đúng 12 chữ số)");
+        } else {
+          setCccdError("");
+        }
+      }
     }
     
     // Auto-save profile after successful verification
@@ -398,6 +432,14 @@ export default function Settings() {
                           onChange={e => {
                             const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 12);
                             setCccdInput(value);
+                            // Clear error when user starts typing
+                            if (cccdError) setCccdError("");
+                            // Validate CCCD length
+                            if (value.length > 0 && value.length !== 12) {
+                              setCccdError("Số CCCD phải có đúng 12 chữ số");
+                            } else {
+                              setCccdError("");
+                            }
                           }}
                           readOnly
                           disabled
@@ -405,6 +447,12 @@ export default function Settings() {
                           placeholder="Nhập số CCCD của bạn"
                         />
                       </label>
+                      {cccdError && (
+                        <div className="text-red-400 text-xs mt-1 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {cccdError}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-white mb-1 font-primary">

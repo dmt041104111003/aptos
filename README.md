@@ -9,13 +9,15 @@
 
 ## Project Overview
 
-APT-UTC is a next-generation decentralized freelance platform built on the Aptos blockchain, now enhanced with advanced AI-powered face anti-spoofing verification. The platform ensures that all users are real people, not bots or deepfakes, by leveraging state-of-the-art facial recognition and anti-spoofing models that can be retrained with new data for continuous improvement.
+APT-UTC is a next-generation decentralized freelance platform built on the Aptos blockchain, now enhanced with advanced AI-powered face anti-spoofing verification, **DAO governance system**, and **dynamic trust scoring mechanism**. The platform ensures that all users are real people, not bots or deepfakes, by leveraging state-of-the-art facial recognition and anti-spoofing models that can be retrained with new data for continuous improvement.
 
 **Key strengths:**
 - **AI Face Anti-Spoofing Verification:** Prevents fake profiles and deepfakes using deep learning (PyTorch, dlib, OpenCV) and allows retraining the model with new data to adapt to evolving threats.
-- **On-Chain Security & Transparency:** All job, milestone, and transaction data is stored directly on-chain, ensuring immutability and eliminating third-party risks.
-- **Fully Automated, Trustless Workflow:** Escrow, milestone management, fund distribution, and dispute resolution are all governed by smart contracts, removing the need for intermediaries.
-- **Modern Web3 Experience:** Combines identity verification, real-time chat, decentralized file storage (IPFS), and seamless Aptos wallet integration for a frictionless user journey.
+- **DAO Governance System:** Community-driven decision making with voting mechanisms for platform upgrades, fee structures, and dispute resolutions.
+- **Dynamic Trust Score System:** Real-time reputation scoring based on job completion, client feedback, and community voting, ensuring quality and reliability.
+- **On-Chain Security & Transparency:** All job, milestone, DAO proposals, votes, and transaction data is stored directly on-chain, ensuring immutability and eliminating third-party risks.
+- **Fully Automated, Trustless Workflow:** Escrow, milestone management, fund distribution, DAO voting, and dispute resolution are all governed by smart contracts, removing the need for intermediaries.
+- **Modern Web3 Experience:** Combines identity verification, real-time chat, decentralized file storage (IPFS), DAO participation, and seamless Aptos wallet integration for a frictionless user journey.
 
 ## Unique Project Highlights
 
@@ -23,18 +25,29 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
   - Uses deep learning to distinguish real faces from spoofed or deepfake images.
   - Supports **retraining the AI model** with new datasets for improved accuracy and adaptability.
   - Integrates OCR to extract and match identity information from official documents.
+- **Decentralized Autonomous Organization (DAO):**
+  - **Community Governance:** Users can propose and vote on platform improvements, fee structures, and policy changes.
+  - **Transparent Voting:** All proposals and votes are recorded on-chain with immutable history.
+  - **Stakeholder Participation:** Trust score and job completion history determine voting power.
+  - **Automated Execution:** Approved proposals are automatically executed by smart contracts.
+- **Dynamic Trust Score & Reputation System:**
+  - **Real-time Scoring:** Trust scores update based on job completion, client feedback, and community voting.
+  - **Quality Assurance:** Higher trust scores unlock premium features and better job matching.
+  - **Anti-Gaming Protection:** Sophisticated algorithms prevent manipulation of the trust system.
+  - **Community-Driven:** Users can vote on trust score adjustments for exceptional or problematic behavior.
 - **Comprehensive On-Chain Data Management:**
-  - Not just NFTs—every job, milestone, escrow, and event state is stored directly on the Aptos blockchain.
-  - All actions (job posting, applying, submitting, accepting, withdrawing, canceling, etc.) are on-chain transactions, not just message signing.
+  - Not just NFTs—every job, milestone, escrow, DAO proposal, vote, and event state is stored directly on the Aptos blockchain.
+  - All actions (job posting, applying, submitting, accepting, withdrawing, canceling, voting, proposing, etc.) are on-chain transactions, not just message signing.
 - **Security & Transparency:**
   - Data is tamper-proof and not reliant on centralized servers.
-  - Escrow, fund splitting, and dispute handling are fully automated and transparent.
-- **DeFi-Ready Architecture:**
+  - Escrow, fund splitting, DAO governance, and dispute handling are fully automated and transparent.
+- **Ready Architecture:**
   - Escrowed funds can be deployed into DeFi protocols to generate yield and share profits with stakeholders.
+  - DAO can vote on yield distribution strategies and DeFi integrations.
 - **Modern User Experience:**
-  - Real-time chat, notifications, profile management, Aptos wallet integration, and decentralized file storage.
+  - Real-time chat, notifications, profile management, DAO participation, trust score tracking, Aptos wallet integration, and decentralized file storage.
 
-> **APT-UTC is more than a freelance platform—it's a secure, AI-driven identity verification and anti-fraud solution for the Web3 community, powered by blockchain and advanced machine learning.**
+> **APT-UTC is more than a freelance platform—it's a secure, AI-driven identity verification, community-governed, and reputation-based solution for the Web3 community, powered by blockchain, advanced machine learning, and decentralized governance.**
 
 ## Key Features
 
@@ -42,17 +55,28 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
   - Advanced anti-spoofing (deepfake/fake prevention) using PyTorch, dlib, OpenCV.
   - Retrainable model for continuous improvement and adaptability.
   - OCR extraction and face matching with ID documents.
+- **DAO Governance System:**
+  - **Proposal Creation:** Users can submit proposals for platform improvements.
+  - **Voting Mechanism:** Weighted voting based on trust score and activity.
+  - **Execution Engine:** Smart contracts automatically execute approved proposals.
+  - **Transparency:** All governance activities are publicly verifiable on-chain.
+- **Dynamic Trust Score System:**
+  - **Multi-factor Scoring:** Based on job completion rate, client satisfaction, community feedback.
+  - **Real-time Updates:** Scores adjust immediately after job completion or community voting.
+  - **Feature Unlocking:** Higher scores unlock premium features and better job matching.
+  - **Anti-manipulation:** Advanced algorithms prevent gaming of the reputation system.
 - **On-Chain Job & Milestone Management:**
-  - All job, milestone, escrow, and event data is stored directly on the Aptos blockchain.
-  - Every action (job posting, applying, submitting, accepting, withdrawing, canceling, etc.) is an on-chain transaction.
+  - All job, milestone, escrow, DAO proposals, votes, and event data is stored directly on the Aptos blockchain.
+  - Every action (job posting, applying, submitting, accepting, withdrawing, canceling, voting, proposing, etc.) is an on-chain transaction.
 - **Trustless, Automated Escrow:**
-  - Smart contracts handle all fund flows, milestone approvals, and dispute resolution—no intermediaries needed.
+  - Smart contracts handle all fund flows, milestone approvals, DAO governance, and dispute resolution—no intermediaries needed.
 - **Real-Time Communication:**
   - Integrated chat, notifications, and user presence for seamless collaboration.
-- **DeFi-Ready:**
+- **Ready:**
   - Escrowed funds can generate yield via DeFi protocols, with profit sharing for stakeholders.
+  - DAO votes on yield distribution and DeFi strategy.
 - **Modern Web3 UX:**
-  - Decentralized identity, Aptos wallet integration, IPFS file storage, and a responsive, user-friendly interface.
+  - Decentralized identity, Aptos wallet integration, IPFS file storage, DAO participation, trust score tracking, and a responsive, user-friendly interface.
 
 ## Visual Overview
 
@@ -127,7 +151,7 @@ aptos/
 ├── public/                  # Static assets (logo, videos, etc.)
 ├── src/                     # Frontend source code (React, TypeScript)
 │   ├── components/          # Reusable UI components
-│   ├── pages/               # Page components (Dashboard, Jobs, Messages, etc.)
+│   ├── pages/               # Page components (Dashboard, Jobs, Messages, DAO, etc.)
 │   ├── context/             # React contexts (Wallet, Profile)
 │   ├── hooks/               # Custom React hooks
 │   ├── utils/               # Utility functions (Aptos, IPFS, face verification, etc.)
@@ -136,7 +160,8 @@ aptos/
 │       └── job/
 │           └── sources/
 │               ├── job.move              # Job marketplace contract
-│               └── Web3WorkProfiles.move # User profiles contract
+│               ├── DAO.move              # DAO governance contract
+│               └── Web3WorkProfiles.move # User profiles & trust score contract
 │
 ├── Face/                    # AI Face Verification backend (Python)
 │   └── Face_to_Fake_Real/
@@ -156,20 +181,3 @@ aptos/
 └── README.md                            # Project documentation
 ```
 
-## Getting Started
-
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-- Aptos wallet (Petra recommended)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd aptos
-   ```
-
-2. **Install dependencies**
-   ```
