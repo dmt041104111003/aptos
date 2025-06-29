@@ -46,7 +46,7 @@ export default function Profile() {
       try {
         const registryResource = await aptos.getAccountResource({
           accountAddress: MODULE_ADDRESS,
-          resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME}`,
+          resourceType: ${MODULE_ADDRESS}::${MODULE_NAME}::${RESOURCE_NAME},
         });
         if (!registryResource) return;
         const profiles = registryResource.profiles;
@@ -55,33 +55,17 @@ export default function Profile() {
           handle: profiles.handle,
           data: {
             key_type: "address",
-            value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::ProfileData`,
+            value_type: ${MODULE_ADDRESS}::${MODULE_NAME}::ProfileData,
             key: address,
           },
         });
         setProfile(profileDataFromChain as ProfileDataFromChain);
+        setTrustScore(profileDataFromChain.trust_score);
       } catch (err) {
         setProfile(null);
       }
     };
     fetchProfile();
-
-    // Fetch trust_score from contract
-    const fetchTrustScore = async () => {
-      if (!address) return;
-      try {
-        const result = await aptos.view({
-          payload: {
-            function: `${MODULE_ADDRESS}::${MODULE_NAME}::get_trust_score_by_address`,
-            functionArguments: [address],
-          },
-        });
-        setTrustScore(Number(result[0]));
-      } catch (err) {
-        setTrustScore(null);
-      }
-    };
-    fetchTrustScore();
   }, [address]);
 
   return (
@@ -118,7 +102,7 @@ export default function Profile() {
               <div className="w-full h-4 bg-gray-800 rounded-full mt-2 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-blue-400 to-green-400 transition-all duration-500"
-                  style={{ width: `${Math.min(trustScore ?? 0, 100)}%` }}
+                  style={{ width: ${Math.min(trustScore ?? 0, 100)}% }}
                 ></div>
               </div>
               {trustScore !== null && trustScore >= 80 && (
