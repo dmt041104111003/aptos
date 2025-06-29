@@ -21,6 +21,8 @@ interface ProfileDataFromChain {
   embedding_webcam?: string;
   processing_time?: number;
   verify_message?: string;
+  bio?: string;
+  profilePic?: string;
 }
 
 const MODULE_ADDRESS = "0x496087ca0e9e97ac4edb6e554ab6eca842cdaebd6648cb2ac8f057b3411e8d39";
@@ -102,7 +104,17 @@ export default function Settings() {
           ...prev,
           did: profileDataFromChain.did,
           name: profileDataFromChain.name,
+          face_verified: profileDataFromChain.face_verified,
+          distance: profileDataFromChain.distance,
+          is_real: profileDataFromChain.is_real,
+          processing_time: profileDataFromChain.processing_time,
+          verify_message: profileDataFromChain.verify_message,
         }));
+        
+        // Nếu đã verified từ blockchain thì set isFaceVerified = true
+        if (profileDataFromChain.face_verified) {
+          setIsFaceVerified(true);
+        }
       } catch (error: any) {
         setIsProfileExistInState(false);
         setCccd('');
@@ -140,14 +152,15 @@ export default function Settings() {
     }
 
     // Check if face verification is required
-    if (!isProfileExistInState && !isFaceVerified) {
+    // Chỉ yêu cầu xác minh nếu chưa có profile hoặc chưa verified
+    if (!isProfileExistInState && !profile.face_verified) {
       setPendingAction('register');
       setShowFaceVerification(true);
       return;
     }
 
-    // If updating profile and not verified recently, require verification
-    if (isProfileExistInState && !isFaceVerified) {
+    // If updating profile and not verified, require verification
+    if (isProfileExistInState && !profile.face_verified) {
       setPendingAction('update');
       setShowFaceVerification(true);
       return;
@@ -175,13 +188,33 @@ export default function Settings() {
       };
 
       const cid = await uploadJSONToIPFS(profileData);
+      const args = isProfileExistInState
+        ? [
+            cid,
+            profile.name,
+            profile.face_verified ?? false,
+            profile.distance ?? 0,
+            profile.is_real ?? false,
+            profile.processing_time ?? 0,
+            profile.verify_message ?? ""
+          ]
+        : [
+            `did:aptos:${account}`,
+            cccdInput,
+            cid,
+            profile.name,
+            profile.face_verified ?? false,
+            profile.distance ?? 0,
+            profile.is_real ?? false,
+            profile.processing_time ?? 0,
+            profile.verify_message ?? ""
+          ];
+
       const payload = {
         type: "entry_function_payload",
         function: `${import.meta.env.VITE_MODULE_ADDRESS}::${MODULE_NAME}::${isProfileExistInState ? 'update_profile' : 'register_profile'}`,
         type_arguments: [],
-        arguments: isProfileExistInState 
-          ? [cid, profile.name] 
-          : [`did:aptos:${account}`, cccdInput, cid, profile.name],
+        arguments: args,
       };
 
       const txnHash = await window.aptos.signAndSubmitTransaction(payload);
@@ -196,6 +229,9 @@ export default function Settings() {
       updateProfile({
         ...profileData,
         profile_cid: cid,
+        bio: profile.bio || "",
+        wallet: account || "",
+        cccd: Number(profile.cccd) || 0,
       });
 
       setStatus({ 
@@ -224,14 +260,26 @@ export default function Settings() {
     if (ocrText) setPendingOcrText(ocrText);
   };
 
-  // Khi xác minh thành công, mới tự động điền
+  // Khi xác minh thành công, cập nhật profile.face_verified = true
   const handleFaceVerificationSuccess = () => {
     setIsFaceVerified(true);
     setShowFaceVerification(false);
+    
+    // Cập nhật đầy đủ thông tin xác thực khuôn mặt vào state
+    setProfile(prev => ({
+      ...prev,
+      face_verified: true,
+      distance: 0, // Sẽ được cập nhật từ backend
+      is_real: true, // Sẽ được cập nhật từ backend
+      processing_time: 0, // Sẽ được cập nhật từ backend
+      verify_message: "Xác thực thành công"
+    }));
+    
     if (pendingOcrFields) {
       if (pendingOcrFields.name) setProfile(prev => ({ ...prev, name: pendingOcrFields.name }));
       if (pendingOcrFields.cccd) setCccdInput(pendingOcrFields.cccd);
     }
+    
     // Auto-save profile after successful verification
     if (pendingAction) {
       saveProfile();
