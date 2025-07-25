@@ -96,22 +96,6 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
 
 *Above: Project logo and a demo of AI-powered face verification in action.*
 
----
-
-## Links
-
-- [Project Homepage](https://github.com/your-org/aptos)  
-- [Aptos Documentation](https://aptos.dev/)
-- [Move Language](https://move-language.github.io/move/)
-- [PyTorch](https://pytorch.org/)
-- [OpenCV](https://opencv.org/)
-- [dlib](http://dlib.net/)
-- [Flask](https://flask.palletsprojects.com/)
-- [Docker](https://www.docker.com/)
-- [Firebase](https://firebase.google.com/docs)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Pinata (IPFS)](https://www.pinata.cloud/)
-- [Petra Wallet](https://petra.app/)
 
 ## Technology Stack
 
@@ -171,42 +155,6 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
 - **Autoprefixer** - CSS vendor prefixing
 - **Docker** - Containerization for AI services
 
-## Project Structure
-
-```
-aptos/
-├── public/                  # Static assets (logo, videos, etc.)
-├── src/                     # Frontend source code (React, TypeScript)
-│   ├── components/          # Reusable UI components
-│   ├── pages/               # Page components (Dashboard, Jobs, Messages, DAO, etc.)
-│   ├── context/             # React contexts (Wallet, Profile)
-│   ├── hooks/               # Custom React hooks
-│   ├── utils/               # Utility functions (Aptos, IPFS, face verification, etc.)
-│   ├── lib/                 # Library configurations (Firebase, etc.)
-│   └── contracts/           # Move smart contracts
-│       └── job/
-│           └── sources/
-│               ├── job.move              # Job marketplace contract
-│               ├── DAO.move              # DAO governance contract
-│               └── Web3WorkProfiles.move # User profiles & trust score contract
-│
-├── Face/                    # AI Face Verification backend (Python)
-│   └── Face_to_Fake_Real/
-│       ├── Code/            # Python source code (Flask API, training, inference)
-│       │   ├── apiCall_Fake_Real.py     # Flask API for face verification
-│       │   ├── train_main.py, train.py  # Model training scripts
-│       │   ├── test.py, anti_spoof_predict.py # Inference scripts
-│       │   ├── requirements.txt         # Python dependencies
-│       │   ├── Dockerfile               # Docker build file
-│       │   └── ...                      # Other supporting scripts
-│       ├── resources/       # Pretrained models, detection configs
-│       │   ├── anti_spoof_models/       # Anti-spoofing model weights (.pth)
-│       │   └── detection_model/         # Face detection models (Caffe, prototxt)
-│       └── saved_logs/      # Training logs (optional)
-│
-├── package.json, vite.config.ts, ...    # Frontend config files
-└── README.md                            # Project documentation
-```
 ### Top contributors build web:
 <a href="https://github.com/dmt041104111003/aptos/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dmt041104111003/aptos" alt="contrib.rocks image" />
