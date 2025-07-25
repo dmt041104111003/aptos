@@ -1,3 +1,5 @@
+<div align="center">
+  
 # APT-UTC: Decentralized Talent Marketplace on Aptos
 
 [![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
@@ -6,6 +8,8 @@
 [![Aptos](https://img.shields.io/badge/Aptos-SDK-2.0.1-green.svg)](https://aptos.dev/)
 [![Firebase](https://img.shields.io/badge/Firebase-11.9.1-orange.svg)](https://firebase.google.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4.11-38B2AC.svg)](https://tailwindcss.com/)
+
+</div>
 
 ## Project Overview
 
@@ -88,10 +92,6 @@ APT-UTC is a next-generation decentralized freelance platform built on the Aptos
 
 <p align="center">
   <img src="public/logo/logo.png" alt="APT-UTC Logo" width="120"/>
-</p>
-
-<p align="center">
-  <img src="public/videos/feature-1.mp4" alt="Face Verification Demo" width="400"/>
 </p>
 
 *Above: Project logo and a demo of AI-powered face verification in action.*
@@ -207,4 +207,11 @@ aptos/
 ├── package.json, vite.config.ts, ...    # Frontend config files
 └── README.md                            # Project documentation
 ```
+### Top contributors build web:
+<a href="https://github.com/dmt041104111003/aptos/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=dmt041104111003/aptos" alt="contrib.rocks image" />
+</a>
 
+## License
+
+[MIT](LICENSE)
