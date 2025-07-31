@@ -15,6 +15,8 @@
 
 APT-UTC is a next-generation decentralized freelance platform built on the Aptos blockchain, now enhanced with advanced AI-powered face anti-spoofing verification, **DAO governance system**, and **dynamic trust scoring mechanism**. The platform ensures that all users are real people, not bots or deepfakes, by leveraging state-of-the-art facial recognition and anti-spoofing models that can be retrained with new data for continuous improvement.
 
+[Video demo APT - UTC](https://drive.google.com/file/d/1G_JLBun2OnlC8TeisjHkM85i7rgJzSSw/preview)
+
 **Key strengths:**
 - **AI Face Anti-Spoofing Verification:** Prevents fake profiles and deepfakes using deep learning (PyTorch, dlib, OpenCV) and allows retraining the model with new data to adapt to evolving threats.
 - **DAO Governance System:** Community-driven decision making with voting mechanisms for platform upgrades, fee structures, and dispute resolutions.
